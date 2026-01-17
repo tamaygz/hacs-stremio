@@ -68,7 +68,7 @@ else
 fi
 
 # Check if Home Assistant is installed
-if ! command -v hass &> /dev/null; then
+if ! python -c "import homeassistant" &> /dev/null; then
     echo -e "${RED}❌ Home Assistant not found. Installing...${NC}"
     pip install homeassistant
 fi
@@ -109,8 +109,8 @@ http:
 EOF
 fi
 
-# Build command
-HA_CMD="hass -c $CONFIG_DIR"
+# Build command - use python -m for cross-platform compatibility
+HA_CMD="python -m homeassistant -c $CONFIG_DIR"
 
 if [ "$VERBOSE" = true ]; then
     HA_CMD="$HA_CMD --verbose"

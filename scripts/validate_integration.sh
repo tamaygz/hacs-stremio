@@ -55,39 +55,39 @@ MANIFEST="$INTEGRATION_DIR/manifest.json"
 if [ ! -f "$MANIFEST" ]; then
     fail "manifest.json not found"
 else
-    # Check required fields
-    if grep -q '"domain"' "$MANIFEST"; then
+    # Check required fields using Python for cross-platform compatibility
+    if python3 -c "import json; d=json.load(open('$MANIFEST')); assert 'domain' in d" 2>/dev/null; then
         pass "manifest.json has domain"
     else
         fail "manifest.json missing domain"
     fi
 
-    if grep -q '"name"' "$MANIFEST"; then
+    if python3 -c "import json; d=json.load(open('$MANIFEST')); assert 'name' in d" 2>/dev/null; then
         pass "manifest.json has name"
     else
         fail "manifest.json missing name"
     fi
 
-    if grep -q '"version"' "$MANIFEST"; then
-        VERSION=$(grep -oP '"version":\s*"\K[^"]+' "$MANIFEST")
+    if python3 -c "import json; d=json.load(open('$MANIFEST')); assert 'version' in d" 2>/dev/null; then
+        VERSION=$(python3 -c "import json; print(json.load(open('$MANIFEST')).get('version', 'unknown'))")
         pass "manifest.json has version: $VERSION"
     else
         fail "manifest.json missing version"
     fi
 
-    if grep -q '"documentation"' "$MANIFEST"; then
+    if python3 -c "import json; d=json.load(open('$MANIFEST')); assert 'documentation' in d" 2>/dev/null; then
         pass "manifest.json has documentation URL"
     else
         warn "manifest.json missing documentation URL"
     fi
 
-    if grep -q '"issue_tracker"' "$MANIFEST"; then
+    if python3 -c "import json; d=json.load(open('$MANIFEST')); assert 'issue_tracker' in d" 2>/dev/null; then
         pass "manifest.json has issue_tracker URL"
     else
         warn "manifest.json missing issue_tracker URL"
     fi
 
-    if grep -q '"codeowners"' "$MANIFEST"; then
+    if python3 -c "import json; d=json.load(open('$MANIFEST')); assert 'codeowners' in d" 2>/dev/null; then
         pass "manifest.json has codeowners"
     else
         warn "manifest.json missing codeowners"

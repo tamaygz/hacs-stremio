@@ -67,16 +67,16 @@ if [ -z "$RELEASE_INFO" ] || echo "$RELEASE_INFO" | grep -q "API rate limit"; th
     # Fallback: Use the official HACS install script method
     DOWNLOAD_URL="https://github.com/hacs/integration/releases/latest/download/hacs.zip"
 else
-    # Extract download URL for hacs.zip
-    DOWNLOAD_URL=$(echo "$RELEASE_INFO" | grep -oP '"browser_download_url":\s*"\K[^"]+hacs\.zip' | head -1)
-    HACS_VERSION=$(echo "$RELEASE_INFO" | grep -oP '"tag_name":\s*"\K[^"]+' | head -1)
+    # Extract download URL for hacs.zip using Python for cross-platform compatibility
+    DOWNLOAD_URL=$(echo "$RELEASE_INFO" | python3 -c "import sys, json; data = json.load(sys.stdin); assets = data.get('assets', []); urls = [a['browser_download_url'] for a in assets if 'hacs.zip' in a['browser_download_url']]; print(urls[0] if urls else '')" 2>/dev/null)
+    HACS_VERSION=$(echo "$RELEASE_INFO" | python3 -c "import sys, json; print(json.load(sys.stdin).get('tag_name', ''))" 2>/dev/null)
     
     if [ -z "$DOWNLOAD_URL" ]; then
-        print_error "Could not find HACS download URL in release"
-        exit 1
+        print_step "Could not parse release info, using direct download URL..."
+        DOWNLOAD_URL="https://github.com/hacs/integration/releases/latest/download/hacs.zip"
+    else
+        echo -e "  Latest version: ${GREEN}$HACS_VERSION${NC}"
     fi
-    
-    echo -e "  Latest version: ${GREEN}$HACS_VERSION${NC}"
 fi
 
 print_step "Downloading HACS..."
@@ -106,7 +106,7 @@ fi
 
 # Verify installation
 if [ -f "$HACS_DIR/manifest.json" ]; then
-    INSTALLED_VERSION=$(grep -oP '"version":\s*"\K[^"]+' "$HACS_DIR/manifest.json" 2>/dev/null || echo "unknown")
+    INSTALLED_VERSION=$(python3 -c "import json; print(json.load(open('$HACS_DIR/manifest.json')).get('version', 'unknown'))" 2>/dev/null || echo "unknown")
     print_status "HACS installed successfully (version: $INSTALLED_VERSION)"
 else
     print_error "HACS installation verification failed - manifest.json not found"
