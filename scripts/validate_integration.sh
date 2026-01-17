@@ -16,17 +16,23 @@ CROSS="❌"
 WARN="⚠️"
 ARROW="➡️"
 
-# Get paths
+# Get paths - use Windows paths when on Windows/WSL
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 INTEGRATION_DIR="$PROJECT_ROOT/custom_components/stremio"
 
-# Determine Python command (prefer venv python, then system)
-if [ -f "$PROJECT_ROOT/.venv/bin/python" ]; then
-    PYTHON_CMD="$PROJECT_ROOT/.venv/bin/python"
-elif [ -f "$PROJECT_ROOT/.venv/Scripts/python.exe" ]; then
-    PYTHON_CMD="$PROJECT_ROOT/.venv/Scripts/python.exe"
-elif command -v python &> /dev/null; then
+# Convert WSL paths to Windows paths if needed
+to_native_path() {
+    local path="$1"
+    if [[ "$path" == /mnt/* ]] && command -v wslpath &> /dev/null; then
+        wslpath -w "$path"
+    else
+        echo "$path"
+    fi
+}
+
+# Determine Python command
+if command -v python &> /dev/null; then
     PYTHON_CMD="python"
 elif command -v python3 &> /dev/null; then
     PYTHON_CMD="python3"
@@ -48,12 +54,12 @@ pass() {
 
 fail() {
     echo -e "${RED}${CROSS} $1${NC}"
-    ((ERRORS++))
+    ((ERRORS++)) || true
 }
 
 warn() {
     echo -e "${YELLOW}${WARN} $1${NC}"
-    ((WARNINGS++))
+    ((WARNINGS++)) || true
 }
 
 check() {
@@ -66,49 +72,50 @@ check() {
 check "Checking manifest.json..."
 
 MANIFEST="$INTEGRATION_DIR/manifest.json"
+MANIFEST_NATIVE=$(to_native_path "$MANIFEST")
 if [ ! -f "$MANIFEST" ]; then
     fail "manifest.json not found"
 else
     # Check required fields using Python for cross-platform compatibility
-    if $PYTHON_CMD -c "import json; d=json.load(open('$MANIFEST')); assert 'domain' in d" 2>/dev/null; then
+    if $PYTHON_CMD -c "import json; d=json.load(open(r'$MANIFEST_NATIVE')); assert 'domain' in d" 2>/dev/null; then
         pass "manifest.json has domain"
     else
         fail "manifest.json missing domain"
     fi
 
-    if $PYTHON_CMD -c "import json; d=json.load(open('$MANIFEST')); assert 'name' in d" 2>/dev/null; then
+    if $PYTHON_CMD -c "import json; d=json.load(open(r'$MANIFEST_NATIVE')); assert 'name' in d" 2>/dev/null; then
         pass "manifest.json has name"
     else
         fail "manifest.json missing name"
     fi
 
-    if $PYTHON_CMD -c "import json; d=json.load(open('$MANIFEST')); assert 'version' in d" 2>/dev/null; then
-        VERSION=$($PYTHON_CMD -c "import json; print(json.load(open('$MANIFEST')).get('version', 'unknown'))")
+    if $PYTHON_CMD -c "import json; d=json.load(open(r'$MANIFEST_NATIVE')); assert 'version' in d" 2>/dev/null; then
+        VERSION=$($PYTHON_CMD -c "import json; print(json.load(open(r'$MANIFEST_NATIVE')).get('version', 'unknown'))")
         pass "manifest.json has version: $VERSION"
     else
         fail "manifest.json missing version"
     fi
 
-    if $PYTHON_CMD -c "import json; d=json.load(open('$MANIFEST')); assert 'documentation' in d" 2>/dev/null; then
+    if $PYTHON_CMD -c "import json; d=json.load(open(r'$MANIFEST_NATIVE')); assert 'documentation' in d" 2>/dev/null; then
         pass "manifest.json has documentation URL"
     else
         warn "manifest.json missing documentation URL"
     fi
 
-    if $PYTHON_CMD -c "import json; d=json.load(open('$MANIFEST')); assert 'issue_tracker' in d" 2>/dev/null; then
+    if $PYTHON_CMD -c "import json; d=json.load(open(r'$MANIFEST_NATIVE')); assert 'issue_tracker' in d" 2>/dev/null; then
         pass "manifest.json has issue_tracker URL"
     else
         warn "manifest.json missing issue_tracker URL"
     fi
 
-    if $PYTHON_CMD -c "import json; d=json.load(open('$MANIFEST')); assert 'codeowners' in d" 2>/dev/null; then
+    if $PYTHON_CMD -c "import json; d=json.load(open(r'$MANIFEST_NATIVE')); assert 'codeowners' in d" 2>/dev/null; then
         pass "manifest.json has codeowners"
     else
         warn "manifest.json missing codeowners"
     fi
 
     # Validate JSON syntax
-    if $PYTHON_CMD -c "import json; json.load(open('$MANIFEST'))" 2>/dev/null; then
+    if $PYTHON_CMD -c "import json; json.load(open(r'$MANIFEST_NATIVE'))" 2>/dev/null; then
         pass "manifest.json is valid JSON"
     else
         fail "manifest.json has invalid JSON syntax"
@@ -123,17 +130,18 @@ echo ""
 check "Checking hacs.json..."
 
 HACS_JSON="$PROJECT_ROOT/hacs.json"
+HACS_JSON_NATIVE=$(to_native_path "$HACS_JSON")
 if [ ! -f "$HACS_JSON" ]; then
     fail "hacs.json not found (required for HACS)"
 else
     # Validate JSON syntax
-    if $PYTHON_CMD -c "import json; json.load(open('$HACS_JSON'))" 2>/dev/null; then
+    if $PYTHON_CMD -c "import json; json.load(open(r'$HACS_JSON_NATIVE'))" 2>/dev/null; then
         pass "hacs.json is valid JSON"
     else
         fail "hacs.json has invalid JSON syntax"
     fi
 
-    if $PYTHON_CMD -c "import json; d=json.load(open('$HACS_JSON')); assert 'name' in d" 2>/dev/null; then
+    if $PYTHON_CMD -c "import json; d=json.load(open(r'$HACS_JSON_NATIVE')); assert 'name' in d" 2>/dev/null; then
         pass "hacs.json has name"
     else
         warn "hacs.json missing name"
@@ -170,9 +178,11 @@ echo ""
 check "Checking translations..."
 
 TRANSLATIONS_DIR="$INTEGRATION_DIR/translations"
+TRANSLATIONS_EN="$TRANSLATIONS_DIR/en.json"
+TRANSLATIONS_EN_NATIVE=$(to_native_path "$TRANSLATIONS_EN")
 if [ -d "$TRANSLATIONS_DIR" ]; then
-    if [ -f "$TRANSLATIONS_DIR/en.json" ]; then
-        if $PYTHON_CMD -c "import json; json.load(open('$TRANSLATIONS_DIR/en.json'))" 2>/dev/null; then
+    if [ -f "$TRANSLATIONS_EN" ]; then
+        if $PYTHON_CMD -c "import json; json.load(open(r'$TRANSLATIONS_EN_NATIVE'))" 2>/dev/null; then
             pass "translations/en.json is valid"
         else
             fail "translations/en.json has invalid JSON"
@@ -192,11 +202,12 @@ echo ""
 check "Checking services.yaml..."
 
 SERVICES_YAML="$INTEGRATION_DIR/services.yaml"
+SERVICES_YAML_NATIVE=$(to_native_path "$SERVICES_YAML")
 if [ -f "$SERVICES_YAML" ]; then
     pass "services.yaml exists"
-    
+
     # Basic YAML validation
-    if $PYTHON_CMD -c "import yaml; yaml.safe_load(open('$SERVICES_YAML'))" 2>/dev/null; then
+    if $PYTHON_CMD -c "import yaml; yaml.safe_load(open(r'$SERVICES_YAML_NATIVE'))" 2>/dev/null; then
         pass "services.yaml is valid YAML"
     else
         fail "services.yaml has invalid YAML syntax"
@@ -215,11 +226,12 @@ check "Checking Python syntax..."
 SYNTAX_ERRORS=0
 for pyfile in "$INTEGRATION_DIR"/*.py; do
     if [ -f "$pyfile" ]; then
-        if $PYTHON_CMD -m py_compile "$pyfile" 2>/dev/null; then
+        PYFILE_NATIVE=$(to_native_path "$pyfile")
+        if $PYTHON_CMD -m py_compile "$PYFILE_NATIVE" 2>/dev/null; then
             : # pass silently
         else
             fail "Syntax error in $(basename "$pyfile")"
-            ((SYNTAX_ERRORS++))
+            ((SYNTAX_ERRORS++)) || true
         fi
     fi
 done
