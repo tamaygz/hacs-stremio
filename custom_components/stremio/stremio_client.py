@@ -9,8 +9,6 @@ from stremio_api import StremioAPIClient as StremioAPI
 
 from homeassistant.exceptions import HomeAssistantError
 
-from .const import API_TIMEOUT
-
 _LOGGER = logging.getLogger(__name__)
 
 

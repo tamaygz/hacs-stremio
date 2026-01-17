@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
 
 import voluptuous as vol
 
@@ -16,7 +15,7 @@ from homeassistant.core import (
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import config_validation as cv
 
-from .apple_tv_handover import HandoverError, HandoverManager, HandoverMethod
+from .apple_tv_handover import HandoverError, HandoverManager
 from .const import (
     DOMAIN,
     EVENT_NEW_CONTENT,

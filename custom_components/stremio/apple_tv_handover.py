@@ -21,7 +21,6 @@ _LOGGER = logging.getLogger(__name__)
 # Try to import pyatv, but handle if not installed
 try:
     import pyatv
-    from pyatv.const import Protocol
 
     PYATV_AVAILABLE = True
 except ImportError:
