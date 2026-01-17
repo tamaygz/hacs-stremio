@@ -26,6 +26,9 @@ PROJECT_ROOT = Path(__file__).parent.parent
 COMPONENT_PATH = PROJECT_ROOT / "custom_components" / "stremio"
 TESTS_PATH = PROJECT_ROOT / "tests"
 
+# Use the current Python interpreter (should be from venv)
+PYTHON = sys.executable
+
 
 def run_command(cmd: list[str], description: str) -> bool:
     """Run a command and return True if successful."""
@@ -59,14 +62,14 @@ def main() -> int:
     # Black - code formatter
     if fix_mode:
         if not run_command(
-            ["python", "-m", "black", str(COMPONENT_PATH), str(TESTS_PATH)],
+            [PYTHON, "-m", "black", str(COMPONENT_PATH), str(TESTS_PATH)],
             "Black (formatting)",
         ):
             failures += 1
     else:
         if not run_command(
             [
-                "python",
+                PYTHON,
                 "-m",
                 "black",
                 "--check",
@@ -83,7 +86,7 @@ def main() -> int:
     # Flake8 - linter
     if not run_command(
         [
-            "python",
+            PYTHON,
             "-m",
             "flake8",
             str(COMPONENT_PATH),
@@ -99,12 +102,12 @@ def main() -> int:
     # Ruff - fast linter (if available)
     if fix_mode:
         run_command(
-            ["python", "-m", "ruff", "check", "--fix", str(COMPONENT_PATH)],
+            [PYTHON, "-m", "ruff", "check", "--fix", str(COMPONENT_PATH)],
             "Ruff (lint + fix)",
         )
     else:
         run_command(
-            ["python", "-m", "ruff", "check", str(COMPONENT_PATH)],
+            [PYTHON, "-m", "ruff", "check", str(COMPONENT_PATH)],
             "Ruff (lint check)",
         )
 
@@ -113,7 +116,7 @@ def main() -> int:
     # MyPy - type checker (non-blocking)
     run_command(
         [
-            "python",
+            PYTHON,
             "-m",
             "mypy",
             str(COMPONENT_PATH),
