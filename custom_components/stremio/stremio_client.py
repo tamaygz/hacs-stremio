@@ -6,7 +6,6 @@ from typing import Any
 
 from stremio_api import StremioAPIClient as StremioAPI
 
-from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 
 from .const import API_TIMEOUT
@@ -17,21 +16,47 @@ _LOGGER = logging.getLogger(__name__)
 class StremioClient:
     """Stremio API client wrapper with error handling and retries."""
 
-    def __init__(self, hass: HomeAssistant, auth_key: str) -> None:
+    def __init__(self, email: str, password: str) -> None:
         """Initialize the Stremio client.
 
         Args:
-            hass: Home Assistant instance
-            auth_key: Stremio authentication key
+            email: Stremio account email
+            password: Stremio account password
         """
-        self.hass = hass
-        self._auth_key = auth_key
+        self._email = email
+        self._password = password
+        self._auth_key: str | None = None
         self._client: StremioAPI | None = None
 
-    async def async_init(self) -> None:
-        """Initialize the API client."""
-        self._client = StremioAPI(auth_key=self._auth_key)
-        await self._client.__aenter__()
+    async def async_authenticate(self) -> str:
+        """Authenticate with Stremio and get auth key.
+
+        Returns:
+            Authentication key
+
+        Raises:
+            StremioAuthError: Authentication failed
+            StremioConnectionError: Connection failed
+        """
+        try:
+            async with StremioAPI(auth_key=None) as client:
+                auth_key = await client.login(self._email, self._password)
+                if not auth_key:
+                    raise StremioAuthError("No auth key received")
+                self._auth_key = auth_key
+                
+                # Initialize persistent client
+                self._client = StremioAPI(auth_key=self._auth_key)
+                await self._client.__aenter__()
+                
+                return auth_key
+        except StremioAuthError:
+            raise
+        except Exception as err:
+            _LOGGER.error("Authentication failed: %s", err)
+            if "401" in str(err) or "authentication" in str(err).lower():
+                raise StremioAuthError(f"Authentication failed: {err}") from err
+            raise StremioConnectionError(f"Connection failed: {err}") from err
 
     async def async_close(self) -> None:
         """Close the API client."""
@@ -115,11 +140,20 @@ class StremioClient:
                 f"Failed to get continue watching: {err}"
             ) from err
 
-    async def async_get_streams(self, content_id: str) -> list[dict[str, Any]]:
+    async def async_get_streams(
+        self,
+        media_id: str,
+        media_type: str = "movie",
+        season: int | None = None,
+        episode: int | None = None,
+    ) -> list[dict[str, Any]]:
         """Get available streams for content.
 
         Args:
-            content_id: Content identifier (e.g., IMDb ID)
+            media_id: Content identifier (e.g., IMDb ID)
+            media_type: Type of media (movie or series)
+            season: Season number for series
+            episode: Episode number for series
 
         Returns:
             List of stream dictionaries
@@ -132,13 +166,76 @@ class StremioClient:
             raise StremioConnectionError("Client not initialized")
 
         try:
-            # Note: stremio-api may not have this method yet
-            # This is a placeholder for future implementation
-            _LOGGER.warning("Stream fetching not yet implemented in stremio-api")
+            # Build video ID for series
+            if media_type == "series" and season is not None and episode is not None:
+                video_id = f"{media_id}:{season}:{episode}"
+            else:
+                video_id = media_id
+
+            # Attempt to get streams (API method may vary)
+            streams = await self._client.get_streams(media_type, video_id)
+            return self._process_streams(streams)
+        except AttributeError:
+            _LOGGER.warning("Stream fetching may not be available in stremio-api")
             return []
         except Exception as err:
             _LOGGER.error("Failed to get streams: %s", err)
             raise StremioConnectionError(f"Failed to get streams: {err}") from err
+
+    async def async_add_to_library(
+        self, media_id: str, media_type: str = "movie"
+    ) -> bool:
+        """Add item to library.
+
+        Args:
+            media_id: Content identifier (e.g., IMDb ID)
+            media_type: Type of media (movie or series)
+
+        Returns:
+            True if successful
+
+        Raises:
+            StremioConnectionError: Connection failed
+        """
+        if not self._client:
+            raise StremioConnectionError("Client not initialized")
+
+        try:
+            await self._client.add_to_library(media_type, media_id)
+            return True
+        except AttributeError:
+            _LOGGER.warning("add_to_library may not be available in stremio-api")
+            return False
+        except Exception as err:
+            _LOGGER.error("Failed to add to library: %s", err)
+            raise StremioConnectionError(f"Failed to add to library: {err}") from err
+
+    async def async_remove_from_library(self, media_id: str) -> bool:
+        """Remove item from library.
+
+        Args:
+            media_id: Content identifier (e.g., IMDb ID)
+
+        Returns:
+            True if successful
+
+        Raises:
+            StremioConnectionError: Connection failed
+        """
+        if not self._client:
+            raise StremioConnectionError("Client not initialized")
+
+        try:
+            await self._client.remove_from_library(media_id)
+            return True
+        except AttributeError:
+            _LOGGER.warning("remove_from_library may not be available in stremio-api")
+            return False
+        except Exception as err:
+            _LOGGER.error("Failed to remove from library: %s", err)
+            raise StremioConnectionError(
+                f"Failed to remove from library: {err}"
+            ) from err
 
     def _process_library_items(self, library: Any) -> list[dict[str, Any]]:
         """Process library items into consistent format.
@@ -157,9 +254,13 @@ class StremioClient:
             for item in library:
                 processed_item = {
                     "id": getattr(item, "id", None),
-                    "name": getattr(item, "name", "Unknown"),
+                    "imdb_id": getattr(item, "imdb_id", None) or getattr(item, "id", None),
+                    "title": getattr(item, "name", None) or getattr(item, "title", "Unknown"),
                     "type": getattr(item, "type", "unknown"),
                     "poster": getattr(item, "poster", None),
+                    "year": getattr(item, "year", None),
+                    "genres": getattr(item, "genres", []),
+                    "cast": getattr(item, "cast", []),
                     "added_at": getattr(item, "added_at", None),
                 }
                 items.append(processed_item)
@@ -185,16 +286,49 @@ class StremioClient:
             for item in watching:
                 processed_item = {
                     "id": getattr(item, "id", None),
-                    "name": getattr(item, "name", "Unknown"),
+                    "imdb_id": getattr(item, "imdb_id", None) or getattr(item, "id", None),
+                    "title": getattr(item, "name", None) or getattr(item, "title", "Unknown"),
                     "type": getattr(item, "type", "unknown"),
                     "poster": getattr(item, "poster", None),
                     "progress": getattr(item, "progress", 0),
                     "duration": getattr(item, "duration", 0),
+                    "season": getattr(item, "season", None),
+                    "episode": getattr(item, "episode", None),
+                    "year": getattr(item, "year", None),
                     "watched_at": getattr(item, "watched_at", None),
                 }
                 items.append(processed_item)
         except (AttributeError, TypeError) as err:
             _LOGGER.warning("Error processing continue watching items: %s", err)
+
+        return items
+
+    def _process_streams(self, streams: Any) -> list[dict[str, Any]]:
+        """Process streams into consistent format.
+
+        Args:
+            streams: Raw stream data from API
+
+        Returns:
+            Processed stream items
+        """
+        if not streams:
+            return []
+
+        items = []
+        try:
+            for stream in streams:
+                processed = {
+                    "url": getattr(stream, "url", None),
+                    "name": getattr(stream, "name", None),
+                    "title": getattr(stream, "title", None),
+                    "quality": getattr(stream, "quality", None),
+                    "source": getattr(stream, "source", None),
+                }
+                if processed["url"]:
+                    items.append(processed)
+        except (AttributeError, TypeError) as err:
+            _LOGGER.warning("Error processing streams: %s", err)
 
         return items
 
