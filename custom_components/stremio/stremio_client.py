@@ -179,9 +179,13 @@ class StremioClient:
 
         try:
             session = await self._get_session()
-            url = f"{STREMIO_DATASTORE_META_URL}?authKey={self._auth_key}&type={COLLECTION_USER}"
+            payload = {
+                "authKey": self._auth_key,
+                "collection": COLLECTION_USER,
+            }
+            _LOGGER.debug("Sending datastoreMeta request for user profile")
 
-            async with session.get(url) as response:
+            async with session.post(STREMIO_DATASTORE_META_URL, json=payload) as response:
                 if response.status == 401:
                     _LOGGER.warning("Authentication expired while fetching user")
                     raise StremioAuthError("Authentication expired or invalid")
@@ -232,9 +236,13 @@ class StremioClient:
 
         try:
             session = await self._get_session()
-            url = f"{STREMIO_DATASTORE_META_URL}?authKey={self._auth_key}&type={COLLECTION_LIBRARY_ITEM}"
+            payload = {
+                "authKey": self._auth_key,
+                "collection": COLLECTION_LIBRARY_ITEM,
+            }
+            _LOGGER.debug("Sending datastoreMeta request for library items")
 
-            async with session.get(url) as response:
+            async with session.post(STREMIO_DATASTORE_META_URL, json=payload) as response:
                 if response.status == 401:
                     _LOGGER.warning("Authentication expired while fetching library")
                     raise StremioAuthError("Authentication expired or invalid")
@@ -287,9 +295,13 @@ class StremioClient:
         try:
             session = await self._get_session()
             # Get library items with state data
-            url = f"{STREMIO_DATASTORE_META_URL}?authKey={self._auth_key}&type={COLLECTION_LIBRARY_ITEM}"
+            payload = {
+                "authKey": self._auth_key,
+                "collection": COLLECTION_LIBRARY_ITEM,
+            }
+            _LOGGER.debug("Sending datastoreMeta request for continue watching")
 
-            async with session.get(url) as response:
+            async with session.post(STREMIO_DATASTORE_META_URL, json=payload) as response:
                 if response.status == 401:
                     _LOGGER.warning("Authentication expired while fetching continue watching")
                     raise StremioAuthError("Authentication expired or invalid")
