@@ -4,9 +4,19 @@ from __future__ import annotations
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 
-from custom_components.stremio.const import DOMAIN
+from custom_components.stremio.const import (
+    DOMAIN,
+    SERVICE_SEARCH_LIBRARY,
+    SERVICE_GET_STREAMS,
+    SERVICE_ADD_TO_LIBRARY,
+    SERVICE_REMOVE_FROM_LIBRARY,
+    SERVICE_REFRESH_LIBRARY,
+    SERVICE_HANDOVER_TO_APPLE_TV,
+)
+from custom_components.stremio.services import async_setup_services, async_unload_services
 
 from .conftest import MOCK_LIBRARY_ITEMS, MOCK_STREAMS
 
@@ -14,11 +24,25 @@ from .conftest import MOCK_LIBRARY_ITEMS, MOCK_STREAMS
 @pytest.fixture
 def mock_service_hass(mock_hass, mock_coordinator):
     """Set up mock hass with coordinator for services."""
+    mock_client = AsyncMock()
+    mock_client.async_get_streams = AsyncMock(return_value=MOCK_STREAMS)
+    mock_client.async_add_to_library = AsyncMock(return_value=True)
+    mock_client.async_remove_from_library = AsyncMock(return_value=True)
+    
     mock_hass.data[DOMAIN] = {
         "test_entry": {
             "coordinator": mock_coordinator,
+            "client": mock_client,
         }
     }
+    mock_hass.bus = MagicMock()
+    mock_hass.bus.async_fire = MagicMock()
+    
+    # Mock services
+    mock_hass.services = MagicMock()
+    mock_hass.services.async_register = MagicMock()
+    mock_hass.services.async_remove = MagicMock()
+    
     return mock_hass
 
 
@@ -28,62 +52,79 @@ class TestSearchLibraryService:
     @pytest.mark.asyncio
     async def test_search_by_title(self, mock_service_hass, mock_coordinator):
         """Test searching library by title."""
-        from custom_components.stremio.services import async_search_library
+        mock_coordinator.data = {"library": MOCK_LIBRARY_ITEMS}
         
-        service_call = MagicMock()
-        service_call.data = {"query": "Shawshank"}
+        await async_setup_services(mock_service_hass)
         
-        result = await async_search_library(mock_service_hass, service_call)
+        # Find the registered search_library handler
+        calls = mock_service_hass.services.async_register.call_args_list
+        search_call = next(c for c in calls if c[0][1] == SERVICE_SEARCH_LIBRARY)
+        handler = search_call[0][2]
         
-        # Verify search was called
-        mock_coordinator.client.search_library.assert_called()
+        # Create mock service call
+        service_call = MagicMock(spec=ServiceCall)
+        service_call.data = {"query": "Shawshank", "search_type": "title", "limit": 10}
+        
+        result = await handler(service_call)
+        
+        assert "results" in result
+        assert "count" in result
 
     @pytest.mark.asyncio
     async def test_search_empty_query(self, mock_service_hass, mock_coordinator):
         """Test searching with empty query."""
-        from custom_components.stremio.services import async_search_library
+        mock_coordinator.data = {"library": MOCK_LIBRARY_ITEMS}
         
-        service_call = MagicMock()
-        service_call.data = {"query": ""}
+        await async_setup_services(mock_service_hass)
         
-        # Should handle empty query gracefully
-        result = await async_search_library(mock_service_hass, service_call)
-        assert result is not None or True  # Depends on implementation
+        # Find the registered search_library handler
+        calls = mock_service_hass.services.async_register.call_args_list
+        search_call = next(c for c in calls if c[0][1] == SERVICE_SEARCH_LIBRARY)
+        handler = search_call[0][2]
+        
+        service_call = MagicMock(spec=ServiceCall)
+        service_call.data = {"query": "", "search_type": "all", "limit": 10}
+        
+        result = await handler(service_call)
+        
+        # Should return empty results
+        assert result["count"] == 0
 
 
-class TestGetStreamUrlService:
-    """Tests for the get_stream_url service."""
+class TestGetStreamsService:
+    """Tests for the get_streams service."""
 
     @pytest.mark.asyncio
     async def test_get_stream_url_success(self, mock_service_hass, mock_coordinator):
         """Test getting stream URL successfully."""
-        from custom_components.stremio.services import async_get_stream_url
+        await async_setup_services(mock_service_hass)
         
-        mock_coordinator.client.get_streams.return_value = MOCK_STREAMS
+        # Find the registered get_streams handler
+        calls = mock_service_hass.services.async_register.call_args_list
+        streams_call = next(c for c in calls if c[0][1] == SERVICE_GET_STREAMS)
+        handler = streams_call[0][2]
         
-        service_call = MagicMock()
+        service_call = MagicMock(spec=ServiceCall)
         service_call.data = {
             "media_id": "tt0111161",
             "media_type": "movie",
         }
         
-        result = await async_get_stream_url(mock_service_hass, service_call)
+        result = await handler(service_call)
         
-        mock_coordinator.client.get_streams.assert_called_with(
-            media_id="tt0111161",
-            media_type="movie",
-            season=None,
-            episode=None,
-        )
+        assert "streams" in result
+        assert "count" in result
 
     @pytest.mark.asyncio
     async def test_get_stream_url_series(self, mock_service_hass, mock_coordinator):
         """Test getting stream URL for series episode."""
-        from custom_components.stremio.services import async_get_stream_url
+        await async_setup_services(mock_service_hass)
         
-        mock_coordinator.client.get_streams.return_value = MOCK_STREAMS
+        calls = mock_service_hass.services.async_register.call_args_list
+        streams_call = next(c for c in calls if c[0][1] == SERVICE_GET_STREAMS)
+        handler = streams_call[0][2]
         
-        service_call = MagicMock()
+        service_call = MagicMock(spec=ServiceCall)
         service_call.data = {
             "media_id": "tt0903747",
             "media_type": "series",
@@ -91,26 +132,28 @@ class TestGetStreamUrlService:
             "episode": 1,
         }
         
-        result = await async_get_stream_url(mock_service_hass, service_call)
+        result = await handler(service_call)
         
-        mock_coordinator.client.get_streams.assert_called()
+        assert "streams" in result
 
     @pytest.mark.asyncio
-    async def test_get_stream_url_no_streams(self, mock_service_hass, mock_coordinator):
-        """Test when no streams are found."""
-        from custom_components.stremio.services import async_get_stream_url
+    async def test_get_stream_url_series_missing_episode(self, mock_service_hass, mock_coordinator):
+        """Test validation error when series missing season/episode."""
+        await async_setup_services(mock_service_hass)
         
-        mock_coordinator.client.get_streams.return_value = []
+        calls = mock_service_hass.services.async_register.call_args_list
+        streams_call = next(c for c in calls if c[0][1] == SERVICE_GET_STREAMS)
+        handler = streams_call[0][2]
         
-        service_call = MagicMock()
+        service_call = MagicMock(spec=ServiceCall)
         service_call.data = {
-            "media_id": "tt0000000",
-            "media_type": "movie",
+            "media_id": "tt0903747",
+            "media_type": "series",
+            # Missing season and episode
         }
         
-        result = await async_get_stream_url(mock_service_hass, service_call)
-        
-        # Should return empty or raise
+        with pytest.raises(ServiceValidationError):
+            await handler(service_call)
 
 
 class TestAddToLibraryService:
@@ -119,20 +162,29 @@ class TestAddToLibraryService:
     @pytest.mark.asyncio
     async def test_add_to_library(self, mock_service_hass, mock_coordinator):
         """Test adding item to library."""
-        from custom_components.stremio.services import async_add_to_library
+        await async_setup_services(mock_service_hass)
         
-        mock_coordinator.client.add_to_library.return_value = True
+        calls = mock_service_hass.services.async_register.call_args_list
+        add_call = next(c for c in calls if c[0][1] == SERVICE_ADD_TO_LIBRARY)
+        handler = add_call[0][2]
         
-        service_call = MagicMock()
+        service_call = MagicMock(spec=ServiceCall)
         service_call.data = {
             "media_id": "tt1234567",
             "media_type": "movie",
         }
         
-        await async_add_to_library(mock_service_hass, service_call)
+        await handler(service_call)
         
-        mock_coordinator.client.add_to_library.assert_called()
+        # Verify client method was called
+        client = mock_service_hass.data[DOMAIN]["test_entry"]["client"]
+        client.async_add_to_library.assert_called_once()
+        
+        # Verify refresh was requested
         mock_coordinator.async_request_refresh.assert_called()
+        
+        # Verify event was fired
+        mock_service_hass.bus.async_fire.assert_called()
 
 
 class TestRemoveFromLibraryService:
@@ -141,18 +193,24 @@ class TestRemoveFromLibraryService:
     @pytest.mark.asyncio
     async def test_remove_from_library(self, mock_service_hass, mock_coordinator):
         """Test removing item from library."""
-        from custom_components.stremio.services import async_remove_from_library
+        await async_setup_services(mock_service_hass)
         
-        mock_coordinator.client.remove_from_library.return_value = True
+        calls = mock_service_hass.services.async_register.call_args_list
+        remove_call = next(c for c in calls if c[0][1] == SERVICE_REMOVE_FROM_LIBRARY)
+        handler = remove_call[0][2]
         
-        service_call = MagicMock()
+        service_call = MagicMock(spec=ServiceCall)
         service_call.data = {
             "media_id": "tt0111161",
         }
         
-        await async_remove_from_library(mock_service_hass, service_call)
+        await handler(service_call)
         
-        mock_coordinator.client.remove_from_library.assert_called()
+        # Verify client method was called
+        client = mock_service_hass.data[DOMAIN]["test_entry"]["client"]
+        client.async_remove_from_library.assert_called_once()
+        
+        # Verify refresh was requested
         mock_coordinator.async_request_refresh.assert_called()
 
 
@@ -162,12 +220,16 @@ class TestRefreshLibraryService:
     @pytest.mark.asyncio
     async def test_refresh_library(self, mock_service_hass, mock_coordinator):
         """Test refreshing library."""
-        from custom_components.stremio.services import async_refresh_library
+        await async_setup_services(mock_service_hass)
         
-        service_call = MagicMock()
+        calls = mock_service_hass.services.async_register.call_args_list
+        refresh_call = next(c for c in calls if c[0][1] == SERVICE_REFRESH_LIBRARY)
+        handler = refresh_call[0][2]
+        
+        service_call = MagicMock(spec=ServiceCall)
         service_call.data = {}
         
-        await async_refresh_library(mock_service_hass, service_call)
+        await handler(service_call)
         
         mock_coordinator.async_request_refresh.assert_called()
 
@@ -176,38 +238,31 @@ class TestHandoverService:
     """Tests for the Apple TV handover service."""
 
     @pytest.mark.asyncio
-    async def test_handover_airplay(self, mock_service_hass, mock_coordinator, mock_pyatv):
-        """Test AirPlay handover."""
-        from custom_components.stremio.services import async_handover_to_apple_tv
+    async def test_handover_with_stream_url(self, mock_service_hass, mock_coordinator):
+        """Test handover with provided stream URL."""
+        mock_coordinator.data = {"current_watching": None}
         
-        mock_coordinator.client.get_streams.return_value = MOCK_STREAMS
+        await async_setup_services(mock_service_hass)
         
-        service_call = MagicMock()
+        calls = mock_service_hass.services.async_register.call_args_list
+        handover_call = next(c for c in calls if c[0][1] == SERVICE_HANDOVER_TO_APPLE_TV)
+        handler = handover_call[0][2]
+        
+        service_call = MagicMock(spec=ServiceCall)
         service_call.data = {
-            "media_id": "tt0111161",
-            "device_name": "Living Room Apple TV",
-            "method": "airplay",
-        }
-        
-        # This test would require more setup for pyatv mocking
-        # await async_handover_to_apple_tv(mock_service_hass, service_call)
-
-    @pytest.mark.asyncio
-    async def test_handover_vlc(self, mock_service_hass, mock_coordinator):
-        """Test VLC deep link handover."""
-        from custom_components.stremio.services import async_handover_to_apple_tv
-        
-        mock_coordinator.client.get_streams.return_value = MOCK_STREAMS
-        
-        service_call = MagicMock()
-        service_call.data = {
-            "media_id": "tt0111161",
-            "device_name": "iPad",
+            "device_id": "media_player.apple_tv",
+            "stream_url": "http://example.com/stream.mp4",
             "method": "vlc",
         }
         
-        # VLC handover returns a deep link
-        # result = await async_handover_to_apple_tv(mock_service_hass, service_call)
+        with patch("custom_components.stremio.services.HandoverManager") as mock_handover:
+            mock_manager = MagicMock()
+            mock_manager.handover = AsyncMock(return_value={"success": True})
+            mock_handover.return_value = mock_manager
+            
+            await handler(service_call)
+            
+            mock_manager.handover.assert_called_once()
 
 
 class TestServiceRegistration:
@@ -216,16 +271,26 @@ class TestServiceRegistration:
     @pytest.mark.asyncio
     async def test_services_registered(self, mock_hass, mock_config_entry, mock_coordinator):
         """Test that all services are registered on setup."""
-        from custom_components.stremio.services import async_setup_services
-        
+        mock_client = AsyncMock()
         mock_hass.data[DOMAIN] = {
             mock_config_entry.entry_id: {
                 "coordinator": mock_coordinator,
+                "client": mock_client,
             }
         }
         mock_hass.services.async_register = MagicMock()
         
         await async_setup_services(mock_hass)
         
-        # Verify services were registered
-        assert mock_hass.services.async_register.call_count >= 4
+        # Verify 6 services were registered
+        assert mock_hass.services.async_register.call_count == 6
+
+    @pytest.mark.asyncio
+    async def test_services_unregistered(self, mock_hass):
+        """Test that all services are unregistered on unload."""
+        mock_hass.services.async_remove = MagicMock()
+        
+        await async_unload_services(mock_hass)
+        
+        # Verify 6 services were removed
+        assert mock_hass.services.async_remove.call_count == 6
