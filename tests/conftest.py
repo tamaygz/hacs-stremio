@@ -2,10 +2,16 @@
 
 from __future__ import annotations
 
+import asyncio
 import sys
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+
+# On Windows, use the SelectorEventLoop instead of the ProactorEventLoop
+# This is required for compatibility with pytest-homeassistant-custom-component
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 
 # Mock the stremio_api module before any imports that might need it
