@@ -11,6 +11,11 @@ from custom_components.stremio.const import (
     DEFAULT_PLAYER_SCAN_INTERVAL,
     DEFAULT_LIBRARY_SCAN_INTERVAL,
 )
+from custom_components.stremio.coordinator import StremioDataUpdateCoordinator
+from custom_components.stremio.stremio_client import (
+    StremioAuthError,
+    StremioConnectionError,
+)
 
 from tests.conftest import (
     MOCK_LIBRARY_ITEMS,
@@ -20,29 +25,35 @@ from tests.conftest import (
 )
 
 
+@pytest.fixture
+def mock_stremio_client_for_coordinator():
+    """Create a mock Stremio API client for coordinator tests."""
+    client = AsyncMock()
+    client.async_get_user = AsyncMock(return_value=MOCK_USER_DATA)
+    client.async_get_library = AsyncMock(return_value=MOCK_LIBRARY_ITEMS)
+    client.async_get_continue_watching = AsyncMock(return_value=MOCK_CONTINUE_WATCHING)
+    return client
+
+
 @pytest.mark.asyncio
-async def test_coordinator_init(mock_hass, mock_config_entry, mock_stremio_client):
+async def test_coordinator_init(mock_hass, mock_config_entry, mock_stremio_client_for_coordinator):
     """Test coordinator initialization."""
-    from custom_components.stremio.coordinator import StremioDataUpdateCoordinator
-    
     coordinator = StremioDataUpdateCoordinator(
         hass=mock_hass,
-        client=mock_stremio_client,
+        client=mock_stremio_client_for_coordinator,
         entry=mock_config_entry,
     )
     
-    assert coordinator.client == mock_stremio_client
+    assert coordinator.client == mock_stremio_client_for_coordinator
     assert coordinator.update_interval == timedelta(seconds=DEFAULT_PLAYER_SCAN_INTERVAL)
 
 
 @pytest.mark.asyncio
-async def test_coordinator_fetch_data_success(mock_hass, mock_config_entry, mock_stremio_client):
+async def test_coordinator_fetch_data_success(mock_hass, mock_config_entry, mock_stremio_client_for_coordinator):
     """Test successful data fetch."""
-    from custom_components.stremio.coordinator import StremioDataUpdateCoordinator
-    
     coordinator = StremioDataUpdateCoordinator(
         hass=mock_hass,
-        client=mock_stremio_client,
+        client=mock_stremio_client_for_coordinator,
         entry=mock_config_entry,
     )
     
@@ -52,16 +63,14 @@ async def test_coordinator_fetch_data_success(mock_hass, mock_config_entry, mock
     assert "continue_watching" in data
     assert data["library"] == MOCK_LIBRARY_ITEMS
     assert data["continue_watching"] == MOCK_CONTINUE_WATCHING
+    assert data["library_count"] == len(MOCK_LIBRARY_ITEMS)
 
 
 @pytest.mark.asyncio
-async def test_coordinator_fetch_data_failure(mock_hass, mock_config_entry):
+async def test_coordinator_fetch_data_connection_failure(mock_hass, mock_config_entry):
     """Test data fetch failure handling."""
-    from custom_components.stremio.coordinator import StremioDataUpdateCoordinator
-    from custom_components.stremio.stremio_client import ConnectionError
-    
     mock_client = AsyncMock()
-    mock_client.get_library.side_effect = ConnectionError("Network error")
+    mock_client.async_get_user = AsyncMock(side_effect=StremioConnectionError("Network error"))
     
     coordinator = StremioDataUpdateCoordinator(
         hass=mock_hass,
@@ -74,100 +83,114 @@ async def test_coordinator_fetch_data_failure(mock_hass, mock_config_entry):
 
 
 @pytest.mark.asyncio
-async def test_coordinator_library_sync(mock_hass, mock_config_entry, mock_stremio_client):
-    """Test library synchronization logic."""
-    from custom_components.stremio.coordinator import StremioDataUpdateCoordinator
+async def test_coordinator_fetch_data_auth_failure(mock_hass, mock_config_entry):
+    """Test authentication failure handling."""
+    mock_client = AsyncMock()
+    mock_client.async_get_user = AsyncMock(side_effect=StremioAuthError("Invalid credentials"))
+    
+    mock_config_entry.async_start_reauth = MagicMock()
     
     coordinator = StremioDataUpdateCoordinator(
         hass=mock_hass,
-        client=mock_stremio_client,
+        client=mock_client,
+        entry=mock_config_entry,
+    )
+    
+    with pytest.raises(UpdateFailed):
+        await coordinator._async_update_data()
+    
+    # Should trigger reauth
+    mock_config_entry.async_start_reauth.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_coordinator_library_sync(mock_hass, mock_config_entry, mock_stremio_client_for_coordinator):
+    """Test library synchronization logic."""
+    coordinator = StremioDataUpdateCoordinator(
+        hass=mock_hass,
+        client=mock_stremio_client_for_coordinator,
         entry=mock_config_entry,
     )
     
     # First fetch
     data = await coordinator._async_update_data()
-    library_count = len(data.get("library", []))
+    library_count = data.get("library_count", 0)
     
     # Verify library was fetched
     assert library_count == len(MOCK_LIBRARY_ITEMS)
-    mock_stremio_client.get_library.assert_called_once()
+    mock_stremio_client_for_coordinator.async_get_library.assert_called_once()
 
 
 @pytest.mark.asyncio
-async def test_coordinator_player_state_detection(mock_hass, mock_config_entry, mock_stremio_client):
-    """Test player state detection logic."""
-    from custom_components.stremio.coordinator import StremioDataUpdateCoordinator
+async def test_coordinator_current_watching_detection(mock_hass, mock_config_entry):
+    """Test current watching detection logic."""
+    mock_client = AsyncMock()
+    mock_client.async_get_user = AsyncMock(return_value=MOCK_USER_DATA)
+    mock_client.async_get_library = AsyncMock(return_value=[])
+    mock_client.async_get_continue_watching = AsyncMock(return_value=[
+        {
+            "title": "Test Movie",
+            "type": "movie",
+            "progress": 1800,  # 30 minutes
+            "duration": 7200,  # 2 hours
+            "imdb_id": "tt1234567",
+            "watched_at": "2024-01-01T12:00:00Z",
+        }
+    ])
     
     coordinator = StremioDataUpdateCoordinator(
         hass=mock_hass,
-        client=mock_stremio_client,
+        client=mock_client,
         entry=mock_config_entry,
     )
     
     data = await coordinator._async_update_data()
     
-    # Should determine playing state from continue watching
-    assert "is_playing" in data or "current_media" in data
+    # Should have current watching (progress 25% < 95%)
+    assert data.get("current_watching") is not None
+    assert data["current_watching"]["title"] == "Test Movie"
+    assert data["current_watching"]["progress_percent"] == 25.0
 
 
 @pytest.mark.asyncio
-async def test_coordinator_event_firing(mock_hass, mock_config_entry, mock_stremio_client):
+async def test_coordinator_event_firing(mock_hass, mock_config_entry):
     """Test that events are fired on state changes."""
-    from custom_components.stremio.coordinator import StremioDataUpdateCoordinator
+    mock_client = AsyncMock()
+    mock_client.async_get_user = AsyncMock(return_value=MOCK_USER_DATA)
+    mock_client.async_get_library = AsyncMock(return_value=MOCK_LIBRARY_ITEMS)
+    mock_client.async_get_continue_watching = AsyncMock(return_value=[
+        {
+            "title": "Test Movie",
+            "type": "movie",
+            "progress": 1800,
+            "duration": 7200,
+            "imdb_id": "tt1234567",
+            "watched_at": "2024-01-01T12:00:00Z",
+        }
+    ])
+    
+    mock_hass.bus = MagicMock()
+    mock_hass.bus.async_fire = MagicMock()
     
     coordinator = StremioDataUpdateCoordinator(
         hass=mock_hass,
-        client=mock_stremio_client,
+        client=mock_client,
         entry=mock_config_entry,
     )
     
-    # Mock the previous state
-    coordinator._previous_data = {"is_playing": False}
+    # First update - no previous state, so playback started event
+    await coordinator._async_update_data()
     
-    data = await coordinator._async_update_data()
-    
-    # Verify event bus interaction (if playing state changed)
-    # This depends on implementation details
+    # Should have fired playback started event
+    mock_hass.bus.async_fire.assert_called()
 
 
 @pytest.mark.asyncio
-async def test_coordinator_rate_limiting(mock_hass, mock_config_entry, mock_stremio_client):
-    """Test that API rate limiting is respected."""
-    from custom_components.stremio.coordinator import StremioDataUpdateCoordinator
-    from custom_components.stremio.stremio_client import RateLimitError
-    
-    mock_stremio_client.get_library.side_effect = [
-        RateLimitError("Rate limited"),
-        MOCK_LIBRARY_ITEMS,
-    ]
-    
-    coordinator = StremioDataUpdateCoordinator(
-        hass=mock_hass,
-        client=mock_stremio_client,
-        entry=mock_config_entry,
-    )
-    
-    # First call should raise UpdateFailed due to rate limit
-    with pytest.raises(UpdateFailed):
-        await coordinator._async_update_data()
-    
-    # Reset the mock for next call
-    mock_stremio_client.get_library.side_effect = None
-    mock_stremio_client.get_library.return_value = MOCK_LIBRARY_ITEMS
-    
-    # Second call should succeed
-    data = await coordinator._async_update_data()
-    assert data["library"] == MOCK_LIBRARY_ITEMS
-
-
-@pytest.mark.asyncio
-async def test_coordinator_cache_behavior(mock_hass, mock_config_entry, mock_stremio_client):
+async def test_coordinator_cache_behavior(mock_hass, mock_config_entry, mock_stremio_client_for_coordinator):
     """Test that coordinator caches data appropriately."""
-    from custom_components.stremio.coordinator import StremioDataUpdateCoordinator
-    
     coordinator = StremioDataUpdateCoordinator(
         hass=mock_hass,
-        client=mock_stremio_client,
+        client=mock_stremio_client_for_coordinator,
         entry=mock_config_entry,
     )
     
@@ -182,25 +205,21 @@ async def test_coordinator_cache_behavior(mock_hass, mock_config_entry, mock_str
 
 
 @pytest.mark.asyncio
-async def test_coordinator_partial_failure(mock_hass, mock_config_entry, mock_stremio_client):
+async def test_coordinator_partial_failure(mock_hass, mock_config_entry):
     """Test handling of partial API failures."""
-    from custom_components.stremio.coordinator import StremioDataUpdateCoordinator
-    
-    # Library succeeds, continue_watching fails
-    mock_stremio_client.get_library.return_value = MOCK_LIBRARY_ITEMS
-    mock_stremio_client.get_continue_watching.side_effect = Exception("API Error")
+    mock_client = AsyncMock()
+    # User and library succeed
+    mock_client.async_get_user = AsyncMock(return_value=MOCK_USER_DATA)
+    mock_client.async_get_library = AsyncMock(return_value=MOCK_LIBRARY_ITEMS)
+    # Continue watching fails
+    mock_client.async_get_continue_watching = AsyncMock(side_effect=Exception("API Error"))
     
     coordinator = StremioDataUpdateCoordinator(
         hass=mock_hass,
-        client=mock_stremio_client,
+        client=mock_client,
         entry=mock_config_entry,
     )
     
-    # Should still return partial data or raise
-    try:
-        data = await coordinator._async_update_data()
-        # If partial data is supported
-        assert "library" in data
-    except UpdateFailed:
-        # If strict mode requires all data
-        pass
+    # Should raise UpdateFailed due to unexpected error
+    with pytest.raises(UpdateFailed):
+        await coordinator._async_update_data()
