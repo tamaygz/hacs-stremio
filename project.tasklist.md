@@ -417,22 +417,22 @@ This document tracks the implementation progress of the Stremio HACS integration
   - **Output**: Clipboard always works ✓
 
 ### 6.5 Media Details Card
-- [ ] ⬜ **Task 6.5.1**: Create stremio-media-details-card.js
+- [x] ✅ **Task 6.5.1**: Create stremio-media-details-card.js (Completed: 2026-01-17)
   - Display full media metadata (description, cast, year)
   - Show large poster image
   - Display available addons (subtitles, etc.)
   - Add "Get Streams" button to open stream dialog
   - **Best Practice**: Rich media presentation
   - **Dependencies**: Task 6.1.1, Task 6.4.1
-  - **Output**: Media details card working
+  - **Output**: Media details card working ✓
 
-- [ ] ⬜ **Task 6.5.2**: Integrate with library card
+- [x] ✅ **Task 6.5.2**: Integrate with library card (Completed: 2026-01-17)
   - Open media details card when library item clicked
   - Pass media_id to details card
   - Use browser_mod for popup or inline display
   - **Best Practice**: Seamless navigation flow
   - **Dependencies**: Task 6.3.2, Task 6.5.1
-  - **Output**: Library to details flow working
+  - **Output**: Library to details flow working ✓
 
 ---
 
