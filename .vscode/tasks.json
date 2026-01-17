@@ -1,0 +1,89 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Disable HACS",
+            "type": "shell",
+            "command": "bash",
+            "args": [
+                "-c",
+                "if [ -d '${workspaceFolder}/config/custom_components/hacs' ]; then mv '${workspaceFolder}/config/custom_components/hacs' '${workspaceFolder}/config/custom_components/hacs.disabled' && echo '✅ HACS disabled (renamed to hacs.disabled)'; else echo '✅ HACS already disabled'; fi"
+            ],
+            "presentation": {
+                "reveal": "silent",
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Restore HACS",
+            "type": "shell",
+            "command": "bash",
+            "args": [
+                "-c",
+                "if [ -d '${workspaceFolder}/config/custom_components/hacs.disabled' ]; then mv '${workspaceFolder}/config/custom_components/hacs.disabled' '${workspaceFolder}/config/custom_components/hacs' && echo '✅ HACS restored (renamed from hacs.disabled)'; else echo '✅ HACS already enabled'; fi"
+            ],
+            "presentation": {
+                "reveal": "silent",
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Clean Home Assistant Cache",
+            "type": "shell",
+            "command": "bash",
+            "args": [
+                "-c",
+                "rm -rf '${workspaceFolder}/config/.storage' '${workspaceFolder}/config/home-assistant_v2.db'* && echo '✅ Home Assistant cache and database cleaned'"
+            ],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Install Dependencies",
+            "type": "shell",
+            "command": "bash",
+            "args": [
+                "-c",
+                "cd '${workspaceFolder}' && source .venv/bin/activate && pip install -r requirements_dev.txt && echo '✅ Development dependencies installed'"
+            ],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Run Linter",
+            "type": "shell",
+            "command": "bash",
+            "args": [
+                "-c",
+                "cd '${workspaceFolder}' && source .venv/bin/activate && python scripts/run_lint.py"
+            ],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Validate Integration",
+            "type": "shell",
+            "command": "bash",
+            "args": [
+                "-c",
+                "cd '${workspaceFolder}' && source .venv/bin/activate && python scripts/validate_integration.py"
+            ],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        }
+    ]
+}
