@@ -1,0 +1,158 @@
+# Services for Stremio integration
+
+search_library:
+  name: Search Library
+  description: Search the Stremio library by title, genre, or cast.
+  fields:
+    query:
+      name: Search Query
+      description: The search term to look for in your library.
+      required: true
+      example: "Breaking Bad"
+      selector:
+        text:
+    search_type:
+      name: Search Type
+      description: Type of search to perform (title, genre, cast, or all).
+      required: false
+      default: "all"
+      example: "title"
+      selector:
+        select:
+          options:
+            - "all"
+            - "title"
+            - "genre"
+            - "cast"
+    limit:
+      name: Limit
+      description: Maximum number of results to return.
+      required: false
+      default: 10
+      example: 5
+      selector:
+        number:
+          min: 1
+          max: 50
+          mode: slider
+
+get_streams:
+  name: Get Streams
+  description: Get available streaming URLs for a media item.
+  fields:
+    media_id:
+      name: Media ID
+      description: The IMDB ID or Stremio ID of the media item.
+      required: true
+      example: "tt0903747"
+      selector:
+        text:
+    media_type:
+      name: Media Type
+      description: Type of media (movie or series).
+      required: true
+      example: "series"
+      selector:
+        select:
+          options:
+            - "movie"
+            - "series"
+    season:
+      name: Season
+      description: Season number (required for series).
+      required: false
+      example: 1
+      selector:
+        number:
+          min: 1
+          max: 100
+          mode: box
+    episode:
+      name: Episode
+      description: Episode number (required for series).
+      required: false
+      example: 1
+      selector:
+        number:
+          min: 1
+          max: 100
+          mode: box
+
+add_to_library:
+  name: Add to Library
+  description: Add a media item to your Stremio library.
+  fields:
+    media_id:
+      name: Media ID
+      description: The IMDB ID of the media item to add.
+      required: true
+      example: "tt0903747"
+      selector:
+        text:
+    media_type:
+      name: Media Type
+      description: Type of media (movie or series).
+      required: true
+      example: "series"
+      selector:
+        select:
+          options:
+            - "movie"
+            - "series"
+
+remove_from_library:
+  name: Remove from Library
+  description: Remove a media item from your Stremio library.
+  fields:
+    media_id:
+      name: Media ID
+      description: The IMDB ID of the media item to remove.
+      required: true
+      example: "tt0903747"
+      selector:
+        text:
+
+refresh_library:
+  name: Refresh Library
+  description: Force a refresh of the Stremio library data.
+  fields: {}
+
+handover_to_apple_tv:
+  name: Handover to Apple TV
+  description: Send the current or specified media to an Apple TV device.
+  fields:
+    device_id:
+      name: Apple TV Device
+      description: Entity ID of the Apple TV to send media to.
+      required: true
+      example: "media_player.living_room_apple_tv"
+      selector:
+        entity:
+          domain: media_player
+          integration: apple_tv
+    media_id:
+      name: Media ID
+      description: The IMDB ID of the media to play. If not provided, uses current watching.
+      required: false
+      example: "tt0903747"
+      selector:
+        text:
+    stream_url:
+      name: Stream URL
+      description: Direct stream URL to play. If not provided, fetches automatically.
+      required: false
+      example: "https://example.com/stream.m3u8"
+      selector:
+        text:
+    method:
+      name: Handover Method
+      description: Method to use for handover (auto, airplay, or vlc).
+      required: false
+      default: "auto"
+      example: "airplay"
+      selector:
+        select:
+          options:
+            - "auto"
+            - "airplay"
+            - "vlc"
