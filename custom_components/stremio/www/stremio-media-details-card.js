@@ -8,7 +8,9 @@
  * @version 1.0.0
  */
 
-import { LitElement, html, css } from 'https://unpkg.com/lit-element@2.5.1/lit-element.js?module';
+const LitElement = Object.getPrototypeOf(customElements.get("ha-panel-lovelace"));
+const html = LitElement.prototype.html;
+const css = LitElement.prototype.css;
 
 class StremioMediaDetailsCard extends LitElement {
   static get properties() {
