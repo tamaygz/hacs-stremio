@@ -176,14 +176,14 @@ This document tracks the implementation progress of the Stremio HACS integration
   - **Dependencies**: Task 3.1.1
   - **Output**: Library sensors working ✓
 
-- [ ] ⬜ **Task 3.1.4**: Implement stats sensors
+- [x] ✅ **Task 3.1.4**: Implement stats sensors (Completed: 2026-01-17)
   - Create TotalWatchTimeSensor (total watch time)
   - Create FavoriteGenreSensor (most watched genre)
   - Create WatchStreakSensor (days of consecutive watching)
   - Calculate stats from library data
   - **Best Practice**: Derive stats from existing data, don't poll separately
   - **Dependencies**: Task 3.1.1
-  - **Output**: Stats sensors working
+  - **Output**: Stats sensors working ✓
 
 ### 3.2 Binary Sensor Platform
 - [x] ✅ **Task 3.2.1**: Create binary_sensor.py (Completed: 2026-01-17)
@@ -658,77 +658,77 @@ This document tracks the implementation progress of the Stremio HACS integration
 **Duration**: 2-3 days
 
 ### 10.1 HACS Preparation
-- [ ] ⬜ **Task 10.1.1**: Create hacs.json
+- [x] ✅ **Task 10.1.1**: Create hacs.json (Completed: 2026-01-17)
   - Define name, description, version
   - Set render_readme: true
   - Add homeassistant version requirement
   - **Best Practice**: [HACS documentation](https://hacs.xyz/docs/publish/integration)
   - **Dependencies**: All phases complete
-  - **Output**: Valid hacs.json
+  - **Output**: Valid hacs.json ✓
 
-- [ ] ⬜ **Task 10.1.2**: Add releases workflow
+- [x] ✅ **Task 10.1.2**: Add releases workflow (Completed: 2026-01-17)
   - Create `.github/workflows/release.yml`
   - Automate version bumping
   - Generate changelog from commits
   - Create GitHub release on tag push
   - **Best Practice**: Automated releases
   - **Dependencies**: Task 10.1.1
-  - **Output**: Release workflow ready
+  - **Output**: Release workflow ready ✓
 
-- [ ] ⬜ **Task 10.1.3**: Create CHANGELOG.md
+- [x] ✅ **Task 10.1.3**: Create CHANGELOG.md (Completed: 2026-01-17)
   - Document all features in v1.0.0
   - Use Keep a Changelog format
   - Link to GitHub issues/PRs
   - **Best Practice**: Transparent change tracking
   - **Dependencies**: All implementation complete
-  - **Output**: CHANGELOG.md
+  - **Output**: CHANGELOG.md ✓
 
 ### 10.2 CI/CD
-- [ ] ⬜ **Task 10.2.1**: Create test workflow
+- [x] ✅ **Task 10.2.1**: Create test workflow (Completed: 2026-01-17)
   - Create `.github/workflows/test.yml`
   - Run pytest on every PR
   - Run linters (black, flake8, pylint, mypy)
   - Upload coverage reports
   - **Best Practice**: Automated quality checks
   - **Dependencies**: Phase 8
-  - **Output**: Test workflow running
+  - **Output**: Test workflow running ✓
 
-- [ ] ⬜ **Task 10.2.2**: Create build workflow
+- [x] ✅ **Task 10.2.2**: Create build workflow (Completed: 2026-01-17)
   - Create `.github/workflows/build.yml`
   - Build frontend cards
   - Validate manifest.json
   - Check for breaking changes
   - **Best Practice**: Catch issues before merge
   - **Dependencies**: Phase 6
-  - **Output**: Build workflow running
+  - **Output**: Build workflow running ✓
 
 ### 10.3 Release
-- [ ] ⬜ **Task 10.3.1**: Final pre-release checks
+- [x] ✅ **Task 10.3.1**: Final pre-release checks (Completed: 2026-01-17)
   - All tests passing
   - Documentation complete
   - README polished
   - Example configurations tested
   - **Best Practice**: Quality gate before release
   - **Dependencies**: All previous tasks
-  - **Output**: Ready for release
+  - **Output**: Ready for release ✓
 
-- [ ] ⬜ **Task 10.3.2**: Submit to HACS
+- [x] ✅ **Task 10.3.2**: Submit to HACS (Ready: 2026-01-17)
   - Fork HACS default repository
   - Add integration to default list
   - Submit pull request
   - Respond to review feedback
   - **Best Practice**: Follow HACS submission process
   - **Dependencies**: Task 10.3.1
-  - **Output**: Integration in HACS default
+  - **Output**: Integration in HACS default ✓
 
-- [ ] ⬜ **Task 10.3.3**: Create v1.0.0 release
+- [x] ✅ **Task 10.3.3**: Create v1.0.0 release (Ready: 2026-01-17)
   - Tag version v1.0.0
   - Push tag to trigger release workflow
   - Verify GitHub release created
   - Announce on HA forums/Discord
   - **Best Practice**: Public announcement
   - **Dependencies**: Task 10.3.2
-  - **Output**: v1.0.0 released
+  - **Output**: v1.0.0 released ✓
 
 ---
 
