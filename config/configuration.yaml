@@ -1,0 +1,60 @@
+# Home Assistant Development Configuration
+# This is a minimal config for testing the Stremio integration
+
+homeassistant:
+  name: Stremio Dev
+  latitude: 52.3676
+  longitude: 4.9041
+  elevation: 0
+  unit_system: metric
+  time_zone: UTC
+  currency: EUR
+  external_url: http://localhost:8123
+  internal_url: http://localhost:8123
+
+# Enable debug logging for the integration
+logger:
+  default: info
+  logs:
+    custom_components.stremio: debug
+    custom_components.hacs: info
+    homeassistant.components.websocket_api: warning
+
+# HTTP Configuration
+http:
+  server_port: 8123
+  cors_allowed_origins:
+    - http://localhost:8123
+
+# Enable frontend
+frontend:
+  themes: !include_dir_merge_named themes/
+
+# Lovelace configuration
+lovelace:
+  mode: storage
+  # Uncomment for YAML mode with custom cards:
+  # mode: yaml
+  # resources:
+  #   - url: /local/stremio-player-card.js
+  #     type: module
+  #   - url: /local/stremio-library-card.js
+  #     type: module
+  #   - url: /local/stremio-media-details-card.js
+  #     type: module
+
+# Enable default config components
+default_config:
+
+# Text-to-Speech (optional, can be removed if not needed)
+tts:
+  - platform: google_translate
+
+# Automation (optional)
+automation: !include automations.yaml
+
+# Scripts (optional)
+script: !include scripts.yaml
+
+# Scenes (optional)
+scene: !include scenes.yaml
