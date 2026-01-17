@@ -4,7 +4,10 @@
 homeassistant>=2024.1.0
 
 # Runtime Dependencies (from manifest.json)
-stremio-api>=0.1.0
+# Note: stremio-api is excluded from dev requirements due to pydantic v2 conflict
+# with pytest-homeassistant-custom-component (which requires pydantic v1).
+# For actual runtime, stremio-api will be installed via manifest.json requirements.
+# stremio-api>=0.1.0
 pyatv>=0.14.0
 
 # Testing
