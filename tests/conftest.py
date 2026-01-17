@@ -7,6 +7,15 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+# Enable sockets for all tests by allowing all hosts
+# Required for Home Assistant's async internals to work properly
+
+
+@pytest.fixture(autouse=True)
+def enable_socket_for_tests(socket_enabled):
+    """Enable socket for all tests - uses the socket_enabled fixture from pytest-socket."""
+    yield
+
 
 # Mock the stremio_api module before any imports that might need it
 mock_stremio_api_module = MagicMock()
