@@ -10,6 +10,7 @@ from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse, Supp
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import config_validation as cv
 
+from .apple_tv_handover import HandoverError, HandoverManager, HandoverMethod
 from .const import (
     DOMAIN,
     EVENT_NEW_CONTENT,
@@ -328,19 +329,27 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                 translation_key="no_stream_url",
             )
 
-        # Send to Apple TV
-        # This will be implemented in Phase 5 with the HandoverManager
-        # For now, we use the basic media_player.play_media service
-        await hass.services.async_call(
-            "media_player",
-            "play_media",
-            {
-                "entity_id": device_id,
-                "media_content_type": "video",
-                "media_content_id": stream_url,
-            },
-            blocking=True,
-        )
+        # Get current watching title for display
+        title = None
+        current = coordinator.data.get("current_watching")
+        if current:
+            title = current.get("title")
+
+        # Use HandoverManager for proper handover
+        handover_manager = HandoverManager(hass)
+
+        try:
+            result = await handover_manager.handover(
+                device_identifier=device_id,
+                stream_url=stream_url,
+                method=method,
+                title=title,
+            )
+
+            _LOGGER.info("Handover result: %s", result)
+
+        except HandoverError as err:
+            raise HomeAssistantError(f"Handover failed: {err}") from err
 
         # Fire event
         hass.bus.async_fire(

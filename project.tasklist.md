@@ -291,40 +291,40 @@ This document tracks the implementation progress of the Stremio HACS integration
 **Duration**: 3-4 days
 
 ### 5.1 Handover Service Core
-- [ ] ⬜ **Task 5.1.1**: Create apple_tv_handover.py module
+- [x] ✅ **Task 5.1.1**: Create apple_tv_handover.py module (Completed: 2026-01-17)
   - Create HandoverManager class
   - Implement format detection (HLS/MP4/MKV)
   - Add method to discover Apple TV devices (pyatv)
   - Add method to generate VLC deep links
   - **Best Practice**: Modular design for testability
   - **Dependencies**: Task 4.1.3
-  - **Output**: HandoverManager class ready
+  - **Output**: HandoverManager class ready ✓
 
-- [ ] ⬜ **Task 5.1.2**: Implement AirPlay handover
+- [x] ✅ **Task 5.1.2**: Implement AirPlay handover (Completed: 2026-01-17)
   - Use pyatv library for AirPlay protocol
   - Discover Apple TV devices on network
   - Send stream URL via AirPlay
   - Handle connection errors gracefully
   - **Best Practice**: [pyatv library](https://pyatv.dev/)
   - **Dependencies**: Task 5.1.1
-  - **Output**: AirPlay handover working for HLS
+  - **Output**: AirPlay handover working for HLS ✓
 
-- [ ] ⬜ **Task 5.1.3**: Implement VLC handover fallback
+- [x] ✅ **Task 5.1.3**: Implement VLC handover fallback (Completed: 2026-01-17)
   - Generate VLC deep links (vlc-x-callback://)
   - Encode stream URL properly
   - Add subtitle parameter if available
   - **Best Practice**: VLC fallback for non-HLS formats
   - **Dependencies**: Task 5.1.1
-  - **Output**: VLC deep links working
+  - **Output**: VLC deep links working ✓
 
-- [ ] ⬜ **Task 5.1.4**: Create handover service
+- [x] ✅ **Task 5.1.4**: Create handover service (Completed: 2026-01-17)
   - Add async_handover_to_apple_tv service
   - Accept media_id, device_name, method parameters
   - Call HandoverManager with appropriate method
   - Return success/error status
   - **Best Practice**: User choice of handover method
   - **Dependencies**: Task 5.1.1, 5.1.2, 5.1.3
-  - **Output**: Handover service complete
+  - **Output**: Handover service complete ✓
 
 - [ ] ⬜ **Task 5.1.5**: Add handover options to config flow
   - Add toggle for Apple TV handover in options flow
