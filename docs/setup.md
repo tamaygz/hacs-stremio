@@ -51,28 +51,31 @@ After initial setup, you can configure options:
 
 Available options:
 
-| Option | Default | Description |
-|--------|---------|-------------|
-| Player Update Interval | 30s | How often to check playback state |
-| Library Update Interval | 300s | How often to sync library |
-| Enable Apple TV Handover | Off | Enable AirPlay/VLC handover feature |
-| Handover Method | Auto | Choose AirPlay, VLC, or Auto |
+| Option                   | Default | Description                         |
+| ------------------------ | ------- | ----------------------------------- |
+| Player Update Interval   | 30s     | How often to check playback state   |
+| Library Update Interval  | 300s    | How often to sync library           |
+| Enable Apple TV Handover | Off     | Enable AirPlay/VLC handover feature |
+| Handover Method          | Auto    | Choose AirPlay, VLC, or Auto        |
 
 ## Entities Created
 
 After setup, the following entities are created:
 
 ### Sensors
+
 - `sensor.stremio_current_media` - Currently playing media
 - `sensor.stremio_last_watched` - Last watched media
 - `sensor.stremio_library_count` - Total library items
 - `sensor.stremio_continue_watching_count` - Items in progress
 
 ### Binary Sensors
+
 - `binary_sensor.stremio_is_playing` - On when media is playing
 - `binary_sensor.stremio_has_new_content` - On when new content detected
 
 ### Media Player
+
 - `media_player.stremio` - Stremio media player entity
 
 ## Verification

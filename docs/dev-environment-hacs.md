@@ -33,6 +33,7 @@ Open http://localhost:8123 in your browser.
 ### Step 4: Complete Onboarding
 
 If this is your first time:
+
 1. Create a user account
 2. Set up your location
 3. Skip analytics if desired
@@ -62,6 +63,7 @@ If this is your first time:
 ## Why No Add-ons Menu?
 
 In Home Assistant Core (development environment):
+
 - ✅ Custom integrations work (like HACS and Stremio)
 - ✅ HACS appears in the sidebar after setup
 - ✅ All integrations available via Configuration → Integrations
@@ -89,6 +91,7 @@ Already fixed! `libpcap-dev` has been installed.
 ### "FFmpeg not found"
 
 Install if needed:
+
 ```bash
 sudo apt-get install ffmpeg
 ```
@@ -116,6 +119,7 @@ tail -f /workspaces/hacs-stremio/config/home-assistant.log
 ### Access HACS
 
 After HACS is set up:
+
 1. Look for **HACS** in the left sidebar
 2. Click it to browse integrations and themes
 
@@ -142,6 +146,7 @@ pytest tests/
 ### Restarting Home Assistant
 
 After code changes:
+
 1. In HA UI: **Developer Tools** → **YAML** → **Restart**
 2. Or: Stop the process and run `./scripts/start_homeassistant.sh` again
 
@@ -153,6 +158,7 @@ After code changes:
 - ✅ All custom components are in `/config/custom_components/`
 
 For more information:
+
 - [Home Assistant Installation Types](https://www.home-assistant.io/installation/)
 - [HACS Documentation](https://hacs.xyz/)
 - [Stremio Integration Docs](../docs/setup.md)
