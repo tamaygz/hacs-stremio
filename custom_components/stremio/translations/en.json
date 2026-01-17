@@ -1,0 +1,22 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to Stremio",
+        "description": "Enter your Stremio credentials to connect your account.",
+        "data": {
+          "email": "Email",
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect to Stremio API. Please check your internet connection.",
+      "invalid_auth": "Invalid email or password. Please try again.",
+      "unknown": "Unexpected error occurred. Please try again later."
+    },
+    "abort": {
+      "already_configured": "This Stremio account is already configured."
+    }
+  }
+}
