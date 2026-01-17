@@ -131,6 +131,14 @@ class StremioMediaPlayer(CoordinatorEntity[StremioDataUpdateCoordinator], MediaP
     async def async_play_media(
         self, media_type: str, media_id: str, **kwargs: Any
     ) -> None:
-        """Play media from a URL or file."""
-        # TODO: Implement play_media functionality in Phase 4
-        _LOGGER.info("Play media called with type=%s, id=%s", media_type, media_id)
+        """Play media from a URL or file.
+
+        Note: Stremio's API does not support remote playback control.
+        This method logs the request but cannot initiate playback.
+        Use the handover service to send content to external players.
+        """
+        _LOGGER.info(
+            "Play media requested - type=%s, id=%s. Use handover service for playback.",
+            media_type,
+            media_id,
+        )
