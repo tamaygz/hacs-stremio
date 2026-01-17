@@ -213,7 +213,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Remove data from hass.data and cleanup client
     if unload_ok:
         data = hass.data[DOMAIN].pop(entry.entry_id)
-        
+
         # Close the client to cleanup any resources
         client = data.get("client")
         if client:
