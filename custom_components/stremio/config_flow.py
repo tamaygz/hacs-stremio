@@ -6,8 +6,6 @@ import logging
 from typing import Any
 
 import voluptuous as vol
-from stremio_api import StremioAPIClient
-
 from homeassistant import config_entries
 from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
 from homeassistant.core import HomeAssistant, callback
@@ -27,6 +25,7 @@ from .const import (
     DOMAIN,
     HANDOVER_METHODS,
 )
+from .stremio_client import StremioAuthError, StremioClient, StremioConnectionError
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -46,31 +45,36 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
     email = data[CONF_EMAIL]
     password = data[CONF_PASSWORD]
 
+    client = StremioClient(email, password)
     try:
-        async with StremioAPIClient(auth_key=None) as client:
-            auth_key = await client.login(email, password)
+        auth_key = await client.async_authenticate()
 
-            if not auth_key:
-                raise InvalidAuth("Authentication failed - no auth key received")
+        if not auth_key:
+            raise InvalidAuth("Authentication failed - no auth key received")
 
-            # Validate the auth key by fetching user profile
-            async with StremioAPIClient(auth_key=auth_key) as validated_client:
-                user = await validated_client.get_user()
+        # Validate the auth key by fetching user profile
+        user = await client.async_get_user()
 
-                if not user or not hasattr(user, "email"):
-                    raise InvalidAuth("Failed to fetch user profile")
+        if not user or not user.get("email"):
+            raise InvalidAuth("Failed to fetch user profile")
 
-                return {
-                    "title": user.email,
-                    CONF_AUTH_KEY: auth_key,
-                    CONF_EMAIL: email,
-                }
+        return {
+            "title": user["email"],
+            CONF_AUTH_KEY: auth_key,
+            CONF_EMAIL: email,
+        }
 
+    except StremioAuthError as err:
+        _LOGGER.error("Authentication failed: %s", err)
+        raise InvalidAuth from err
+    except StremioConnectionError as err:
+        _LOGGER.error("Connection failed: %s", err)
+        raise CannotConnect from err
     except Exception as err:
         _LOGGER.exception("Unexpected error during authentication: %s", err)
-        if "401" in str(err) or "authentication" in str(err).lower():
-            raise InvalidAuth from err
         raise CannotConnect from err
+    finally:
+        await client.async_close()
 
 
 class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):

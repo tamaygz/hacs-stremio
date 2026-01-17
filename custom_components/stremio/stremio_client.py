@@ -433,7 +433,6 @@ class StremioClient:
 
         return items
 
-
     def _process_streams(self, streams: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Process streams into consistent format.
 
