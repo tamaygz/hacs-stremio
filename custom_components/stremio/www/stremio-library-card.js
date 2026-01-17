@@ -357,10 +357,33 @@ class StremioLibraryCard extends LitElement {
 
   _handleItemClick(item) {
     this._selectedItem = item;
+    
+    // Fire event for external listeners (media details card integration)
+    this.dispatchEvent(
+      new CustomEvent('stremio-item-selected', {
+        bubbles: true,
+        composed: true,
+        detail: { 
+          item,
+          mediaId: item.imdb_id || item.id,
+          title: item.title || item.name,
+          type: item.type,
+          poster: item.poster,
+        },
+      })
+    );
   }
 
   _closeDetail() {
     this._selectedItem = null;
+    
+    // Fire event for external listeners
+    this.dispatchEvent(
+      new CustomEvent('stremio-detail-closed', {
+        bubbles: true,
+        composed: true,
+      })
+    );
   }
 
   _openInStremio(item) {
@@ -369,6 +392,25 @@ class StremioLibraryCard extends LitElement {
     if (id) {
       window.open(`stremio://detail/${type}/${id}`, '_blank');
     }
+  }
+
+  _openFullDetails(item) {
+    // Fire event to open in stremio-media-details-card or browser_mod popup
+    this.dispatchEvent(
+      new CustomEvent('stremio-open-media-details', {
+        bubbles: true,
+        composed: true,
+        detail: { 
+          item,
+          mediaId: item.imdb_id || item.id,
+          title: item.title || item.name,
+          type: item.type,
+          poster: item.poster,
+          year: item.year,
+          progress: item.progress_percent,
+        },
+      })
+    );
   }
 
   _getStreams(item) {
@@ -382,10 +424,16 @@ class StremioLibraryCard extends LitElement {
 
     // Fire custom event to show stream dialog
     this.dispatchEvent(
-      new CustomEvent('stremio-show-streams', {
+      new CustomEvent('stremio-open-stream-dialog', {
         bubbles: true,
         composed: true,
-        detail: { item },
+        detail: { 
+          item,
+          mediaId: id,
+          title: item.title || item.name,
+          type: item.type,
+          poster: item.poster,
+        },
       })
     );
   }
@@ -499,6 +547,10 @@ class StremioLibraryCard extends LitElement {
           </div>
 
           <div class="detail-actions">
+            <button class="detail-button secondary" @click=${() => this._openFullDetails(item)}>
+              <ha-icon icon="mdi:information-outline"></ha-icon>
+              Full Details
+            </button>
             <button class="detail-button secondary" @click=${this._closeDetail}>
               Close
             </button>

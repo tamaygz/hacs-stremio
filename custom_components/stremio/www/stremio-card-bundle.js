@@ -12,6 +12,7 @@
 import './stremio-player-card.js';
 import './stremio-library-card.js';
 import './stremio-stream-dialog.js';
+import './stremio-media-details-card.js';
 
 // Card registration info
 const CARD_VERSION = '0.1.0';
@@ -38,5 +39,21 @@ window.customCards.push({
   name: 'Stremio Library Card',
   description: 'Browse and search your Stremio library',
   preview: true,
+  documentationURL: 'https://github.com/tamaygz/hacs-stremio/blob/main/docs/ui.md',
+});
+
+window.customCards.push({
+  type: 'stremio-media-details-card',
+  name: 'Stremio Media Details Card',
+  description: 'Display full media metadata with description, cast, and actions',
+  preview: true,
+  documentationURL: 'https://github.com/tamaygz/hacs-stremio/blob/main/docs/ui.md',
+});
+
+window.customCards.push({
+  type: 'stremio-stream-dialog',
+  name: 'Stremio Stream Dialog',
+  description: 'Stream selector dialog for choosing playback sources',
+  preview: false,
   documentationURL: 'https://github.com/tamaygz/hacs-stremio/blob/main/docs/ui.md',
 });
