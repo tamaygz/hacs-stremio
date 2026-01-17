@@ -55,12 +55,13 @@ lovelace:
 # Enable default config components
 default_config:
 
-# Add HACS
-hacs:
-  token: !secret github_token
+# HACS - Home Assistant Community Store
+# For first-time setup, go to Configuration > Integrations > Add Integration > HACS
+# No configuration needed here - it uses config flow
+# hacs:
 
-# Disable components not needed for development or causing errors
-# Remove discovery as it's deprecated
+# Disable DHCP discovery in dev environment
+dhcp:
 
 # Text-to-Speech (optional, can be removed if not needed)
 tts:
