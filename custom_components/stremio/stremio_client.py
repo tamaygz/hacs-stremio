@@ -49,26 +49,29 @@ class StremioClient:
     - Retrieve stream information from addons
     """
 
-    def __init__(self, email: str, password: str) -> None:
+    def __init__(self, email: str, password: str, session: aiohttp.ClientSession | None = None) -> None:
         """Initialize the Stremio client.
 
         Args:
             email: Stremio account email
             password: Stremio account password
+            session: Optional aiohttp session (uses Home Assistant's shared session)
         """
         self._email = email
         self._password = password
         self._auth_key: str | None = None
         self._user_id: str | None = None
-        self._session: aiohttp.ClientSession | None = None
+        self._session: aiohttp.ClientSession | None = session
+        self._owns_session: bool = session is None  # Track if we created the session
         self._last_auth_time: float = 0
-        _LOGGER.debug("StremioClient initialized for user: %s", email)
+        _LOGGER.debug("StremioClient initialized for user: %s (external_session=%s)", email, session is not None)
 
     async def _get_session(self) -> aiohttp.ClientSession:
         """Get or create aiohttp session."""
         if self._session is None or self._session.closed:
             timeout = ClientTimeout(total=30)
             self._session = aiohttp.ClientSession(timeout=timeout)
+            self._owns_session = True  # We created it, so we own it
             _LOGGER.debug("Created new aiohttp session")
         return self._session
 
@@ -151,13 +154,18 @@ class StremioClient:
             raise StremioConnectionError(f"Authentication error: {err}") from err
 
     async def async_close(self) -> None:
-        """Close the API client and cleanup resources."""
-        _LOGGER.debug("Closing StremioClient session")
-        if self._session and not self._session.closed:
+        """Close the API client and cleanup resources.
+        
+        Only closes the session if we own it (i.e., we created it ourselves).
+        If using Home Assistant's shared session, we don't close it.
+        """
+        _LOGGER.debug("Closing StremioClient (owns_session=%s)", self._owns_session)
+        if self._owns_session and self._session and not self._session.closed:
             await self._session.close()
-            self._session = None
+            _LOGGER.debug("Closed owned aiohttp session")
+        self._session = None
         self._auth_key = None
-        _LOGGER.debug("StremioClient session closed")
+        _LOGGER.debug("StremioClient closed")
 
     async def async_get_user(self) -> dict[str, Any]:
         """Get user profile information.

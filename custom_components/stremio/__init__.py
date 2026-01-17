@@ -18,6 +18,7 @@ from homeassistant.const import CONF_EMAIL, CONF_PASSWORD, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.typing import ConfigType
 
 # Try to import StaticPathConfig (HA 2024.6+), fallback for older versions
@@ -140,8 +141,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     email = entry.data[CONF_EMAIL]
     password = entry.data[CONF_PASSWORD]
 
-    # Initialize Stremio client
-    client = StremioClient(email=email, password=password)
+    # Get shared aiohttp session from Home Assistant
+    session = async_get_clientsession(hass)
+
+    # Initialize Stremio client with shared session
+    client = StremioClient(email=email, password=password, session=session)
 
     try:
         # Test authentication
@@ -206,9 +210,14 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Unload platforms
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
-    # Remove data from hass.data
+    # Remove data from hass.data and cleanup client
     if unload_ok:
-        hass.data[DOMAIN].pop(entry.entry_id)
+        data = hass.data[DOMAIN].pop(entry.entry_id)
+        
+        # Close the client to cleanup any resources
+        client = data.get("client")
+        if client:
+            await client.async_close()
 
         # Unload services if no more entries
         if not hass.data[DOMAIN]:
