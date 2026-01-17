@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import logging
 from typing import Any
 
@@ -18,16 +18,17 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
 from .coordinator import StremioDataUpdateCoordinator
+from .entity_helpers import get_device_info
 
 _LOGGER = logging.getLogger(__name__)
 
 
-@dataclass
+@dataclass(frozen=False)
 class StremioBinarySensorEntityDescription(BinarySensorEntityDescription):
     """Describes Stremio binary sensor entity."""
 
-    value_fn: Callable[[dict[str, Any]], bool] = None
-    attributes_fn: Callable[[dict[str, Any]], dict[str, Any]] = None
+    value_fn: Callable[[dict[str, Any]], bool] | None = None
+    attributes_fn: Callable[[dict[str, Any]], dict[str, Any]] | None = None
 
 
 BINARY_SENSOR_TYPES: tuple[StremioBinarySensorEntityDescription, ...] = (
@@ -106,13 +107,7 @@ class StremioBinarySensor(
         self.entity_description = description
         self._attr_unique_id = f"{entry.entry_id}_{description.key}"
         self._attr_has_entity_name = True
-        self._attr_device_info = {
-            "identifiers": {(DOMAIN, entry.entry_id)},
-            "name": f"Stremio {entry.data.get('email', 'Account')}",
-            "manufacturer": "Stremio",
-            "model": "Stremio Integration",
-            "entry_type": "service",
-        }
+        self._attr_device_info = get_device_info(entry)
 
     @property
     def is_on(self) -> bool:

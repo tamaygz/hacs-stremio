@@ -32,7 +32,7 @@ async def test_coordinator_init(mock_hass, mock_config_entry, mock_stremio_clien
     )
     
     assert coordinator.client == mock_stremio_client
-    assert coordinator.update_interval == timedelta(seconds=DEFAULT_PLAYER_UPDATE_INTERVAL)
+    assert coordinator.update_interval == timedelta(seconds=DEFAULT_PLAYER_SCAN_INTERVAL)
 
 
 @pytest.mark.asyncio

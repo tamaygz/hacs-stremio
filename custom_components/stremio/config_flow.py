@@ -111,6 +111,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     data={
                         CONF_AUTH_KEY: info[CONF_AUTH_KEY],
                         CONF_EMAIL: info[CONF_EMAIL],
+                        CONF_PASSWORD: user_input[CONF_PASSWORD],
                     },
                 )
 

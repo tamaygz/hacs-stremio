@@ -17,6 +17,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
 from .coordinator import StremioDataUpdateCoordinator
+from .entity_helpers import get_device_info
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -64,13 +65,7 @@ class StremioMediaPlayer(CoordinatorEntity[StremioDataUpdateCoordinator], MediaP
         self._attr_unique_id = f"{entry.entry_id}_media_player"
         self._attr_name = "Stremio"
         self._attr_has_entity_name = True
-        self._attr_device_info = {
-            "identifiers": {(DOMAIN, entry.entry_id)},
-            "name": f"Stremio {entry.data.get('email', 'Account')}",
-            "manufacturer": "Stremio",
-            "model": "Stremio Integration",
-            "entry_type": "service",
-        }
+        self._attr_device_info = get_device_info(entry)
 
     @property
     def state(self) -> MediaPlayerState:

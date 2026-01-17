@@ -95,11 +95,11 @@ class StremioMediaSource(MediaSource):
         try:
             # Get stream URL from Stremio API
             client = coordinator.client
-            streams = await client.get_streams(
+            streams = await client.async_get_streams(
                 media_id=media_id,
                 media_type=media_type,
-                season=season,
-                episode=episode,
+                season=int(season) if season else None,
+                episode=int(episode) if episode else None,
             )
 
             if not streams:

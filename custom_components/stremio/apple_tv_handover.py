@@ -53,7 +53,7 @@ class DeviceNotFoundError(HandoverError):
     """Apple TV device not found."""
 
 
-class ConnectionError(HandoverError):
+class AppleTVConnectionError(HandoverError):
     """Connection to Apple TV failed."""
 
 
@@ -272,7 +272,7 @@ class HandoverManager:
             raise
         except Exception as err:
             _LOGGER.error("AirPlay handover failed: %s", err)
-            raise ConnectionError(f"AirPlay handover failed: {err}") from err
+            raise AppleTVConnectionError(f"AirPlay handover failed: {err}") from err
 
     def generate_vlc_deep_link(
         self,
