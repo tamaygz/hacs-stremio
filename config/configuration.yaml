@@ -25,6 +25,15 @@ http:
   server_port: 8123
   cors_allowed_origins:
     - http://localhost:8123
+  # Trust proxies for dev container environment
+  use_x_forwarded_for: true
+  trusted_proxies:
+    - 127.0.0.1
+    - ::1
+    - 10.0.0.0/8
+    - 172.16.0.0/12
+    - 192.168.0.0/16
+    - fe80::/10
 
 # Enable frontend
 frontend:
@@ -45,6 +54,10 @@ lovelace:
 
 # Enable default config components
 default_config:
+
+# Disable components not needed for development
+dhcp:
+discovery:
 
 # Text-to-Speech (optional, can be removed if not needed)
 tts:
