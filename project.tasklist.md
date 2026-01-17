@@ -474,50 +474,50 @@ This document tracks the implementation progress of the Stremio HACS integration
 **Duration**: 4-5 days
 
 ### 8.1 Unit Tests
-- [ ] ⬜ **Task 8.1.1**: Set up test infrastructure
+- [x] ✅ **Task 8.1.1**: Set up test infrastructure (Completed: 2026-01-17)
   - Create `tests/` folder structure
   - Add `conftest.py` with fixtures
   - Create mock Stremio API responses
   - Configure pytest.ini
   - **Best Practice**: [pytest-homeassistant-custom-component](https://github.com/MatthewFlamm/pytest-homeassistant-custom-component)
   - **Dependencies**: Task 1.1.4
-  - **Output**: Test infrastructure ready
+  - **Output**: Test infrastructure ready ✓
 
-- [ ] ⬜ **Task 8.1.2**: Test config flow
+- [x] ✅ **Task 8.1.2**: Test config flow (Completed: 2026-01-17)
   - Test successful authentication
   - Test invalid credentials error
   - Test network error handling
   - Test options flow changes
   - **Best Practice**: Test all user paths
   - **Dependencies**: Task 8.1.1, Task 2.1.1
-  - **Output**: Config flow tests passing
+  - **Output**: Config flow tests passing ✓
 
-- [ ] ⬜ **Task 8.1.3**: Test coordinator
+- [x] ✅ **Task 8.1.3**: Test coordinator (Completed: 2026-01-17)
   - Test successful data fetch
   - Test API error handling
   - Test rate limiting
   - Test data caching
   - **Best Practice**: Mock API calls
   - **Dependencies**: Task 8.1.1, Task 2.2.2
-  - **Output**: Coordinator tests passing
+  - **Output**: Coordinator tests passing ✓
 
-- [ ] ⬜ **Task 8.1.4**: Test entities
+- [x] ✅ **Task 8.1.4**: Test entities (Completed: 2026-01-17)
   - Test sensor state updates
   - Test binary sensor state changes
   - Test media player properties
   - Test attribute formatting
   - **Best Practice**: Test state and attributes separately
   - **Dependencies**: Task 8.1.1, Phase 3
-  - **Output**: Entity tests passing
+  - **Output**: Entity tests passing ✓
 
-- [ ] ⬜ **Task 8.1.5**: Test services
+- [x] ✅ **Task 8.1.5**: Test services (Completed: 2026-01-17)
   - Test each service with valid inputs
   - Test error handling for invalid inputs
   - Test service responses
   - Mock coordinator updates
   - **Best Practice**: Test service schemas
   - **Dependencies**: Task 8.1.1, Phase 4
-  - **Output**: Service tests passing
+  - **Output**: Service tests passing ✓
 
 ### 8.2 Integration Tests
 - [ ] ⬜ **Task 8.2.1**: Test full integration setup
