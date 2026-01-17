@@ -2,6 +2,15 @@
 
 This guide covers testing practices for the Stremio HACS Integration.
 
+## Platform Requirements
+
+> **Important:** Tests are designed to run on **Linux/macOS** or in the **devcontainer**.
+>
+> The `pytest-homeassistant-custom-component` package blocks socket access for safety, which conflicts with Windows' asyncio ProactorEventLoop. For Windows users:
+> - **Recommended:** Use the VS Code devcontainer (Docker-based Linux environment)
+> - **Alternative:** Use WSL2 with a Linux distribution
+> - **CI:** GitHub Actions runs tests on Linux automatically
+
 ## Running Tests
 
 ### Quick Commands

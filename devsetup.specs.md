@@ -437,3 +437,4 @@ After implementation, a developer should be able to:
 - Integration is symlinked so code changes are immediately available
 - Use `config/secrets.yaml` for API credentials (gitignored)
 - Scripts support both interactive and CI/headless modes
+- **Windows Users**: The test suite requires Linux/macOS due to `pytest-homeassistant-custom-component` socket restrictions. Use the devcontainer or WSL2 for running tests.
