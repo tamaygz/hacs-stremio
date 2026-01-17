@@ -156,7 +156,7 @@ class HandoverManager:
             try:
                 devices = await pyatv.scan(
                     self.hass.loop,
-                    timeout=timeout,
+                    timeout=int(timeout),
                 )
 
                 self._discovered_devices = {}
@@ -208,7 +208,7 @@ class HandoverManager:
         devices = await pyatv.scan(
             self.hass.loop,
             identifier=self._discovered_devices[device_name]["identifier"],
-            timeout=5.0,
+            timeout=5,
         )
 
         if not devices:
