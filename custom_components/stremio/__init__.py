@@ -19,6 +19,7 @@ from homeassistant.helpers.typing import ConfigType
 
 from .const import DOMAIN
 from .coordinator import StremioDataUpdateCoordinator
+from .services import async_setup_services, async_unload_services
 from .stremio_client import StremioAuthError, StremioClient, StremioConnectionError
 
 _LOGGER = logging.getLogger(__name__)
@@ -104,6 +105,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Forward the entry to platform setup
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
+    # Set up services (only once for the first entry)
+    if len(hass.data[DOMAIN]) == 1:
+        await async_setup_services(hass)
+
     # Register update listener for options flow
     entry.async_on_unload(entry.add_update_listener(async_reload_entry))
 
@@ -129,6 +134,10 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Remove data from hass.data
     if unload_ok:
         hass.data[DOMAIN].pop(entry.entry_id)
+
+        # Unload services if no more entries
+        if not hass.data[DOMAIN]:
+            await async_unload_services(hass)
 
     return unload_ok
 
