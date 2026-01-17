@@ -253,11 +253,11 @@ class HandoverManager:
             atv = await pyatv.connect(device_config, self.hass.loop)
 
             try:
-                # Check if AirPlay is available
-                if not atv.features.in_state(
-                    pyatv.FeatureState.Available,
-                    pyatv.FeatureName.PlayUrl,
-                ):
+                # Check if AirPlay (PlayUrl) is available on the device
+                # This implementation handles multiple pyatv API versions
+                feature_available = await self._check_airplay_feature(atv)
+
+                if not feature_available:
                     raise HandoverError(
                         "AirPlay streaming not available on this device"
                     )

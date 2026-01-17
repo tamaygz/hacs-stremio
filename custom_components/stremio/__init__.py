@@ -21,6 +21,15 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.typing import ConfigType
 
+# Try to import StaticPathConfig for modern HA versions (2024.6+)
+try:
+    from homeassistant.components.http import StaticPathConfig
+
+    HAS_STATIC_PATH_CONFIG = True
+except ImportError:
+    HAS_STATIC_PATH_CONFIG = False
+    StaticPathConfig = None  # type: ignore[assignment, misc]
+
 from .const import DOMAIN
 from .coordinator import StremioDataUpdateCoordinator
 from .services import async_setup_services, async_unload_services
@@ -65,6 +74,9 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 async def _async_register_frontend(hass: HomeAssistant) -> None:
     """Register frontend resources for Lovelace cards.
 
+    Supports multiple Home Assistant versions by attempting to use the modern
+    StaticPathConfig API (HA 2024.6+) and falling back to the legacy method.
+
     Args:
         hass: Home Assistant instance
     """
@@ -76,25 +88,73 @@ async def _async_register_frontend(hass: HomeAssistant) -> None:
         return
 
     # Register static path for card resources
-    # Note: static path registration depends on Home Assistant version
-    try:
-        # Try modern approach (HA 2024.6+)
-        from homeassistant.components.http import StaticPathConfig
-
-        await hass.http.async_register_static_paths(
-            [
-                StaticPathConfig(
-                    url_path="/stremio_cards",
-                    path=str(www_path),
+    # Try modern approach first (HA 2024.6+)
+    if HAS_STATIC_PATH_CONFIG and StaticPathConfig is not None:
+        try:
+            _LOGGER.debug(
+                "Using modern StaticPathConfig for HA 2024.6+ to register frontend resources"
+            )
+            # For modern HA versions, use async_register_static_paths
+            if hasattr(hass.http, "async_register_static_paths"):
+                await hass.http.async_register_static_paths(
+                    [
+                        StaticPathConfig(
+                            url_path="/stremio_cards",
+                            path=str(www_path),
+                            cache_headers=True,
+                        )
+                    ]
+                )
+                _LOGGER.info(
+                    "Registered static path for Stremio frontend (async method)"
+                )
+            else:
+                # Fallback to sync method if available
+                if hasattr(hass.http, "register_static_path"):
+                    hass.http.register_static_path(
+                        "/stremio_cards",
+                        str(www_path),
+                        cache_headers=True,
+                    )
+                    _LOGGER.info(
+                        "Registered static path for Stremio frontend (sync method)"
+                    )
+                else:
+                    _LOGGER.warning(
+                        "No suitable static path registration method found in HA"
+                    )
+        except Exception as err:
+            _LOGGER.warning(
+                "Failed to register static path using modern method: %s, trying fallback",
+                err,
+            )
+            # Try fallback method
+            try:
+                hass.http.register_static_path(
+                    "/stremio_cards",
+                    str(www_path),
                     cache_headers=True,
                 )
-            ]
-        )
-    except (ImportError, AttributeError):
-        # Fallback for older Home Assistant versions or different API
-        _LOGGER.debug(
-            "Could not register static paths, skipping frontend resource registration"
-        )
+                _LOGGER.info(
+                    "Registered static path for Stremio frontend (fallback method)"
+                )
+            except Exception as fallback_err:
+                _LOGGER.error(
+                    "Failed to register static path with both methods: %s",
+                    fallback_err,
+                )
+    else:
+        # Use legacy method for older HA versions
+        try:
+            _LOGGER.debug("Using legacy method for older Home Assistant versions")
+            hass.http.register_static_path(
+                "/stremio_cards",
+                str(www_path),
+                cache_headers=True,
+            )
+            _LOGGER.info("Registered static path for Stremio frontend (legacy method)")
+        except Exception as err:
+            _LOGGER.error("Failed to register static path in legacy mode: %s", err)
 
     # Register Lovelace resources
     # This uses the frontend component's resource registration
