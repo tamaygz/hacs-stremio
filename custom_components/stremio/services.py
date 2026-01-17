@@ -129,6 +129,10 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         )
 
         try:
+            # Return empty results for empty query
+            if not query or not query.strip():
+                return {"results": [], "count": 0}
+
             # Get library from coordinator
             library = coordinator.data.get("library", [])
 
