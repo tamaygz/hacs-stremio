@@ -181,6 +181,8 @@ test(coordinator): add tests for data refresh
 
 ## Testing Requirements
 
+> **Note for Windows users:** Tests must be run on Linux/macOS due to `pytest-homeassistant-custom-component` socket restrictions. Use the VS Code devcontainer or WSL2. GitHub Actions runs tests automatically on Linux.
+
 ### Before Submitting a PR
 
 1. **All tests pass:**

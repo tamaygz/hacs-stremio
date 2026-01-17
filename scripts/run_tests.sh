@@ -21,6 +21,24 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 VENV_PATH="$PROJECT_ROOT/.venv"
 
+# Check for Windows (MSYS, Git Bash, etc.)
+if [[ "$OSTYPE" == "msys" ]] || [[ "$OSTYPE" == "cygwin" ]] || [[ -n "$WINDIR" ]]; then
+    echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${YELLOW}⚠️  Windows Detected${NC}"
+    echo -e ""
+    echo -e "The test suite uses pytest-homeassistant-custom-component which"
+    echo -e "blocks sockets. This conflicts with Windows' asyncio ProactorEventLoop."
+    echo -e ""
+    echo -e "Recommended alternatives:"
+    echo -e "  1. ${CYAN}Use VS Code devcontainer${NC} (Ctrl+Shift+P → 'Reopen in Container')"
+    echo -e "  2. ${CYAN}Use WSL2${NC}: wsl bash scripts/run_tests.sh"
+    echo -e "  3. ${CYAN}Run on CI${NC}: GitHub Actions runs tests on Linux automatically"
+    echo -e ""
+    echo -e "You can still run linting checks with: ${CYAN}--quick${NC} flag skipped"
+    echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo ""
+fi
+
 # Parse arguments
 QUICK=false
 FIX=false
