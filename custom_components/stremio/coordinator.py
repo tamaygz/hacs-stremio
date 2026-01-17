@@ -149,3 +149,81 @@ class StremioDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # Unexpected error
             _LOGGER.exception("Unexpected error fetching data: %s", err)
             raise UpdateFailed(f"Unexpected error: {err}") from err
+
+    def _fire_events(self, data: dict[str, Any]) -> None:
+        """Fire events based on state changes.
+
+        Args:
+            data: Current data from API
+        """
+        current_watching = data.get("current_watching")
+        library_count = data.get("library_count", 0)
+
+        # Check for playback started
+        if current_watching and not self._previous_watching:
+            _LOGGER.debug("Firing playback started event")
+            self.hass.bus.async_fire(
+                EVENT_PLAYBACK_STARTED,
+                {
+                    "media_id": current_watching.get("imdb_id"),
+                    "title": current_watching.get("title"),
+                    "type": current_watching.get("type"),
+                    "season": current_watching.get("season"),
+                    "episode": current_watching.get("episode"),
+                    "progress_percent": current_watching.get("progress_percent"),
+                },
+            )
+        # Check for playback stopped
+        elif not current_watching and self._previous_watching:
+            _LOGGER.debug("Firing playback stopped event")
+            self.hass.bus.async_fire(
+                EVENT_PLAYBACK_STOPPED,
+                {
+                    "media_id": self._previous_watching.get("imdb_id"),
+                    "title": self._previous_watching.get("title"),
+                    "type": self._previous_watching.get("type"),
+                },
+            )
+        # Check for content change (different media)
+        elif (
+            current_watching
+            and self._previous_watching
+            and current_watching.get("imdb_id") != self._previous_watching.get("imdb_id")
+        ):
+            _LOGGER.debug("Firing playback stopped and started events (content change)")
+            self.hass.bus.async_fire(
+                EVENT_PLAYBACK_STOPPED,
+                {
+                    "media_id": self._previous_watching.get("imdb_id"),
+                    "title": self._previous_watching.get("title"),
+                    "type": self._previous_watching.get("type"),
+                },
+            )
+            self.hass.bus.async_fire(
+                EVENT_PLAYBACK_STARTED,
+                {
+                    "media_id": current_watching.get("imdb_id"),
+                    "title": current_watching.get("title"),
+                    "type": current_watching.get("type"),
+                    "season": current_watching.get("season"),
+                    "episode": current_watching.get("episode"),
+                    "progress_percent": current_watching.get("progress_percent"),
+                },
+            )
+
+        # Check for library changes
+        if self._previous_library_count > 0 and library_count != self._previous_library_count:
+            change = library_count - self._previous_library_count
+            _LOGGER.debug("Firing library changed event: %+d items", change)
+            self.hass.bus.async_fire(
+                EVENT_NEW_CONTENT,
+                {
+                    "action": "added" if change > 0 else "removed",
+                    "count_change": abs(change),
+                    "new_count": library_count,
+                },
+            )
+
+        # Update previous state
+        self._previous_watching = current_watching
+        self._previous_library_count = library_count
