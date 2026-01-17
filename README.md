@@ -1,133 +1,198 @@
 # Stremio Home Assistant Integration
 
-[![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
-[![GitHub release](https://img.shields.io/github/release/tamaygz/hacs-stremio.svg)](https://github.com/tamaygz/hacs-stremio/releases)
-[![License](https://img.shields.io/github/license/tamaygz/hacs-stremio.svg)](LICENSE)
+[![HACS Badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg?style=for-the-badge)](https://github.com/hacs/integration)
+[![GitHub Release](https://img.shields.io/github/release/tamaygz/hacs-stremio.svg?style=for-the-badge)](https://github.com/tamaygz/hacs-stremio/releases)
+[![License](https://img.shields.io/github/license/tamaygz/hacs-stremio.svg?style=for-the-badge)](LICENSE)
+[![Tests](https://img.shields.io/github/actions/workflow/status/tamaygz/hacs-stremio/test.yml?style=for-the-badge&label=Tests)](https://github.com/tamaygz/hacs-stremio/actions)
 
 A comprehensive Home Assistant Custom Component (HACS) integration that connects to the Stremio API to track your library, viewing activity, and media consumption.
 
+<p align="center">
+  <img src="https://www.stremio.com/website/stremio-logo-small.png" alt="Stremio Logo" width="150">
+</p>
+
+---
+
 ## ✨ Features
 
-- 🎬 **Media Player Entity**: Track current playback with rich metadata
-- 📊 **Multiple Sensors**: Library stats, watch time, current media, and more
-- 🔔 **Events**: React to playback changes and library updates
-- 📺 **Apple TV Handover**: Stream content directly to Apple TV
-- 🎨 **Custom UI Cards**: Beautiful Lovelace cards for library browsing
-- 🔍 **Media Source Integration**: Browse library from HA media browser
-- 🎯 **Services**: Search, manage library, get stream URLs
+| Feature | Description |
+|---------|-------------|
+| 🎬 **Media Player Entity** | Track current playback with rich metadata |
+| 📊 **Multiple Sensors** | Library stats, watch time, current media |
+| 🔔 **Events** | React to playback changes and library updates |
+| 📺 **Apple TV Handover** | Stream content directly to Apple TV via AirPlay |
+| 🎨 **Custom UI Cards** | Beautiful Lovelace cards for library browsing |
+| 🔍 **Media Source** | Browse library from HA media browser |
+| 🎯 **Services** | Search, manage library, get stream URLs |
 
-## 📦 Installation
+---
 
-### HACS (Recommended)
+## 📦 Quick Start
 
-1. Open HACS in Home Assistant
-2. Go to "Integrations"
-3. Click the three dots → "Custom repositories"
-4. Add: `https://github.com/tamaygz/hacs-stremio`
-5. Category: "Integration"
-6. Search for "Stremio" and install
-7. Restart Home Assistant
+### Installation via HACS
 
-### Manual Installation
+1. Open HACS → Integrations
+2. Click ⋮ → Custom repositories
+3. Add: `https://github.com/tamaygz/hacs-stremio` (Category: Integration)
+4. Search "Stremio" → Install → Restart HA
 
-1. Download the latest release
-2. Copy `custom_components/stremio` to your HA `custom_components` directory
-3. Restart Home Assistant
+### Configuration
 
-## ⚙️ Configuration
+1. Go to **Settings** → **Devices & Services** → **+ Add Integration**
+2. Search **"Stremio"** → Enter credentials → Done!
 
-1. Go to **Settings** → **Devices & Services**
-2. Click **"+ Add Integration"**
-3. Search for **"Stremio"**
-4. Enter your Stremio credentials
-5. Configure optional settings
+📖 [Full Setup Guide](docs/setup.md)
 
-See [Configuration Guide](docs/configuration.md) for detailed options.
+---
 
-## 📖 Documentation
-
-- [Setup Guide](docs/setup.md) - Detailed installation instructions
-- [Configuration](docs/configuration.md) - All configuration options
-- [Services](docs/services.md) - Available services and examples
-- [API Reference](docs/api.md) - Developer API documentation
-- [Development Guide](docs/development.md) - Contributing and development
-- [Troubleshooting](docs/troubleshooting.md) - Common issues and solutions
-
-## 🎯 Entities
+## 🎯 Entities Created
 
 ### Sensors
-- Current Watching
-- Last Watched
-- Library Count
-- Watch Time Statistics
-- Continue Watching List
-- And more...
+| Entity | Description |
+|--------|-------------|
+| `sensor.stremio_current_media` | Currently playing media |
+| `sensor.stremio_last_watched` | Last watched content |
+| `sensor.stremio_library_count` | Total library items |
+| `sensor.stremio_continue_watching_count` | In-progress items |
 
 ### Binary Sensors
-- Currently Playing
-- New Content Available
+| Entity | Description |
+|--------|-------------|
+| `binary_sensor.stremio_is_playing` | On when media is playing |
+| `binary_sensor.stremio_has_new_content` | On when new content detected |
 
 ### Media Player
-- Read-only playback state
-- Rich metadata display
-- Deep link support
+| Entity | Description |
+|--------|-------------|
+| `media_player.stremio` | Playback state, metadata, poster |
+
+---
 
 ## 🛠️ Services
 
-- `stremio.get_streams` - Fetch stream URLs
-- `stremio.search_library` - Search your library
-- `stremio.add_to_library` - Add content
-- `stremio.remove_from_library` - Remove content
-- `stremio.refresh_library` - Force refresh
-- `stremio.handover_to_apple_tv` - Stream to Apple TV
+```yaml
+# Get stream URLs for a movie
+service: stremio.get_stream_url
+data:
+  media_id: "tt0111161"
+  media_type: "movie"
 
-See [Services Documentation](docs/services.md) for details and examples.
+# Search your library
+service: stremio.search_library
+data:
+  query: "Breaking Bad"
 
-## 🚀 Quick Example
+# Stream to Apple TV
+service: stremio.handover_to_apple_tv
+data:
+  media_id: "tt0111161"
+  device_name: "Living Room Apple TV"
+  method: "airplay"
+```
+
+📖 [Full Services Documentation](docs/services.md)
+
+---
+
+## 🎨 Custom Lovelace Cards
+
+Cards are **auto-registered** - no manual setup needed!
 
 ```yaml
+# Player Card
+type: custom:stremio-player-card
+entity: media_player.stremio
+
+# Library Card
+type: custom:stremio-library-card
+title: My Library
+
+# Media Details Card
+type: custom:stremio-media-details-card
+entity: media_player.stremio
+```
+
+📖 [UI Cards Guide](docs/ui.md)
+
+---
+
+## 🚀 Automation Examples
+
+```yaml
+# Dim lights when watching
 automation:
-  - alias: "Notify on new Stremio content"
+  - alias: "Cinema Mode"
     trigger:
       - platform: state
-        entity_id: binary_sensor.stremio_new_content
+        entity_id: binary_sensor.stremio_is_playing
         to: "on"
     action:
-      - service: notify.mobile_app
+      - service: light.turn_on
+        target:
+          entity_id: light.living_room
         data:
-          title: "New Content Available"
-          message: "Check your Stremio library!"
+          brightness_pct: 10
 ```
+
+📖 [More Examples](examples/)
+
+---
+
+## 📖 Documentation
+
+| Guide | Description |
+|-------|-------------|
+| [Setup Guide](docs/setup.md) | Installation & configuration |
+| [Configuration](docs/configuration.md) | All options explained |
+| [Services](docs/services.md) | Service calls & automation |
+| [Events](docs/events.md) | Event triggers for automations |
+| [UI Cards](docs/ui.md) | Custom Lovelace cards |
+| [API Reference](docs/api.md) | Developer documentation |
+| [Development](docs/development.md) | Contributing guide |
+| [Troubleshooting](docs/troubleshooting.md) | Common issues |
+
+---
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please read the [Development Guide](docs/development.md) first.
+Contributions welcome! See [Development Guide](docs/development.md).
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Run tests and linters
-5. Submit a pull request
+```bash
+# Setup development environment
+git clone https://github.com/tamaygz/hacs-stremio.git
+cd hacs-stremio
+pip install -r requirements_dev.txt
+
+# Run tests
+pytest tests/
+
+# Run linters
+black custom_components/stremio
+flake8 custom_components/stremio
+```
+
+---
 
 ## 📝 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+MIT License - see [LICENSE](LICENSE) file.
 
 ## 🙏 Credits
 
-- Built with [stremio-api](https://pypi.org/project/stremio-api/) Python library
+- [stremio-api](https://pypi.org/project/stremio-api/) Python library
 - Inspired by [@AboveColin's stremio-ha](https://github.com/AboveColin/stremio-ha)
 
 ## 💬 Support
 
 - 🐛 [Report Issues](https://github.com/tamaygz/hacs-stremio/issues)
 - 💬 [Discussions](https://github.com/tamaygz/hacs-stremio/discussions)
-- 📖 [Full Documentation](docs/)
-
-## ⚠️ Disclaimer
-
-This integration is not affiliated with, endorsed by, or connected to Stremio. Use at your own risk.
 
 ---
 
-**Status**: 🚧 In Development | **Version**: 0.1.0
+<p align="center">
+  <b>⚠️ Not affiliated with Stremio. Use at your own risk.</b>
+</p>
+
+<p align="center">
+  <b>Version 1.0.0</b> | <a href="CHANGELOG.md">Changelog</a>
+</p>
