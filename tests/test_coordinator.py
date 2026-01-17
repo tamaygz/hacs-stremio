@@ -8,11 +8,11 @@ from datetime import timedelta
 from homeassistant.helpers.update_coordinator import UpdateFailed
 
 from custom_components.stremio.const import (
-    DEFAULT_PLAYER_UPDATE_INTERVAL,
-    DEFAULT_LIBRARY_UPDATE_INTERVAL,
+    DEFAULT_PLAYER_SCAN_INTERVAL,
+    DEFAULT_LIBRARY_SCAN_INTERVAL,
 )
 
-from .conftest import (
+from tests.conftest import (
     MOCK_LIBRARY_ITEMS,
     MOCK_CONTINUE_WATCHING,
     MOCK_CURRENT_MEDIA,
