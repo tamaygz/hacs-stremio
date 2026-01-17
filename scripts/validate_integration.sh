@@ -70,45 +70,45 @@ if [ ! -f "$MANIFEST" ]; then
     fail "manifest.json not found"
 else
     # Check required fields using Python for cross-platform compatibility
-    if python3 -c "import json; d=json.load(open('$MANIFEST')); assert 'domain' in d" 2>/dev/null; then
+    if $PYTHON_CMD -c "import json; d=json.load(open('$MANIFEST')); assert 'domain' in d" 2>/dev/null; then
         pass "manifest.json has domain"
     else
         fail "manifest.json missing domain"
     fi
 
-    if python3 -c "import json; d=json.load(open('$MANIFEST')); assert 'name' in d" 2>/dev/null; then
+    if $PYTHON_CMD -c "import json; d=json.load(open('$MANIFEST')); assert 'name' in d" 2>/dev/null; then
         pass "manifest.json has name"
     else
         fail "manifest.json missing name"
     fi
 
-    if python3 -c "import json; d=json.load(open('$MANIFEST')); assert 'version' in d" 2>/dev/null; then
-        VERSION=$(python3 -c "import json; print(json.load(open('$MANIFEST')).get('version', 'unknown'))")
+    if $PYTHON_CMD -c "import json; d=json.load(open('$MANIFEST')); assert 'version' in d" 2>/dev/null; then
+        VERSION=$($PYTHON_CMD -c "import json; print(json.load(open('$MANIFEST')).get('version', 'unknown'))")
         pass "manifest.json has version: $VERSION"
     else
         fail "manifest.json missing version"
     fi
 
-    if python3 -c "import json; d=json.load(open('$MANIFEST')); assert 'documentation' in d" 2>/dev/null; then
+    if $PYTHON_CMD -c "import json; d=json.load(open('$MANIFEST')); assert 'documentation' in d" 2>/dev/null; then
         pass "manifest.json has documentation URL"
     else
         warn "manifest.json missing documentation URL"
     fi
 
-    if python3 -c "import json; d=json.load(open('$MANIFEST')); assert 'issue_tracker' in d" 2>/dev/null; then
+    if $PYTHON_CMD -c "import json; d=json.load(open('$MANIFEST')); assert 'issue_tracker' in d" 2>/dev/null; then
         pass "manifest.json has issue_tracker URL"
     else
         warn "manifest.json missing issue_tracker URL"
     fi
 
-    if python3 -c "import json; d=json.load(open('$MANIFEST')); assert 'codeowners' in d" 2>/dev/null; then
+    if $PYTHON_CMD -c "import json; d=json.load(open('$MANIFEST')); assert 'codeowners' in d" 2>/dev/null; then
         pass "manifest.json has codeowners"
     else
         warn "manifest.json missing codeowners"
     fi
 
     # Validate JSON syntax
-    if python3 -c "import json; json.load(open('$MANIFEST'))" 2>/dev/null; then
+    if $PYTHON_CMD -c "import json; json.load(open('$MANIFEST'))" 2>/dev/null; then
         pass "manifest.json is valid JSON"
     else
         fail "manifest.json has invalid JSON syntax"
@@ -127,13 +127,13 @@ if [ ! -f "$HACS_JSON" ]; then
     fail "hacs.json not found (required for HACS)"
 else
     # Validate JSON syntax
-    if python3 -c "import json; json.load(open('$HACS_JSON'))" 2>/dev/null; then
+    if $PYTHON_CMD -c "import json; json.load(open('$HACS_JSON'))" 2>/dev/null; then
         pass "hacs.json is valid JSON"
     else
         fail "hacs.json has invalid JSON syntax"
     fi
 
-    if python3 -c "import json; d=json.load(open('$HACS_JSON')); assert 'name' in d" 2>/dev/null; then
+    if $PYTHON_CMD -c "import json; d=json.load(open('$HACS_JSON')); assert 'name' in d" 2>/dev/null; then
         pass "hacs.json has name"
     else
         warn "hacs.json missing name"
@@ -172,7 +172,7 @@ check "Checking translations..."
 TRANSLATIONS_DIR="$INTEGRATION_DIR/translations"
 if [ -d "$TRANSLATIONS_DIR" ]; then
     if [ -f "$TRANSLATIONS_DIR/en.json" ]; then
-        if python3 -c "import json; json.load(open('$TRANSLATIONS_DIR/en.json'))" 2>/dev/null; then
+        if $PYTHON_CMD -c "import json; json.load(open('$TRANSLATIONS_DIR/en.json'))" 2>/dev/null; then
             pass "translations/en.json is valid"
         else
             fail "translations/en.json has invalid JSON"
@@ -196,7 +196,7 @@ if [ -f "$SERVICES_YAML" ]; then
     pass "services.yaml exists"
     
     # Basic YAML validation
-    if python3 -c "import yaml; yaml.safe_load(open('$SERVICES_YAML'))" 2>/dev/null; then
+    if $PYTHON_CMD -c "import yaml; yaml.safe_load(open('$SERVICES_YAML'))" 2>/dev/null; then
         pass "services.yaml is valid YAML"
     else
         fail "services.yaml has invalid YAML syntax"
