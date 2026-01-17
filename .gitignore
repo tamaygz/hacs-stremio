@@ -91,3 +91,4 @@ dmypy.json
 /config/.HA_VERSION
 /config/home-assistant.log*
 /config/home-assistant*.db*
+/config/blueprints/*
