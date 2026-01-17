@@ -1,0 +1,43 @@
+# Notification when new content is added to Stremio library
+#
+# This automation sends a notification when new movies or shows
+# are detected in your Stremio library.
+#
+# Prerequisites:
+# - Stremio integration configured
+# - Mobile app or notification service set up
+
+alias: "Stremio: New Content Notification"
+description: "Send notification when new content is added to Stremio library"
+
+trigger:
+  - platform: state
+    entity_id: binary_sensor.stremio_has_new_content
+    from: "off"
+    to: "on"
+
+condition: []
+
+action:
+  - service: notify.mobile_app_your_phone
+    data:
+      title: "📺 New Stremio Content"
+      message: >
+        New content has been added to your Stremio library!
+        Check it out now.
+      data:
+        # Android-specific
+        channel: media_updates
+        importance: default
+        # iOS-specific
+        push:
+          sound: default
+          badge: 1
+        # Action buttons
+        actions:
+          - action: OPEN_STREMIO
+            title: "Open Stremio"
+          - action: DISMISS
+            title: "Dismiss"
+
+mode: single

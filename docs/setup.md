@@ -1,5 +1,11 @@
 # Stremio Home Assistant Integration - Setup Guide
 
+## Prerequisites
+
+- Home Assistant 2025.1 or later
+- HACS (Home Assistant Community Store) installed
+- Stremio account with valid credentials
+
 ## Installation
 
 ### Via HACS (Recommended)
@@ -23,21 +29,74 @@
 
 ## Configuration
 
-1. Go to Settings → Devices & Services
-2. Click "+ Add Integration"
-3. Search for "Stremio"
+### Initial Setup
+
+1. Go to **Settings** → **Devices & Services**
+2. Click **"+ Add Integration"**
+3. Search for **"Stremio"**
 4. Enter your Stremio credentials:
-   - Email
-   - Password
-5. Click "Submit"
+   - **Email**: Your Stremio account email
+   - **Password**: Your Stremio account password
+5. Click **"Submit"**
+
+### Configuration Options
+
+After initial setup, you can configure options:
+
+1. Go to **Settings** → **Devices & Services**
+2. Find **Stremio** integration
+3. Click **"Configure"**
+
+Available options:
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| Player Update Interval | 30s | How often to check playback state |
+| Library Update Interval | 300s | How often to sync library |
+| Enable Apple TV Handover | Off | Enable AirPlay/VLC handover feature |
+| Handover Method | Auto | Choose AirPlay, VLC, or Auto |
+
+## Entities Created
+
+After setup, the following entities are created:
+
+### Sensors
+- `sensor.stremio_current_media` - Currently playing media
+- `sensor.stremio_last_watched` - Last watched media
+- `sensor.stremio_library_count` - Total library items
+- `sensor.stremio_continue_watching_count` - Items in progress
+
+### Binary Sensors
+- `binary_sensor.stremio_is_playing` - On when media is playing
+- `binary_sensor.stremio_has_new_content` - On when new content detected
+
+### Media Player
+- `media_player.stremio` - Stremio media player entity
 
 ## Verification
 
-After setup, you should see:
-- Stremio integration in your integrations list
-- Multiple sensor entities created
-- Media player entity created
+After setup, verify the integration is working:
+
+1. Check that all entities are available in **Developer Tools** → **States**
+2. Open the **Media Browser** panel and look for "Stremio"
+3. Check for any errors in **Settings** → **System** → **Logs**
+
+## Custom Lovelace Cards
+
+The integration includes custom Lovelace cards that are automatically registered:
+
+- `stremio-player-card` - Current playback display
+- `stremio-library-card` - Library browser
+- `stremio-media-details-card` - Detailed media information
+
+See [UI Guide](ui.md) for card configuration.
 
 ## Troubleshooting
 
 See [troubleshooting.md](troubleshooting.md) for common issues and solutions.
+
+## Next Steps
+
+- Read the [Configuration Guide](configuration.md) for detailed options
+- Check the [Services Guide](services.md) for automation capabilities
+- View the [Events Guide](events.md) for automation triggers

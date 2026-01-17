@@ -1,0 +1,81 @@
+# Dim lights when Stremio playback starts
+#
+# This automation creates a cinema-like atmosphere by dimming
+# your lights when media starts playing and restoring them
+# when playback stops.
+#
+# Prerequisites:
+# - Stremio integration configured
+# - Compatible smart lights
+
+alias: "Stremio: Cinema Lighting"
+description: "Dim lights when Stremio playback starts, restore when stopped"
+
+trigger:
+  - platform: state
+    entity_id: binary_sensor.stremio_is_playing
+    id: "playback_started"
+    from: "off"
+    to: "on"
+  - platform: state
+    entity_id: binary_sensor.stremio_is_playing
+    id: "playback_stopped"
+    from: "on"
+    to: "off"
+
+condition:
+  # Only run between 6 PM and 2 AM
+  - condition: time
+    after: "18:00:00"
+    before: "02:00:00"
+
+action:
+  - choose:
+      # When playback starts - dim lights
+      - conditions:
+          - condition: trigger
+            id: "playback_started"
+        sequence:
+          # Save current light state
+          - service: scene.create
+            data:
+              scene_id: stremio_pre_playback
+              snapshot_entities:
+                - light.living_room
+                - light.tv_backlight
+          # Dim the lights
+          - service: light.turn_on
+            target:
+              entity_id: light.living_room
+            data:
+              brightness_pct: 10
+              transition: 3
+          # Turn on TV backlight (optional)
+          - service: light.turn_on
+            target:
+              entity_id: light.tv_backlight
+            data:
+              brightness_pct: 30
+              rgb_color: [100, 80, 150]  # Stremio purple
+              transition: 3
+
+      # When playback stops - restore lights
+      - conditions:
+          - condition: trigger
+            id: "playback_stopped"
+        sequence:
+          # Wait a moment (in case just paused)
+          - delay:
+              seconds: 5
+          # Check if still not playing
+          - condition: state
+            entity_id: binary_sensor.stremio_is_playing
+            state: "off"
+          # Restore previous light state
+          - service: scene.turn_on
+            target:
+              entity_id: scene.stremio_pre_playback
+            data:
+              transition: 3
+
+mode: restart

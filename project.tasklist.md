@@ -570,40 +570,40 @@ This document tracks the implementation progress of the Stremio HACS integration
 **Duration**: 2-3 days
 
 ### 9.1 User Documentation
-- [ ] ⬜ **Task 9.1.1**: Write setup guide (docs/setup.md)
+- [x] ✅ **Task 9.1.1**: Write setup guide (docs/setup.md) (Completed: 2026-01-17)
   - Installation via HACS
   - Initial configuration steps
   - Credential setup
   - Troubleshooting common setup issues
   - **Best Practice**: Step-by-step with screenshots
   - **Dependencies**: Phase 2, Phase 8
-  - **Output**: Complete setup guide
+  - **Output**: Complete setup guide ✓
 
-- [ ] ⬜ **Task 9.1.2**: Write configuration guide (docs/configuration.md)
+- [x] ✅ **Task 9.1.2**: Write configuration guide (docs/configuration.md) (Completed: 2026-01-17)
   - Document all configuration options
   - Explain update intervals
   - Document Apple TV handover options
   - Provide YAML examples for automations
   - **Best Practice**: Comprehensive option reference
   - **Dependencies**: Phase 2, Phase 5
-  - **Output**: Complete configuration guide
+  - **Output**: Complete configuration guide ✓
 
-- [ ] ⬜ **Task 9.1.3**: Write services guide (docs/services.md)
+- [x] ✅ **Task 9.1.3**: Write services guide (docs/services.md) (Completed: 2026-01-17)
   - Document each service with examples
   - Show YAML and UI usage
   - Provide automation examples
   - **Best Practice**: Real-world use cases
   - **Dependencies**: Phase 4
-  - **Output**: Complete services guide
+  - **Output**: Complete services guide ✓
 
-- [ ] ⬜ **Task 9.1.4**: Write UI/cards guide (docs/ui.md)
+- [x] ✅ **Task 9.1.4**: Write UI/cards guide (docs/ui.md) (Completed: 2026-01-17)
   - Document each custom card
   - Show configuration examples
   - Provide dashboard layouts
   - Add screenshots of cards
   - **Best Practice**: Visual examples help users
   - **Dependencies**: Phase 6
-  - **Output**: Complete UI guide
+  - **Output**: Complete UI guide ✓
 
 ### 9.2 Developer Documentation
 - [ ] ⬜ **Task 9.2.1**: Write development guide (docs/development.md)

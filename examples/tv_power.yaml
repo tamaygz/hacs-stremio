@@ -1,0 +1,40 @@
+# Auto power on TV when Stremio playback is detected
+#
+# This automation turns on your TV and switches to the correct
+# input when Stremio starts playing content.
+#
+# Prerequisites:
+# - Stremio integration configured
+# - TV entity (via integration like LG webOS, Samsung, etc.)
+
+alias: "Stremio: Auto TV Power"
+description: "Power on TV when Stremio playback starts"
+
+trigger:
+  - platform: event
+    event_type: stremio_playback_started
+
+condition:
+  # Only run if TV is off
+  - condition: state
+    entity_id: media_player.living_room_tv
+    state: "off"
+
+action:
+  # Turn on TV
+  - service: media_player.turn_on
+    target:
+      entity_id: media_player.living_room_tv
+  
+  # Wait for TV to boot
+  - delay:
+      seconds: 5
+  
+  # Select the correct input (adjust for your setup)
+  - service: media_player.select_source
+    target:
+      entity_id: media_player.living_room_tv
+    data:
+      source: "HDMI 1"  # Adjust to your Stremio device input
+
+mode: single
