@@ -52,13 +52,13 @@ async def test_form_user_step_success(mock_hass, mock_stremio_client):
 async def test_form_user_step_invalid_auth(mock_hass):
     """Test form submission with invalid credentials."""
     from custom_components.stremio.config_flow import StremioConfigFlow
-    from custom_components.stremio.stremio_client import AuthenticationError
+    from custom_components.stremio.stremio_client import StremioAuthError
     
     flow = StremioConfigFlow()
     flow.hass = mock_hass
     
     mock_client = AsyncMock()
-    mock_client.login.side_effect = AuthenticationError("Invalid credentials")
+    mock_client.login.side_effect = StremioAuthError("Invalid credentials")
     
     with patch(
         "custom_components.stremio.config_flow.StremioClient",
@@ -74,13 +74,13 @@ async def test_form_user_step_invalid_auth(mock_hass):
 async def test_form_user_step_connection_error(mock_hass):
     """Test form submission with connection error."""
     from custom_components.stremio.config_flow import StremioConfigFlow
-    from custom_components.stremio.stremio_client import ConnectionError
+    from custom_components.stremio.stremio_client import StremioConnectionError
     
     flow = StremioConfigFlow()
     flow.hass = mock_hass
     
     mock_client = AsyncMock()
-    mock_client.login.side_effect = ConnectionError("Network error")
+    mock_client.login.side_effect = StremioConnectionError("Network error")
     
     with patch(
         "custom_components.stremio.config_flow.StremioClient",

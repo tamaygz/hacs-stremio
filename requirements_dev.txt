@@ -1,23 +1,46 @@
 # Development Dependencies for Stremio HACS Integration
 
+# Home Assistant Core (for testing)
+homeassistant>=2024.1.0
+
+# Runtime Dependencies (from manifest.json)
+stremio-api>=0.1.0
+pyatv>=0.14.0
+
 # Testing
-pytest>=7.4.0
+pytest>=8.0.0
 pytest-homeassistant-custom-component>=0.13.0
 pytest-cov>=4.1.0
-pytest-asyncio>=0.21.0
+pytest-asyncio>=1.0.0
+pytest-aiohttp>=1.0.0
+pytest-timeout>=2.2.0
+
+# Async Support
+aiohttp>=3.9.0
+aioresponses>=0.7.6
 
 # Code Quality
-black>=23.7.0
-flake8>=6.1.0
-pylint>=2.17.0
-mypy>=1.5.0
+black>=24.0.0
+flake8>=7.0.0
+pylint>=3.0.0
+mypy>=1.8.0
+isort>=5.13.0
+ruff>=0.2.0
 
 # Type Stubs
 types-requests>=2.31.0
 
 # Pre-commit
-pre-commit>=3.3.0
+pre-commit>=3.6.0
 
 # Build & Package
-build>=0.10.0
-twine>=4.0.2
+build>=1.0.0
+twine>=5.0.0
+
+# Documentation
+mkdocs>=1.5.0
+mkdocs-material>=9.5.0
+
+# Debugging
+ipython>=8.0.0
+ipdb>=0.13.0

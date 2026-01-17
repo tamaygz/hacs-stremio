@@ -36,10 +36,10 @@ async def test_async_setup_entry_success(mock_hass, mock_config_entry, mock_stre
 @pytest.mark.asyncio
 async def test_async_setup_entry_auth_failure(mock_hass, mock_config_entry):
     """Test setup failure due to authentication error."""
-    from custom_components.stremio.stremio_client import AuthenticationError
+    from custom_components.stremio.stremio_client import StremioAuthError
     
     mock_client = AsyncMock()
-    mock_client.login.side_effect = AuthenticationError("Invalid credentials")
+    mock_client.login.side_effect = StremioAuthError("Invalid credentials")
     
     with patch(
         "custom_components.stremio.StremioClient",
