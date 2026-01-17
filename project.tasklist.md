@@ -229,33 +229,33 @@ This document tracks the implementation progress of the Stremio HACS integration
 **Duration**: 2-3 days
 
 ### 4.1 Services
-- [ ] ⬜ **Task 4.1.1**: Create services.yaml
+- [x] ✅ **Task 4.1.1**: Create services.yaml (Completed: 2026-01-17)
   - Define service schemas for all 5 services
   - Add descriptions and field validators
   - Document required/optional parameters
   - **Best Practice**: Clear service documentation for UI
   - **Dependencies**: Task 1.1.3
-  - **Output**: services.yaml complete
+  - **Output**: services.yaml complete ✓
 
-- [ ] ⬜ **Task 4.1.2**: Implement search service
+- [x] ✅ **Task 4.1.2**: Implement search service (Completed: 2026-01-17)
   - Create async_search_library service
   - Accept query parameter
   - Search library by title, genre, cast
   - Return results as service response
   - **Best Practice**: Use service response for query results
   - **Dependencies**: Task 2.2.2
-  - **Output**: Search service working
+  - **Output**: Search service working ✓
 
-- [ ] ⬜ **Task 4.1.3**: Implement stream URL service
+- [x] ✅ **Task 4.1.3**: Implement stream URL service (Completed: 2026-01-17)
   - Create async_get_stream_url service
   - Accept media_id and stream_quality parameters
   - Call stremio-api to get stream URL
   - Return URL as service response
   - **Best Practice**: Validate media_id before API call
   - **Dependencies**: Task 2.2.1
-  - **Output**: Stream URL service working
+  - **Output**: Stream URL service working ✓
 
-- [ ] ⬜ **Task 4.1.4**: Implement library management services
+- [x] ✅ **Task 4.1.4**: Implement library management services (Completed: 2026-01-17)
   - Create async_add_to_library service
   - Create async_remove_from_library service
   - Create async_refresh_library service
@@ -263,10 +263,10 @@ This document tracks the implementation progress of the Stremio HACS integration
   - Fire events on library changes
   - **Best Practice**: Refresh coordinator after state-changing operations
   - **Dependencies**: Task 2.2.2, Task 4.1.2
-  - **Output**: Library management services working
+  - **Output**: Library management services working ✓
 
 ### 4.2 Events
-- [ ] ⬜ **Task 4.2.1**: Implement event firing logic
+- [x] ✅ **Task 4.2.1**: Implement event firing logic (Completed: 2026-01-17)
   - Add event firing to coordinator update method
   - Fire stremio_playback_started event
   - Fire stremio_playback_stopped event
@@ -274,15 +274,15 @@ This document tracks the implementation progress of the Stremio HACS integration
   - Include relevant data in event payload
   - **Best Practice**: Events enable powerful automations
   - **Dependencies**: Task 2.2.2
-  - **Output**: Events fire correctly
+  - **Output**: Events fire correctly ✓
 
-- [ ] ⬜ **Task 4.2.2**: Document events in docs/events.md
+- [x] ✅ **Task 4.2.2**: Document events in docs/events.md (Completed: 2026-01-17)
   - Create /docs/events.md file
   - Document each event type, trigger, and payload
   - Provide automation examples using events
   - **Best Practice**: Clear event documentation
   - **Dependencies**: Task 4.2.1, Task 1.1.5
-  - **Output**: Event documentation complete
+  - **Output**: Event documentation complete ✓
 
 ---
 
