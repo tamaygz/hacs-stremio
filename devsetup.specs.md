@@ -1,145 +1,290 @@
-# Add Developer-Friendly Testing Environment to hacs-stremio
+# Developer-Friendly Testing Environment for hacs-stremio
 
 ## Objective
-Extend the hacs-stremio project to provide an easy-to-use development environment that allows developers to quickly spin up a clean Home Assistant installation with HACS pre-installed and the Stremio integration ready for testing. 
+Provide an easy-to-use development environment that allows developers to quickly spin up a clean Home Assistant installation with HACS pre-installed and the Stremio integration ready for testing.
 
 ## Background
 This is a Home Assistant custom integration distributed via HACS (Home Assistant Community Store). To properly test HACS-specific features and provide a realistic user experience, developers need both Home Assistant and HACS running in their development environment.
 
+---
+
+## Current Project State
+
+### ✅ Already Implemented
+- `requirements_dev.txt` - Development dependencies (pytest, black, flake8, pylint, mypy, pre-commit)
+- `.vscode/settings.json` - Basic pytest configuration
+- `.github/workflows/test.yml` - CI with linting, tests, HACS validation, hassfest
+- `.github/workflows/release.yml` - Automated release workflow
+- `docs/development.md` - Basic development guide
+- `.pre-commit-config.yaml` - Pre-commit hooks
+- `pytest.ini` - Pytest configuration
+- `tests/` - Unit test suite
+- `README.md` - Project documentation with development section
+
+### 🔲 To Be Implemented
+- `.devcontainer/` - VS Code devcontainer configuration
+- `scripts/` - Automation scripts for setup/testing
+- `config/` - Example Home Assistant configuration
+- `.vscode/launch.json` - Debug configurations
+- `CONTRIBUTING.md` - Contribution guidelines
+- `docs/testing.md` - Detailed testing documentation
+- `docs/architecture.md` - Architecture overview
+
+---
+
 ## Requirements
 
-### 1. VS Code Devcontainer Setup
-Create a `.devcontainer/` directory with the following: 
+### 1. VS Code Devcontainer Setup (`.devcontainer/`)
 
-- **`devcontainer.json`**: Configure a development container that: 
-  - Uses the official Home Assistant development image or appropriate Python base image
-  - Exposes port 8123 for Home Assistant UI
-  - Mounts the integration code into the container's `custom_components/stremio` directory
-  - Sets up appropriate environment variables
-  - Includes VS Code extensions for Python development, YAML, and Home Assistant
-  - Defines post-create commands to set up the environment
+#### `devcontainer.json`
+Configure a development container that:
+- Uses `mcr.microsoft.com/devcontainers/python:3.11` as base image
+- Exposes port 8123 for Home Assistant UI
+- Mounts the integration code into the container's `custom_components/stremio` directory
+- Sets up appropriate environment variables
+- Includes VS Code extensions:
+  - `ms-python.python`
+  - `ms-python.vscode-pylance`
+  - `redhat.vscode-yaml`
+  - `keesschollaart.vscode-home-assistant`
+- Defines `postCreateCommand` to run `scripts/setup_dev_environment.sh`
+- Configures Python interpreter and testing settings
 
-- **`docker-compose.yml`** (if needed): 
-  - Service for Home Assistant
-  - Proper volume mounts for configuration and custom components
-  - Network configuration for development
+#### `docker-compose.yml` (optional)
+Only if multi-service setup needed:
+- Home Assistant service
+- Proper volume mounts for configuration and custom components
+- Network configuration for development
 
-### 2. Setup Scripts (in `/Scripts/`)
-Create the following automation scripts:
+### 2. Setup Scripts (`/scripts/`)
 
-- **`setup_dev_environment.sh`**: Main setup script that:
-  - Installs Home Assistant dependencies
-  - Downloads and installs HACS automatically
-  - Creates a basic Home Assistant configuration if none exists
-  - Symlinks or copies the integration into `custom_components/`
-  - Sets up a development user account
-  - Provides clear status messages throughout the process
+> **Note**: Use lowercase `scripts/` directory (not `Scripts/`) for cross-platform compatibility.
 
-- **`install_hacs.sh`**: Standalone script to: 
-  - Download the latest HACS release from GitHub
-  - Extract it to the correct `custom_components/hacs` location
-  - Verify the installation
-  - Handle errors gracefully
+#### `setup_dev_environment.sh`
+Main setup script that:
+- Checks for required dependencies (Python 3.11+, pip)
+- Creates virtual environment if not exists
+- Installs development dependencies from `requirements_dev.txt`
+- Downloads and installs HACS automatically (calls `install_hacs.sh`)
+- Creates basic Home Assistant configuration in `config/` if none exists
+- Symlinks the integration into `config/custom_components/stremio`
+- Installs pre-commit hooks
+- Provides clear status messages with colors/emojis
 
-- **`start_homeassistant.sh`**: Script to:
-  - Start Home Assistant with appropriate flags for development
-  - Show logs in real-time
-  - Provide the local URL to access the UI
+#### `install_hacs.sh`
+Standalone HACS installation script:
+- Downloads the latest HACS release from GitHub API
+- Extracts to `config/custom_components/hacs/`
+- Verifies installation by checking manifest.json
+- Handles errors gracefully with rollback
 
-- **`test_integration.sh`**: Script to:
-  - Run pytest tests for the integration
-  - Check code quality with flake8/pylint
-  - Validate Home Assistant integration manifest and structure
-  - Run type checking with mypy if applicable
+#### `start_homeassistant.sh`
+Development server script:
+- Creates config directory structure if needed
+- Starts Home Assistant with `hass -c ./config --debug`
+- Optionally runs in background with log tailing
+- Displays the local URL (`http://localhost:8123`)
+- Supports `--background` flag for headless operation
 
-### 3. Documentation (in `/docs/`)
-Create comprehensive developer documentation:
+#### `run_tests.sh`
+Comprehensive test runner:
+- Runs pytest with coverage: `pytest tests/ --cov=custom_components/stremio`
+- Runs black (format check): `black --check custom_components/stremio`
+- Runs flake8 (lint): `flake8 custom_components/stremio --max-line-length=120`
+- Runs mypy (type check): `mypy custom_components/stremio`
+- Supports flags: `--fix` (auto-format), `--quick` (tests only)
+- Exit codes indicate pass/fail for CI usage
 
-- **`DEVELOPMENT. md`**: Primary development guide including:
-  - Prerequisites (Docker, VS Code, Git)
-  - Quick start guide (3-5 steps to get running)
-  - How to open the project in the devcontainer
-  - How to access Home Assistant UI
-  - How to add the integration via HACS custom repository
-  - How to reload the integration after code changes
-  - Debugging tips and tricks
-  - Common issues and troubleshooting
+#### `validate_integration.sh`
+Integration validation script:
+- Validates `manifest.json` structure
+- Checks HACS compatibility (`hacs.json`)
+- Runs hassfest locally if available
+- Validates translations structure
+- Checks for common issues
 
-- **`TESTING.md`**: Testing documentation: 
-  - How to run automated tests
-  - How to manually test the integration
-  - Test coverage expectations
-  - How to add new tests
+### 3. Documentation (`/docs/`)
 
-- **`ARCHITECTURE.md`** (optional but recommended):
-  - Overview of the integration structure
-  - Key components and their responsibilities
-  - Data flow diagram
-  - External dependencies (Stremio API, etc.)
+> **Note**: Use lowercase filenames to match existing docs structure.
+
+#### Update `development.md`
+Expand existing guide to include:
+- **Prerequisites**: Docker, VS Code with Dev Containers extension, Git
+- **Quick Start (Devcontainer)**:
+  1. Clone repo
+  2. Open in VS Code
+  3. Click "Reopen in Container"
+  4. Wait for setup (~2 min)
+  5. Run `scripts/start_homeassistant.sh`
+  6. Open `http://localhost:8123`
+- **Quick Start (Local)**:
+  1. Clone repo
+  2. Run `scripts/setup_dev_environment.sh`
+  3. Run `scripts/start_homeassistant.sh`
+- **Reloading After Changes**: How to use Developer Tools → YAML → Reload
+- **Debugging**: Using VS Code debugger with launch.json
+- **Common Issues**: Troubleshooting section
+
+#### Create `testing.md`
+Testing documentation:
+- Running all tests: `pytest tests/`
+- Running specific tests: `pytest tests/test_config_flow.py -v`
+- Coverage reports: `pytest --cov=custom_components/stremio --cov-report=html`
+- Manual testing checklist
+- Writing new tests guide
+- Mocking the Stremio API
+
+#### Create `architecture.md`
+Architecture overview:
+- Component diagram (ASCII or Mermaid)
+- Data flow: API → Coordinator → Entities → UI
+- Key files and responsibilities
+- Event system overview
+- Frontend card architecture
 
 ### 4. Configuration Files
 
-- **`requirements_dev.txt`**: Development dependencies: 
-  ```
-  homeassistant>=2024.1.0
-  pytest
-  pytest-homeassistant-custom-component
-  pytest-cov
-  flake8
-  pylint
-  black
-  mypy
-  pre-commit
-  ```
+#### `.vscode/settings.json` (Update)
+Expand existing settings:
+```json
+{
+    "python.testing.pytestArgs": ["tests"],
+    "python.testing.unittestEnabled": false,
+    "python.testing.pytestEnabled": true,
+    "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+    "python.formatting.provider": "black",
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+        "source.organizeImports": "explicit"
+    },
+    "[python]": {
+        "editor.defaultFormatter": "ms-python.black-formatter"
+    },
+    "yaml.schemas": {
+        "https://json.schemastore.org/hacs.json": "hacs.json"
+    },
+    "files.associations": {
+        "*.yaml": "home-assistant"
+    }
+}
+```
 
-- **`.vscode/settings.json`**: VS Code settings for: 
-  - Python path configuration
-  - Linting rules
-  - Formatting on save
-  - Home Assistant schema validation
+#### `.vscode/launch.json` (Create)
+Debug configurations:
+```json
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Home Assistant",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "homeassistant",
+            "args": ["-c", "./config", "--debug"],
+            "justMyCode": false
+        },
+        {
+            "name": "Pytest: Current File",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pytest",
+            "args": ["${file}", "-v"],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Pytest: All Tests",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pytest",
+            "args": ["tests/", "-v"],
+            "console": "integratedTerminal"
+        }
+    ]
+}
+```
 
-- **`.vscode/launch.json`**: Debug configurations for:
-  - Starting Home Assistant with debugger attached
-  - Running specific tests with debugger
+#### `config/configuration.yaml` (Create)
+Minimal HA config for development:
+```yaml
+# Home Assistant Development Configuration
+# This is a minimal config for testing the Stremio integration
 
-- **`config/configuration.yaml`** (example): Minimal Home Assistant configuration for testing: 
-  ```yaml
-  homeassistant:
-    name:  Stremio Development
-    latitude: 0
-    longitude: 0
-    elevation: 0
-    unit_system: metric
-    time_zone:  UTC
-  
-  logger:
-    default: info
-    logs: 
-      custom_components.stremio: debug
-  ```
+homeassistant:
+  name: Stremio Dev
+  latitude: 52.3676
+  longitude: 4.9041
+  elevation: 0
+  unit_system: metric
+  time_zone: UTC
+  currency: EUR
 
-### 5. GitHub Workflow (optional but recommended)
+# Enable debug logging for the integration
+logger:
+  default: info
+  logs:
+    custom_components.stremio: debug
+    homeassistant.components.websocket_api: warning
 
-- **`.github/workflows/test.yml`**: CI workflow to:
-  - Run tests on pull requests
-  - Validate integration structure
-  - Check code quality
-  - Test against multiple Home Assistant versions
+# Enable frontend
+frontend:
+  themes: !include_dir_merge_named themes/
 
-### 6. Root Project Files
+# Enable developer tools
+lovelace:
+  mode: yaml
+  resources:
+    - url: /local/stremio-player-card.js
+      type: module
+    - url: /local/stremio-library-card.js
+      type: module
+    - url: /local/stremio-media-details-card.js
+      type: module
+```
 
-Update or create: 
+#### `config/secrets.yaml.example` (Create)
+Template for secrets:
+```yaml
+# Copy this file to secrets.yaml and fill in your values
+# DO NOT commit secrets.yaml to version control!
 
-- **`CONTRIBUTING.md`**: Contribution guidelines: 
-  - How to set up the development environment (link to DEVELOPMENT.md)
-  - Code style guidelines
-  - How to submit PRs
-  - Testing requirements
+stremio_email: your_email@example.com
+stremio_password: your_password_here
+```
 
-- **`README.md`**: Add a "Development" section:
-  - Quick link to development setup
-  - Badge for test status (if CI is set up)
-  - Link to CONTRIBUTING.md
+### 5. Root Project Files
+
+#### `CONTRIBUTING.md` (Create)
+Contribution guidelines:
+- Code of conduct
+- How to report bugs
+- How to suggest features
+- Development setup (link to docs/development.md)
+- Pull request process
+- Code style (Black, 120 char lines)
+- Testing requirements (must pass CI)
+- Commit message format
+
+#### `.env.example` (Create)
+Environment variables template:
+```bash
+# Optional: Stremio credentials for integration testing
+STREMIO_EMAIL=
+STREMIO_PASSWORD=
+
+# Optional: Custom Home Assistant config path
+HA_CONFIG_PATH=./config
+```
+
+### 6. GitHub Workflows (Already Implemented ✅)
+
+The existing `.github/workflows/test.yml` already includes:
+- Matrix testing (Python 3.11, 3.12)
+- Linting (black, flake8)
+- Pytest with coverage
+- HACS validation
+- Hassfest validation
+
+---
 
 ## Implementation Guidelines
 
@@ -148,79 +293,134 @@ After implementation, the project should look like:
 ```
 hacs-stremio/
 ├── .devcontainer/
-│   ├── devcontainer.json
-│   └── docker-compose.yml (if needed)
+│   └── devcontainer.json
 ├── .github/
 │   └── workflows/
-│       └── test. yml
+│       ├── release.yml         ✅ exists
+│       └── test.yml            ✅ exists
 ├── .vscode/
-│   ├── settings.json
-│   └── launch.json
-├── Scripts/
-│   ├── setup_dev_environment.sh
-│   ├── install_hacs.sh
-│   ├── start_homeassistant.sh
-│   └── test_integration.sh
-├── docs/
-│   ├── DEVELOPMENT. md
-│   ├── TESTING.md
-│   └── ARCHITECTURE.md
+│   ├── launch.json             🔲 to create
+│   └── settings.json           ✅ exists (update)
 ├── config/
-│   └── configuration. yaml (example)
+│   ├── configuration.yaml      🔲 to create
+│   └── secrets.yaml.example    🔲 to create
 ├── custom_components/
-│   └── stremio/
-│       └── (existing integration files)
-├── tests/
-│   └── (test files)
-├── CONTRIBUTING.md
-├── requirements_dev.txt
-└── README.md (updated)
+│   └── stremio/                ✅ exists
+├── docs/
+│   ├── api.md                  ✅ exists
+│   ├── architecture.md         🔲 to create
+│   ├── configuration.md        ✅ exists
+│   ├── development.md          ✅ exists (update)
+│   ├── events.md               ✅ exists
+│   ├── services.md             ✅ exists
+│   ├── setup.md                ✅ exists
+│   ├── testing.md              🔲 to create
+│   ├── troubleshooting.md      ✅ exists
+│   └── ui.md                   ✅ exists
+├── examples/                   ✅ exists
+├── scripts/
+│   ├── install_hacs.sh         🔲 to create
+│   ├── run_tests.sh            🔲 to create
+│   ├── setup_dev_environment.sh 🔲 to create
+│   ├── start_homeassistant.sh  🔲 to create
+│   └── validate_integration.sh 🔲 to create
+├── tests/                      ✅ exists
+├── .env.example                🔲 to create
+├── .gitignore                  ✅ exists
+├── .pre-commit-config.yaml     ✅ exists
+├── CHANGELOG.md                ✅ exists
+├── CONTRIBUTING.md             🔲 to create
+├── hacs.json                   ✅ exists
+├── pytest.ini                  ✅ exists
+├── README.md                   ✅ exists
+└── requirements_dev.txt        ✅ exists
 ```
 
-### Best Practices to Follow
+### Best Practices
 
-1. **Automation First**: The setup should be as automated as possible.  A developer should be able to go from clone to running Home Assistant in < 5 minutes.
+1. **Automation First**: Clone to running HA in < 5 minutes
+2. **Clear Error Messages**: Colored output, helpful suggestions
+3. **Idempotency**: Safe to run scripts multiple times
+4. **Cross-Platform**: Use `#!/usr/bin/env bash`, test on Linux/macOS/WSL
+5. **Security**: Never commit secrets, use `.env` files
+6. **Version Pinning**: Use ranges (`>=2025.1.0,<2026.0.0`)
 
-2. **Clear Error Messages**: All scripts should provide helpful error messages and suggestions when things go wrong.
-
-3. **Idempotency**: Scripts should be safe to run multiple times without causing issues. 
-
-4. **Documentation**: Every step should be documented.  Assume the developer has never used Home Assistant before.
-
-5. **Cross-Platform**: Shell scripts should work on Linux, macOS, and WSL on Windows.  Use `#!/usr/bin/env bash` and avoid platform-specific commands.
-
-6. **Security**: Don't commit any secrets, tokens, or credentials. Use environment variables or `.env` files (with `.env.example`).
-
-7. **Version Pinning**: Pin major versions but allow minor updates (e.g., `homeassistant>=2024.1.0,<2025.0.0`).
+---
 
 ## Testing the Implementation
 
-After implementation, a developer should be able to: 
+After implementation, a developer should be able to:
 
+### Devcontainer Flow (Recommended)
 1. Clone the repository
 2. Open in VS Code
 3. Click "Reopen in Container" when prompted
-4. Wait for the container to build and setup to complete
-5. Open browser to `http://localhost:8123`
-6. See Home Assistant running with HACS installed
-7. Add the Stremio integration through HACS using a custom repository
-8. Configure and test the integration
+4. Wait for container build and setup (~2-3 min)
+5. Run `scripts/start_homeassistant.sh`
+6. Open browser to `http://localhost:8123`
+7. Complete HA onboarding
+8. Add the Stremio integration via Settings → Integrations
+
+### Local Development Flow
+1. Clone the repository
+2. Run `./scripts/setup_dev_environment.sh`
+3. Run `./scripts/start_homeassistant.sh`
+4. Open browser to `http://localhost:8123`
+5. Complete HA onboarding
+6. Add the Stremio integration via Settings → Integrations
+
+---
 
 ## Success Criteria
 
-- [ ] A new developer can set up the environment in under 5 minutes
-- [ ] Home Assistant starts successfully with HACS pre-installed
-- [ ] The Stremio integration can be loaded and tested
-- [ ] All scripts run without errors on Linux and macOS
-- [ ] Documentation is clear and comprehensive
-- [ ] Tests can be run easily with a single command
-- [ ] The setup works in the VS Code devcontainer
-- [ ] No manual Home Assistant or HACS configuration steps required (beyond initial HA onboarding)
+- [x] `requirements_dev.txt` with all dev dependencies
+- [x] `.vscode/settings.json` with pytest configuration
+- [x] `.github/workflows/test.yml` with CI pipeline
+- [x] `docs/development.md` with basic guide
+- [x] `.pre-commit-config.yaml` for code quality
+- [ ] `.devcontainer/devcontainer.json` for container development
+- [ ] `scripts/setup_dev_environment.sh` for automated setup
+- [ ] `scripts/install_hacs.sh` for HACS installation
+- [ ] `scripts/start_homeassistant.sh` for running HA
+- [ ] `scripts/run_tests.sh` for test execution
+- [ ] `config/configuration.yaml` example config
+- [ ] `.vscode/launch.json` debug configurations
+- [ ] `CONTRIBUTING.md` contribution guidelines
+- [ ] `docs/testing.md` testing documentation
+- [ ] `docs/architecture.md` architecture overview
+- [ ] New developer can set up environment in < 5 minutes
+- [ ] Home Assistant starts with HACS pre-installed
+- [ ] Integration can be loaded and tested
+
+---
+
+## Implementation Priority
+
+1. **High Priority** (Required for dev setup):
+   - `.devcontainer/devcontainer.json`
+   - `scripts/setup_dev_environment.sh`
+   - `scripts/install_hacs.sh`
+   - `scripts/start_homeassistant.sh`
+   - `config/configuration.yaml`
+
+2. **Medium Priority** (Improves DX):
+   - `.vscode/launch.json`
+   - `scripts/run_tests.sh`
+   - Update `docs/development.md`
+   - `CONTRIBUTING.md`
+
+3. **Low Priority** (Nice to have):
+   - `docs/testing.md`
+   - `docs/architecture.md`
+   - `scripts/validate_integration.sh`
+   - `.env.example`
+
+---
 
 ## Notes
 
-- The devcontainer should handle all the heavy lifting
-- HACS installation should be automated (it's not in the default HA install)
-- Consider using HACS 2.0 features if applicable
-- Make sure the integration symlink/mount works correctly so code changes are immediately available
-- Include a sample `secrets.yaml` if the integration needs API keys for Stremio
+- The devcontainer handles all heavy lifting for containerized development
+- HACS installation is automated via the official get script
+- Integration is symlinked so code changes are immediately available
+- Use `config/secrets.yaml` for API credentials (gitignored)
+- Scripts support both interactive and CI/headless modes
