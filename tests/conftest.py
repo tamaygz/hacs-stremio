@@ -1,8 +1,15 @@
 """Pytest fixtures and configuration for Stremio integration tests."""
 from __future__ import annotations
 
-import pytest
+import sys
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+
+# Mock the stremio_api module before any imports that might need it
+mock_stremio_api_module = MagicMock()
+mock_stremio_api_module.StremioAPIClient = MagicMock()
+sys.modules["stremio_api"] = mock_stremio_api_module
 
 from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
 from homeassistant.core import HomeAssistant
