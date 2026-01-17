@@ -1,7 +1,12 @@
 name: Release
 
 on:
-  workflow_dispatch: # Manual trigger only
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release (e.g., 0.1.1)"
+        required: true
+        type: string
 
 jobs:
   release:
@@ -18,22 +23,27 @@ jobs:
 
       - name: Update version in manifest
         run: |
-          VERSION=${GITHUB_REF#refs/tags/v}
-          sed -i "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" custom_components/stremio/manifest.json
+          VERSION="${{ inputs.version }}"
+          echo "Setting version to: $VERSION"
+          sed -i "s|\"version\": \".*\"|\"version\": \"$VERSION\"|" custom_components/stremio/manifest.json
+          cat custom_components/stremio/manifest.json
 
       - name: Create release zip
         run: |
           cd custom_components
           zip -r ../stremio.zip stremio
 
-      - name: Upload release asset
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
+          tag_name: v${{ inputs.version }}
+          name: Release v${{ inputs.version }}
           files: stremio.zip
+          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Update HACS
+      - name: Summary
         run: |
-          echo "Release ${{ github.ref_name }} published successfully"
+          echo "✅ Release v${{ inputs.version }} created successfully"
           echo "HACS will automatically detect the new release"
