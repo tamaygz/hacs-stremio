@@ -1,4 +1,5 @@
 """Binary sensor platform for Stremio integration."""
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -38,13 +39,17 @@ BINARY_SENSOR_TYPES: tuple[StremioBinarySensorEntityDescription, ...] = (
         icon="mdi:play",
         device_class=BinarySensorDeviceClass.RUNNING,
         value_fn=lambda data: data.get("current_watching") is not None,
-        attributes_fn=lambda data: {
-            "title": data.get("current_watching", {}).get("title"),
-            "type": data.get("current_watching", {}).get("type"),
-            "progress_percent": data.get("current_watching", {}).get("progress_percent"),
-        }
-        if data.get("current_watching")
-        else {},
+        attributes_fn=lambda data: (
+            {
+                "title": data.get("current_watching", {}).get("title"),
+                "type": data.get("current_watching", {}).get("type"),
+                "progress_percent": data.get("current_watching", {}).get(
+                    "progress_percent"
+                ),
+            }
+            if data.get("current_watching")
+            else {}
+        ),
     ),
     StremioBinarySensorEntityDescription(
         key="has_continue_watching",

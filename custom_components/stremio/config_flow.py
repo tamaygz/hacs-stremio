@@ -1,4 +1,5 @@
 """Config flow for Stremio integration."""
+
 from __future__ import annotations
 
 import logging
@@ -48,14 +49,14 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
     try:
         async with StremioAPIClient(auth_key=None) as client:
             auth_key = await client.login(email, password)
-            
+
             if not auth_key:
                 raise InvalidAuth("Authentication failed - no auth key received")
-            
+
             # Validate the auth key by fetching user profile
             async with StremioAPIClient(auth_key=auth_key) as validated_client:
                 user = await validated_client.get_user()
-                
+
                 if not user or not hasattr(user, "email"):
                     raise InvalidAuth("Failed to fetch user profile")
 
@@ -64,7 +65,7 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
                     CONF_AUTH_KEY: auth_key,
                     CONF_EMAIL: email,
                 }
-                
+
     except Exception as err:
         _LOGGER.exception("Unexpected error during authentication: %s", err)
         if "401" in str(err) or "authentication" in str(err).lower():
@@ -163,7 +164,8 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                     vol.Optional(
                         CONF_ENABLE_APPLE_TV_HANDOVER,
                         default=self.config_entry.options.get(
-                            CONF_ENABLE_APPLE_TV_HANDOVER, DEFAULT_ENABLE_APPLE_TV_HANDOVER
+                            CONF_ENABLE_APPLE_TV_HANDOVER,
+                            DEFAULT_ENABLE_APPLE_TV_HANDOVER,
                         ),
                     ): bool,
                     vol.Optional(
@@ -175,4 +177,3 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 }
             ),
         )
-

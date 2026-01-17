@@ -1,4 +1,5 @@
 """Services for Stremio integration."""
+
 from __future__ import annotations
 
 import logging
@@ -6,7 +7,12 @@ from typing import Any
 
 import voluptuous as vol
 
-from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse, SupportsResponse
+from homeassistant.core import (
+    HomeAssistant,
+    ServiceCall,
+    ServiceResponse,
+    SupportsResponse,
+)
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import config_validation as cv
 
@@ -84,7 +90,9 @@ HANDOVER_SCHEMA = vol.Schema(
 )
 
 
-def _get_entry_data(hass: HomeAssistant) -> tuple[StremioDataUpdateCoordinator, StremioClient]:
+def _get_entry_data(
+    hass: HomeAssistant,
+) -> tuple[StremioDataUpdateCoordinator, StremioClient]:
     """Get coordinator and client from first config entry.
 
     Args:

@@ -3,6 +3,7 @@
 This module provides media browser integration for browsing and playing
 Stremio library content through Home Assistant's Media Browser panel.
 """
+
 from __future__ import annotations
 
 import logging
@@ -313,9 +314,7 @@ class StremioMediaSource(MediaSource):
             children=children,
         )
 
-    async def _build_series_detail_browse(
-        self, identifier: str
-    ) -> BrowseMediaSource:
+    async def _build_series_detail_browse(self, identifier: str) -> BrowseMediaSource:
         """Build series detail view with seasons and episodes.
 
         Args:
@@ -382,9 +381,7 @@ class StremioMediaSource(MediaSource):
 
         # Show episodes for specific season
         episodes = []
-        season_data = (
-            seasons[season - 1] if seasons and season <= len(seasons) else {}
-        )
+        season_data = seasons[season - 1] if seasons and season <= len(seasons) else {}
         episode_list = season_data.get("episodes", [])
 
         for ep_num, episode in enumerate(episode_list, 1):
@@ -523,9 +520,7 @@ class StremioMediaSource(MediaSource):
             thumbnail=poster,
         )
 
-    def _build_empty_browse(
-        self, identifier: str, title: str
-    ) -> BrowseMediaSource:
+    def _build_empty_browse(self, identifier: str, title: str) -> BrowseMediaSource:
         """Build an empty browse result.
 
         Args:
@@ -554,9 +549,7 @@ class StremioMediaSource(MediaSource):
                 return entry_data["coordinator"]
         return None
 
-    def _get_mime_type(
-        self, url: str, stream_data: dict[str, Any]
-    ) -> str:
+    def _get_mime_type(self, url: str, stream_data: dict[str, Any]) -> str:
         """Determine MIME type for a stream URL.
 
         Args:

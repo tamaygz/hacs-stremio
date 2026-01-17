@@ -1,4 +1,5 @@
 """Pytest fixtures and configuration for Stremio integration tests."""
+
 from __future__ import annotations
 
 import sys
@@ -7,6 +8,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 import socket
 
+
 # Enable socket access for asyncio event loop (needed on Windows)
 # pytest-socket blocks sockets by default, but Windows asyncio requires sockets
 # for the ProactorEventLoop
@@ -14,6 +16,7 @@ import socket
 def socket_enabled(socket_enabled):
     """Enable socket access for all tests (required for Windows asyncio)."""
     return
+
 
 # Mock the stremio_api module before any imports that might need it
 mock_stremio_api_module = MagicMock()
@@ -82,8 +85,14 @@ MOCK_LIBRARY_ITEMS = [
         "genres": ["Crime", "Drama", "Thriller"],
         "rating": "9.5",
         "seasons": [
-            {"number": 1, "episodes": [{"title": "Pilot"}, {"title": "Cat's in the Bag..."}]},
-            {"number": 2, "episodes": [{"title": "Seven Thirty-Seven"}, {"title": "Grilled"}]},
+            {
+                "number": 1,
+                "episodes": [{"title": "Pilot"}, {"title": "Cat's in the Bag..."}],
+            },
+            {
+                "number": 2,
+                "episodes": [{"title": "Seven Thirty-Seven"}, {"title": "Grilled"}],
+            },
         ],
     },
 ]
@@ -134,11 +143,12 @@ MOCK_CURRENT_MEDIA = {
 # Fixtures
 # ============================================================================
 
+
 @pytest.fixture
 def mock_stremio_client():
     """Create a mock Stremio API client."""
     client = AsyncMock()
-    
+
     # Configure mock methods
     client.login = AsyncMock(return_value=MOCK_USER_DATA)
     client.get_library = AsyncMock(return_value=MOCK_LIBRARY_ITEMS)
@@ -149,7 +159,7 @@ def mock_stremio_client():
     client.remove_from_library = AsyncMock(return_value=True)
     client.get_user_info = AsyncMock(return_value=MOCK_USER_DATA)
     client.is_authenticated = True
-    
+
     return client
 
 
@@ -167,7 +177,7 @@ def mock_coordinator(mock_stremio_client):
     }
     coordinator.last_update_success = True
     coordinator.async_request_refresh = AsyncMock()
-    
+
     return coordinator
 
 
@@ -175,7 +185,7 @@ def mock_coordinator(mock_stremio_client):
 def mock_config_entry():
     """Create a mock config entry."""
     from homeassistant.config_entries import ConfigEntry
-    
+
     entry = MagicMock(spec=ConfigEntry)
     entry.entry_id = "test_entry_id"
     entry.domain = DOMAIN
@@ -188,7 +198,7 @@ def mock_config_entry():
     }
     entry.unique_id = "test@example.com"
     entry.title = "Stremio - test@example.com"
-    
+
     return entry
 
 
@@ -196,12 +206,12 @@ def mock_config_entry():
 def hass(event_loop):
     """Create a Home Assistant instance for testing."""
     from homeassistant.core import HomeAssistant
-    
+
     hass = HomeAssistant()
     hass.config.components.add("stremio")
-    
+
     yield hass
-    
+
     event_loop.run_until_complete(hass.async_stop())
 
 
@@ -215,7 +225,7 @@ def mock_hass():
     hass.bus.async_fire = MagicMock()
     hass.services = MagicMock()
     hass.config_entries = MagicMock()
-    
+
     return hass
 
 
@@ -235,7 +245,7 @@ def mock_pyatv():
         mock_device.identifier = "apple_tv_123"
         mock.scan = AsyncMock(return_value=[mock_device])
         mock.connect = AsyncMock()
-        
+
         yield mock
 
 
@@ -243,10 +253,11 @@ def mock_pyatv():
 # Helpers
 # ============================================================================
 
+
 def create_mock_entity(entity_id: str, state: str, attributes: dict = None):
     """Create a mock entity state."""
     from homeassistant.core import State
-    
+
     return State(
         entity_id=entity_id,
         state=state,
@@ -257,12 +268,12 @@ def create_mock_entity(entity_id: str, state: str, attributes: dict = None):
 async def setup_integration(hass: HomeAssistant, config_entry):
     """Set up the Stremio integration for testing."""
     config_entry.add_to_hass(hass)
-    
+
     with patch(
         "custom_components.stremio.StremioClient",
         return_value=AsyncMock(),
     ):
         await hass.config_entries.async_setup(config_entry.entry_id)
         await hass.async_block_till_done()
-    
+
     return hass.data[DOMAIN][config_entry.entry_id]

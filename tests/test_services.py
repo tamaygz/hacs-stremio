@@ -1,4 +1,5 @@
 """Tests for Stremio services."""
+
 from __future__ import annotations
 
 import pytest
@@ -16,7 +17,10 @@ from custom_components.stremio.const import (
     SERVICE_REFRESH_LIBRARY,
     SERVICE_HANDOVER_TO_APPLE_TV,
 )
-from custom_components.stremio.services import async_setup_services, async_unload_services
+from custom_components.stremio.services import (
+    async_setup_services,
+    async_unload_services,
+)
 
 from .conftest import MOCK_LIBRARY_ITEMS, MOCK_STREAMS
 
@@ -28,7 +32,7 @@ def mock_service_hass(mock_hass, mock_coordinator):
     mock_client.async_get_streams = AsyncMock(return_value=MOCK_STREAMS)
     mock_client.async_add_to_library = AsyncMock(return_value=True)
     mock_client.async_remove_from_library = AsyncMock(return_value=True)
-    
+
     mock_hass.data[DOMAIN] = {
         "test_entry": {
             "coordinator": mock_coordinator,
@@ -37,12 +41,12 @@ def mock_service_hass(mock_hass, mock_coordinator):
     }
     mock_hass.bus = MagicMock()
     mock_hass.bus.async_fire = MagicMock()
-    
+
     # Mock services
     mock_hass.services = MagicMock()
     mock_hass.services.async_register = MagicMock()
     mock_hass.services.async_remove = MagicMock()
-    
+
     return mock_hass
 
 
@@ -53,20 +57,20 @@ class TestSearchLibraryService:
     async def test_search_by_title(self, mock_service_hass, mock_coordinator):
         """Test searching library by title."""
         mock_coordinator.data = {"library": MOCK_LIBRARY_ITEMS}
-        
+
         await async_setup_services(mock_service_hass)
-        
+
         # Find the registered search_library handler
         calls = mock_service_hass.services.async_register.call_args_list
         search_call = next(c for c in calls if c[0][1] == SERVICE_SEARCH_LIBRARY)
         handler = search_call[0][2]
-        
+
         # Create mock service call
         service_call = MagicMock(spec=ServiceCall)
         service_call.data = {"query": "Shawshank", "search_type": "title", "limit": 10}
-        
+
         result = await handler(service_call)
-        
+
         assert "results" in result
         assert "count" in result
 
@@ -74,19 +78,19 @@ class TestSearchLibraryService:
     async def test_search_empty_query(self, mock_service_hass, mock_coordinator):
         """Test searching with empty query."""
         mock_coordinator.data = {"library": MOCK_LIBRARY_ITEMS}
-        
+
         await async_setup_services(mock_service_hass)
-        
+
         # Find the registered search_library handler
         calls = mock_service_hass.services.async_register.call_args_list
         search_call = next(c for c in calls if c[0][1] == SERVICE_SEARCH_LIBRARY)
         handler = search_call[0][2]
-        
+
         service_call = MagicMock(spec=ServiceCall)
         service_call.data = {"query": "", "search_type": "all", "limit": 10}
-        
+
         result = await handler(service_call)
-        
+
         # Should return empty results
         assert result["count"] == 0
 
@@ -98,20 +102,20 @@ class TestGetStreamsService:
     async def test_get_stream_url_success(self, mock_service_hass, mock_coordinator):
         """Test getting stream URL successfully."""
         await async_setup_services(mock_service_hass)
-        
+
         # Find the registered get_streams handler
         calls = mock_service_hass.services.async_register.call_args_list
         streams_call = next(c for c in calls if c[0][1] == SERVICE_GET_STREAMS)
         handler = streams_call[0][2]
-        
+
         service_call = MagicMock(spec=ServiceCall)
         service_call.data = {
             "media_id": "tt0111161",
             "media_type": "movie",
         }
-        
+
         result = await handler(service_call)
-        
+
         assert "streams" in result
         assert "count" in result
 
@@ -119,11 +123,11 @@ class TestGetStreamsService:
     async def test_get_stream_url_series(self, mock_service_hass, mock_coordinator):
         """Test getting stream URL for series episode."""
         await async_setup_services(mock_service_hass)
-        
+
         calls = mock_service_hass.services.async_register.call_args_list
         streams_call = next(c for c in calls if c[0][1] == SERVICE_GET_STREAMS)
         handler = streams_call[0][2]
-        
+
         service_call = MagicMock(spec=ServiceCall)
         service_call.data = {
             "media_id": "tt0903747",
@@ -131,27 +135,29 @@ class TestGetStreamsService:
             "season": 1,
             "episode": 1,
         }
-        
+
         result = await handler(service_call)
-        
+
         assert "streams" in result
 
     @pytest.mark.asyncio
-    async def test_get_stream_url_series_missing_episode(self, mock_service_hass, mock_coordinator):
+    async def test_get_stream_url_series_missing_episode(
+        self, mock_service_hass, mock_coordinator
+    ):
         """Test validation error when series missing season/episode."""
         await async_setup_services(mock_service_hass)
-        
+
         calls = mock_service_hass.services.async_register.call_args_list
         streams_call = next(c for c in calls if c[0][1] == SERVICE_GET_STREAMS)
         handler = streams_call[0][2]
-        
+
         service_call = MagicMock(spec=ServiceCall)
         service_call.data = {
             "media_id": "tt0903747",
             "media_type": "series",
             # Missing season and episode
         }
-        
+
         with pytest.raises(ServiceValidationError):
             await handler(service_call)
 
@@ -163,26 +169,26 @@ class TestAddToLibraryService:
     async def test_add_to_library(self, mock_service_hass, mock_coordinator):
         """Test adding item to library."""
         await async_setup_services(mock_service_hass)
-        
+
         calls = mock_service_hass.services.async_register.call_args_list
         add_call = next(c for c in calls if c[0][1] == SERVICE_ADD_TO_LIBRARY)
         handler = add_call[0][2]
-        
+
         service_call = MagicMock(spec=ServiceCall)
         service_call.data = {
             "media_id": "tt1234567",
             "media_type": "movie",
         }
-        
+
         await handler(service_call)
-        
+
         # Verify client method was called
         client = mock_service_hass.data[DOMAIN]["test_entry"]["client"]
         client.async_add_to_library.assert_called_once()
-        
+
         # Verify refresh was requested
         mock_coordinator.async_request_refresh.assert_called()
-        
+
         # Verify event was fired
         mock_service_hass.bus.async_fire.assert_called()
 
@@ -194,22 +200,22 @@ class TestRemoveFromLibraryService:
     async def test_remove_from_library(self, mock_service_hass, mock_coordinator):
         """Test removing item from library."""
         await async_setup_services(mock_service_hass)
-        
+
         calls = mock_service_hass.services.async_register.call_args_list
         remove_call = next(c for c in calls if c[0][1] == SERVICE_REMOVE_FROM_LIBRARY)
         handler = remove_call[0][2]
-        
+
         service_call = MagicMock(spec=ServiceCall)
         service_call.data = {
             "media_id": "tt0111161",
         }
-        
+
         await handler(service_call)
-        
+
         # Verify client method was called
         client = mock_service_hass.data[DOMAIN]["test_entry"]["client"]
         client.async_remove_from_library.assert_called_once()
-        
+
         # Verify refresh was requested
         mock_coordinator.async_request_refresh.assert_called()
 
@@ -221,16 +227,16 @@ class TestRefreshLibraryService:
     async def test_refresh_library(self, mock_service_hass, mock_coordinator):
         """Test refreshing library."""
         await async_setup_services(mock_service_hass)
-        
+
         calls = mock_service_hass.services.async_register.call_args_list
         refresh_call = next(c for c in calls if c[0][1] == SERVICE_REFRESH_LIBRARY)
         handler = refresh_call[0][2]
-        
+
         service_call = MagicMock(spec=ServiceCall)
         service_call.data = {}
-        
+
         await handler(service_call)
-        
+
         mock_coordinator.async_request_refresh.assert_called()
 
 
@@ -241,27 +247,31 @@ class TestHandoverService:
     async def test_handover_with_stream_url(self, mock_service_hass, mock_coordinator):
         """Test handover with provided stream URL."""
         mock_coordinator.data = {"current_watching": None}
-        
+
         await async_setup_services(mock_service_hass)
-        
+
         calls = mock_service_hass.services.async_register.call_args_list
-        handover_call = next(c for c in calls if c[0][1] == SERVICE_HANDOVER_TO_APPLE_TV)
+        handover_call = next(
+            c for c in calls if c[0][1] == SERVICE_HANDOVER_TO_APPLE_TV
+        )
         handler = handover_call[0][2]
-        
+
         service_call = MagicMock(spec=ServiceCall)
         service_call.data = {
             "device_id": "media_player.apple_tv",
             "stream_url": "http://example.com/stream.mp4",
             "method": "vlc",
         }
-        
-        with patch("custom_components.stremio.services.HandoverManager") as mock_handover:
+
+        with patch(
+            "custom_components.stremio.services.HandoverManager"
+        ) as mock_handover:
             mock_manager = MagicMock()
             mock_manager.handover = AsyncMock(return_value={"success": True})
             mock_handover.return_value = mock_manager
-            
+
             await handler(service_call)
-            
+
             mock_manager.handover.assert_called_once()
 
 
@@ -269,7 +279,9 @@ class TestServiceRegistration:
     """Tests for service registration."""
 
     @pytest.mark.asyncio
-    async def test_services_registered(self, mock_hass, mock_config_entry, mock_coordinator):
+    async def test_services_registered(
+        self, mock_hass, mock_config_entry, mock_coordinator
+    ):
         """Test that all services are registered on setup."""
         mock_client = AsyncMock()
         mock_hass.data[DOMAIN] = {
@@ -279,9 +291,9 @@ class TestServiceRegistration:
             }
         }
         mock_hass.services.async_register = MagicMock()
-        
+
         await async_setup_services(mock_hass)
-        
+
         # Verify 6 services were registered
         assert mock_hass.services.async_register.call_count == 6
 
@@ -289,8 +301,8 @@ class TestServiceRegistration:
     async def test_services_unregistered(self, mock_hass):
         """Test that all services are unregistered on unload."""
         mock_hass.services.async_remove = MagicMock()
-        
+
         await async_unload_services(mock_hass)
-        
+
         # Verify 6 services were removed
         assert mock_hass.services.async_remove.call_count == 6

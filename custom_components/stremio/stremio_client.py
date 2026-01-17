@@ -1,4 +1,5 @@
 """Stremio API Client wrapper."""
+
 from __future__ import annotations
 
 import logging
@@ -44,11 +45,11 @@ class StremioClient:
                 if not auth_key:
                     raise StremioAuthError("No auth key received")
                 self._auth_key = auth_key
-                
+
                 # Initialize persistent client
                 self._client = StremioAPI(auth_key=self._auth_key)
                 await self._client.__aenter__()
-                
+
                 return auth_key
         except StremioAuthError:
             raise
@@ -254,8 +255,10 @@ class StremioClient:
             for item in library:
                 processed_item = {
                     "id": getattr(item, "id", None),
-                    "imdb_id": getattr(item, "imdb_id", None) or getattr(item, "id", None),
-                    "title": getattr(item, "name", None) or getattr(item, "title", "Unknown"),
+                    "imdb_id": getattr(item, "imdb_id", None)
+                    or getattr(item, "id", None),
+                    "title": getattr(item, "name", None)
+                    or getattr(item, "title", "Unknown"),
                     "type": getattr(item, "type", "unknown"),
                     "poster": getattr(item, "poster", None),
                     "year": getattr(item, "year", None),
@@ -286,8 +289,10 @@ class StremioClient:
             for item in watching:
                 processed_item = {
                     "id": getattr(item, "id", None),
-                    "imdb_id": getattr(item, "imdb_id", None) or getattr(item, "id", None),
-                    "title": getattr(item, "name", None) or getattr(item, "title", "Unknown"),
+                    "imdb_id": getattr(item, "imdb_id", None)
+                    or getattr(item, "id", None),
+                    "title": getattr(item, "name", None)
+                    or getattr(item, "title", "Unknown"),
                     "type": getattr(item, "type", "unknown"),
                     "poster": getattr(item, "poster", None),
                     "progress": getattr(item, "progress", 0),

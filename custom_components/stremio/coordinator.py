@@ -1,4 +1,5 @@
 """DataUpdateCoordinator for Stremio integration."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -97,7 +98,9 @@ class StremioDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 for item in sorted_watching:
                     progress = item.get("progress", 0)
                     duration = item.get("duration", 1)
-                    progress_percent = (progress / duration * 100) if duration > 0 else 0
+                    progress_percent = (
+                        (progress / duration * 100) if duration > 0 else 0
+                    )
 
                     if 0 < progress_percent < 95:  # Not finished
                         data["current_watching"] = {
@@ -114,7 +117,10 @@ class StremioDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                         **last_item,
                         "progress_percent": (
                             round(
-                                (last_item.get("progress", 0) / last_item.get("duration", 1))
+                                (
+                                    last_item.get("progress", 0)
+                                    / last_item.get("duration", 1)
+                                )
                                 * 100,
                                 1,
                             )
@@ -188,7 +194,8 @@ class StremioDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         elif (
             current_watching
             and self._previous_watching
-            and current_watching.get("imdb_id") != self._previous_watching.get("imdb_id")
+            and current_watching.get("imdb_id")
+            != self._previous_watching.get("imdb_id")
         ):
             _LOGGER.debug("Firing playback stopped and started events (content change)")
             self.hass.bus.async_fire(
@@ -212,7 +219,10 @@ class StremioDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             )
 
         # Check for library changes
-        if self._previous_library_count > 0 and library_count != self._previous_library_count:
+        if (
+            self._previous_library_count > 0
+            and library_count != self._previous_library_count
+        ):
             change = library_count - self._previous_library_count
             _LOGGER.debug("Firing library changed event: %+d items", change)
             self.hass.bus.async_fire(

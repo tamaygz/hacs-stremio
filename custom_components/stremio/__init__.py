@@ -7,6 +7,7 @@ This integration connects to Stremio and provides:
 - Apple TV handover support
 - Custom Lovelace cards
 """
+
 from __future__ import annotations
 
 import logging
@@ -22,6 +23,7 @@ from homeassistant.helpers.typing import ConfigType
 # Try to import StaticPathConfig (HA 2024.6+), fallback for older versions
 try:
     from homeassistant.components.http import StaticPathConfig
+
     HAS_STATIC_PATH_CONFIG = True
 except ImportError:
     HAS_STATIC_PATH_CONFIG = False

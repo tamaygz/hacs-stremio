@@ -1,4 +1,5 @@
 """Media player platform for Stremio integration."""
+
 from __future__ import annotations
 
 import logging
@@ -42,12 +43,13 @@ async def async_setup_entry(
     async_add_entities([StremioMediaPlayer(coordinator, entry)])
 
 
-class StremioMediaPlayer(CoordinatorEntity[StremioDataUpdateCoordinator], MediaPlayerEntity):
+class StremioMediaPlayer(
+    CoordinatorEntity[StremioDataUpdateCoordinator], MediaPlayerEntity
+):
     """Representation of a Stremio media player."""
 
     _attr_supported_features = (
-        MediaPlayerEntityFeature.BROWSE_MEDIA
-        | MediaPlayerEntityFeature.PLAY_MEDIA
+        MediaPlayerEntityFeature.BROWSE_MEDIA | MediaPlayerEntityFeature.PLAY_MEDIA
     )
 
     def __init__(

@@ -3,6 +3,7 @@
 This module provides functionality to send Stremio streams to Apple TV devices
 using either AirPlay (via pyatv) or VLC deep links as a fallback.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -21,6 +22,7 @@ _LOGGER = logging.getLogger(__name__)
 try:
     import pyatv
     from pyatv.const import Protocol
+
     PYATV_AVAILABLE = True
 except ImportError:
     PYATV_AVAILABLE = False
@@ -134,9 +136,7 @@ class HandoverManager:
         # Default to VLC for unknown formats
         return HandoverMethod.VLC
 
-    async def discover_apple_tv_devices(
-        self, timeout: float = 5.0
-    ) -> dict[str, Any]:
+    async def discover_apple_tv_devices(self, timeout: float = 5.0) -> dict[str, Any]:
         """Discover Apple TV devices on the network.
 
         Args:
@@ -170,9 +170,13 @@ class HandoverManager:
                         "services": [str(s.protocol) for s in device.services],
                     }
                     self._discovered_devices[device.name] = device_info
-                    _LOGGER.debug("Found Apple TV: %s at %s", device.name, device.address)
+                    _LOGGER.debug(
+                        "Found Apple TV: %s at %s", device.name, device.address
+                    )
 
-                _LOGGER.info("Discovered %d Apple TV device(s)", len(self._discovered_devices))
+                _LOGGER.info(
+                    "Discovered %d Apple TV device(s)", len(self._discovered_devices)
+                )
                 return self._discovered_devices
 
             except Exception as err:
@@ -255,7 +259,9 @@ class HandoverManager:
                     pyatv.interface.FeatureState.Available,
                     pyatv.interface.FeatureName.PlayUrl,
                 ):
-                    raise HandoverError("AirPlay streaming not available on this device")
+                    raise HandoverError(
+                        "AirPlay streaming not available on this device"
+                    )
 
                 # Stream the URL
                 await atv.stream.play_url(stream_url)
@@ -407,7 +413,9 @@ class HandoverManager:
                     _LOGGER.warning("AirPlay unavailable, falling back to VLC")
                     method = HandoverMethod.VLC
                 else:
-                    await self.handover_via_airplay(device_identifier, stream_url, title)
+                    await self.handover_via_airplay(
+                        device_identifier, stream_url, title
+                    )
                     result["success"] = True
                     result["method"] = "airplay"
                     return result

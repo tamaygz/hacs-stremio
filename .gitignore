@@ -89,6 +89,7 @@ dmypy.json
 config/custom_components/
 /config/custom_components/*
 config/custom_components/**
+config/custom_components
 /config/www/*
 /config/.HA_VERSION
 /config/home-assistant.log*

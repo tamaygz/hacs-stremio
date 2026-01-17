@@ -1,4 +1,5 @@
 """Sensor platform for Stremio integration."""
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -52,19 +53,23 @@ SENSOR_TYPES: tuple[StremioSensorEntityDescription, ...] = (
             if data.get("current_watching")
             else "Nothing"
         ),
-        attributes_fn=lambda data: {
-            "type": data.get("current_watching", {}).get("type"),
-            "progress_percent": data.get("current_watching", {}).get("progress_percent"),
-            "time_offset": data.get("current_watching", {}).get("time_offset"),
-            "duration": data.get("current_watching", {}).get("duration"),
-            "season": data.get("current_watching", {}).get("season"),
-            "episode": data.get("current_watching", {}).get("episode"),
-            "year": data.get("current_watching", {}).get("year"),
-            "imdb_id": data.get("current_watching", {}).get("imdb_id"),
-            "poster": data.get("current_watching", {}).get("poster"),
-        }
-        if data.get("current_watching")
-        else {},
+        attributes_fn=lambda data: (
+            {
+                "type": data.get("current_watching", {}).get("type"),
+                "progress_percent": data.get("current_watching", {}).get(
+                    "progress_percent"
+                ),
+                "time_offset": data.get("current_watching", {}).get("time_offset"),
+                "duration": data.get("current_watching", {}).get("duration"),
+                "season": data.get("current_watching", {}).get("season"),
+                "episode": data.get("current_watching", {}).get("episode"),
+                "year": data.get("current_watching", {}).get("year"),
+                "imdb_id": data.get("current_watching", {}).get("imdb_id"),
+                "poster": data.get("current_watching", {}).get("poster"),
+            }
+            if data.get("current_watching")
+            else {}
+        ),
     ),
     StremioSensorEntityDescription(
         key="last_watched",
@@ -75,18 +80,22 @@ SENSOR_TYPES: tuple[StremioSensorEntityDescription, ...] = (
             if data.get("last_watched")
             else "Nothing"
         ),
-        attributes_fn=lambda data: {
-            "type": data.get("last_watched", {}).get("type"),
-            "progress_percent": data.get("last_watched", {}).get("progress_percent"),
-            "watched_at": data.get("last_watched", {}).get("watched_at"),
-            "season": data.get("last_watched", {}).get("season"),
-            "episode": data.get("last_watched", {}).get("episode"),
-            "year": data.get("last_watched", {}).get("year"),
-            "imdb_id": data.get("last_watched", {}).get("imdb_id"),
-            "poster": data.get("last_watched", {}).get("poster"),
-        }
-        if data.get("last_watched")
-        else {},
+        attributes_fn=lambda data: (
+            {
+                "type": data.get("last_watched", {}).get("type"),
+                "progress_percent": data.get("last_watched", {}).get(
+                    "progress_percent"
+                ),
+                "watched_at": data.get("last_watched", {}).get("watched_at"),
+                "season": data.get("last_watched", {}).get("season"),
+                "episode": data.get("last_watched", {}).get("episode"),
+                "year": data.get("last_watched", {}).get("year"),
+                "imdb_id": data.get("last_watched", {}).get("imdb_id"),
+                "poster": data.get("last_watched", {}).get("poster"),
+            }
+            if data.get("last_watched")
+            else {}
+        ),
     ),
     StremioSensorEntityDescription(
         key="continue_watching_count",
@@ -100,11 +109,13 @@ SENSOR_TYPES: tuple[StremioSensorEntityDescription, ...] = (
                 {
                     "title": item.get("title"),
                     "type": item.get("type"),
-                    "progress_percent": round(
-                        (item.get("progress", 0) / item.get("duration", 1)) * 100, 1
-                    )
-                    if item.get("duration", 0) > 0
-                    else 0,
+                    "progress_percent": (
+                        round(
+                            (item.get("progress", 0) / item.get("duration", 1)) * 100, 1
+                        )
+                        if item.get("duration", 0) > 0
+                        else 0
+                    ),
                 }
                 for item in data.get("continue_watching", [])[:5]
             ]

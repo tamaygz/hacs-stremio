@@ -3,6 +3,7 @@
 This module contains helper functions and base classes for Stremio entities
 to ensure consistency and reduce code duplication.
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -42,12 +43,12 @@ def format_time(seconds: int | float | None) -> str:
     """
     if not seconds or seconds <= 0:
         return "0:00"
-    
+
     seconds = int(seconds)
     hours = seconds // 3600
     mins = (seconds % 3600) // 60
     secs = seconds % 60
-    
+
     if hours > 0:
         return f"{hours}:{mins:02d}:{secs:02d}"
     return f"{mins}:{secs:02d}"
