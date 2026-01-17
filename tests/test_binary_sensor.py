@@ -7,118 +7,114 @@ from unittest.mock import MagicMock
 from homeassistant.components.binary_sensor import BinarySensorDeviceClass
 
 from custom_components.stremio.const import DOMAIN
+from custom_components.stremio.binary_sensor import (
+    StremioBinarySensor,
+    BINARY_SENSOR_TYPES,
+    async_setup_entry,
+)
 
-from .conftest import MOCK_LIBRARY_ITEMS
+from .conftest import MOCK_LIBRARY_ITEMS, MOCK_CONTINUE_WATCHING
 
 
-class TestIsPlayingBinarySensor:
-    """Tests for the is_playing binary sensor."""
+class TestIsWatchingBinarySensor:
+    """Tests for the is_watching binary sensor."""
 
-    @pytest.mark.asyncio
-    async def test_is_on_when_playing(self, mock_hass, mock_coordinator):
-        """Test sensor is on when media is playing."""
-        from custom_components.stremio.binary_sensor import StremioIsPlayingBinarySensor
-        
-        mock_coordinator.data = {"is_playing": True}
-        
-        sensor = StremioIsPlayingBinarySensor(mock_coordinator, "test_entry")
-        sensor.hass = mock_hass
-        
-        assert sensor.is_on is True
-
-    @pytest.mark.asyncio
-    async def test_is_off_when_not_playing(self, mock_hass, mock_coordinator):
-        """Test sensor is off when media is not playing."""
-        from custom_components.stremio.binary_sensor import StremioIsPlayingBinarySensor
-        
-        mock_coordinator.data = {"is_playing": False}
-        
-        sensor = StremioIsPlayingBinarySensor(mock_coordinator, "test_entry")
-        sensor.hass = mock_hass
-        
-        assert sensor.is_on is False
+    @pytest.fixture
+    def is_watching_sensor(self, mock_coordinator, mock_config_entry):
+        """Create is_watching sensor for testing."""
+        description = next(d for d in BINARY_SENSOR_TYPES if d.key == "is_watching")
+        sensor = StremioBinarySensor(mock_coordinator, mock_config_entry, description)
+        return sensor
 
     @pytest.mark.asyncio
-    async def test_device_class(self, mock_hass, mock_coordinator):
+    async def test_is_on_when_watching(self, mock_hass, mock_coordinator, is_watching_sensor):
+        """Test sensor is on when media is being watched."""
+        mock_coordinator.data = {
+            "current_watching": {"title": "Test Movie", "type": "movie", "progress_percent": 50}
+        }
+        is_watching_sensor.hass = mock_hass
+        
+        assert is_watching_sensor.is_on is True
+
+    @pytest.mark.asyncio
+    async def test_is_off_when_not_watching(self, mock_hass, mock_coordinator, is_watching_sensor):
+        """Test sensor is off when no media is being watched."""
+        mock_coordinator.data = {"current_watching": None}
+        is_watching_sensor.hass = mock_hass
+        
+        assert is_watching_sensor.is_on is False
+
+    @pytest.mark.asyncio
+    async def test_device_class(self, is_watching_sensor):
         """Test sensor device class."""
-        from custom_components.stremio.binary_sensor import StremioIsPlayingBinarySensor
-        
-        sensor = StremioIsPlayingBinarySensor(mock_coordinator, "test_entry")
-        
-        # Should have appropriate device class
-        assert sensor.device_class is not None
+        assert is_watching_sensor.device_class == BinarySensorDeviceClass.RUNNING
 
     @pytest.mark.asyncio
-    async def test_unique_id(self, mock_hass, mock_coordinator):
+    async def test_unique_id(self, mock_config_entry, is_watching_sensor):
         """Test sensor unique ID."""
-        from custom_components.stremio.binary_sensor import StremioIsPlayingBinarySensor
-        
-        sensor = StremioIsPlayingBinarySensor(mock_coordinator, "test_entry")
-        
-        assert sensor.unique_id is not None
-        assert "test_entry" in sensor.unique_id
-
-
-class TestHasNewContentBinarySensor:
-    """Tests for the has_new_content binary sensor."""
+        assert is_watching_sensor.unique_id is not None
+        assert mock_config_entry.entry_id in is_watching_sensor.unique_id
+        assert "is_watching" in is_watching_sensor.unique_id
 
     @pytest.mark.asyncio
-    async def test_is_on_when_new_content(self, mock_hass, mock_coordinator):
-        """Test sensor is on when new content detected."""
-        from custom_components.stremio.binary_sensor import StremioHasNewContentBinarySensor
-        
-        mock_coordinator.data = {
-            "has_new_content": True,
-            "library": MOCK_LIBRARY_ITEMS,
-        }
-        
-        sensor = StremioHasNewContentBinarySensor(mock_coordinator, "test_entry")
-        sensor.hass = mock_hass
-        
-        assert sensor.is_on is True
-
-    @pytest.mark.asyncio
-    async def test_is_off_when_no_new_content(self, mock_hass, mock_coordinator):
-        """Test sensor is off when no new content."""
-        from custom_components.stremio.binary_sensor import StremioHasNewContentBinarySensor
-        
-        mock_coordinator.data = {
-            "has_new_content": False,
-            "library": MOCK_LIBRARY_ITEMS,
-        }
-        
-        sensor = StremioHasNewContentBinarySensor(mock_coordinator, "test_entry")
-        sensor.hass = mock_hass
-        
-        assert sensor.is_on is False
-
-    @pytest.mark.asyncio
-    async def test_device_class(self, mock_hass, mock_coordinator):
-        """Test sensor device class is update."""
-        from custom_components.stremio.binary_sensor import StremioHasNewContentBinarySensor
-        
-        sensor = StremioHasNewContentBinarySensor(mock_coordinator, "test_entry")
-        
-        # Should indicate update availability
-        assert sensor.device_class == BinarySensorDeviceClass.UPDATE
-
-    @pytest.mark.asyncio
-    async def test_extra_state_attributes(self, mock_hass, mock_coordinator):
+    async def test_extra_state_attributes(self, mock_hass, mock_coordinator, is_watching_sensor):
         """Test extra state attributes."""
-        from custom_components.stremio.binary_sensor import StremioHasNewContentBinarySensor
-        
         mock_coordinator.data = {
-            "has_new_content": True,
-            "new_items": [{"title": "New Movie", "type": "movie"}],
+            "current_watching": {"title": "Test Movie", "type": "movie", "progress_percent": 75}
         }
+        is_watching_sensor.hass = mock_hass
         
-        sensor = StremioHasNewContentBinarySensor(mock_coordinator, "test_entry")
-        sensor.hass = mock_hass
+        attrs = is_watching_sensor.extra_state_attributes
         
-        attrs = sensor.extra_state_attributes
-        
-        # Should contain new items info
         assert attrs is not None
+        assert attrs.get("title") == "Test Movie"
+        assert attrs.get("type") == "movie"
+        assert attrs.get("progress_percent") == 75
+
+
+class TestHasContinueWatchingBinarySensor:
+    """Tests for the has_continue_watching binary sensor."""
+
+    @pytest.fixture
+    def continue_watching_sensor(self, mock_coordinator, mock_config_entry):
+        """Create has_continue_watching sensor for testing."""
+        description = next(d for d in BINARY_SENSOR_TYPES if d.key == "has_continue_watching")
+        sensor = StremioBinarySensor(mock_coordinator, mock_config_entry, description)
+        return sensor
+
+    @pytest.mark.asyncio
+    async def test_is_on_when_has_continue_watching(self, mock_hass, mock_coordinator, continue_watching_sensor):
+        """Test sensor is on when there are items to continue watching."""
+        mock_coordinator.data = {
+            "continue_watching": MOCK_CONTINUE_WATCHING,
+        }
+        continue_watching_sensor.hass = mock_hass
+        
+        assert continue_watching_sensor.is_on is True
+
+    @pytest.mark.asyncio
+    async def test_is_off_when_no_continue_watching(self, mock_hass, mock_coordinator, continue_watching_sensor):
+        """Test sensor is off when no items to continue watching."""
+        mock_coordinator.data = {
+            "continue_watching": [],
+        }
+        continue_watching_sensor.hass = mock_hass
+        
+        assert continue_watching_sensor.is_on is False
+
+    @pytest.mark.asyncio
+    async def test_extra_state_attributes(self, mock_hass, mock_coordinator, continue_watching_sensor):
+        """Test extra state attributes contain count."""
+        mock_coordinator.data = {
+            "continue_watching": MOCK_CONTINUE_WATCHING,
+        }
+        continue_watching_sensor.hass = mock_hass
+        
+        attrs = continue_watching_sensor.extra_state_attributes
+        
+        assert attrs is not None
+        assert "count" in attrs
+        assert attrs["count"] == len(MOCK_CONTINUE_WATCHING)
 
 
 class TestBinarySensorSetup:
@@ -127,8 +123,6 @@ class TestBinarySensorSetup:
     @pytest.mark.asyncio
     async def test_async_setup_entry(self, mock_hass, mock_config_entry, mock_coordinator):
         """Test binary sensor platform setup."""
-        from custom_components.stremio.binary_sensor import async_setup_entry
-        
         mock_hass.data[DOMAIN] = {
             mock_config_entry.entry_id: {
                 "coordinator": mock_coordinator,
@@ -139,27 +133,24 @@ class TestBinarySensorSetup:
         
         await async_setup_entry(mock_hass, mock_config_entry, async_add_entities)
         
-        # Should add at least 2 binary sensors
+        # Should add binary sensors for each description
         async_add_entities.assert_called_once()
         entities = async_add_entities.call_args[0][0]
-        assert len(entities) >= 2
+        assert len(entities) == len(BINARY_SENSOR_TYPES)
 
 
 class TestBinarySensorDeviceInfo:
     """Tests for binary sensor device info."""
 
     @pytest.mark.asyncio
-    async def test_device_info(self, mock_hass, mock_coordinator):
+    async def test_device_info(self, mock_hass, mock_coordinator, mock_config_entry):
         """Test device info is set correctly."""
-        from custom_components.stremio.binary_sensor import StremioIsPlayingBinarySensor
-        
-        mock_coordinator.data = {"is_playing": False}
-        
-        sensor = StremioIsPlayingBinarySensor(mock_coordinator, "test_entry")
+        description = BINARY_SENSOR_TYPES[0]
+        sensor = StremioBinarySensor(mock_coordinator, mock_config_entry, description)
         sensor.hass = mock_hass
         
         device_info = sensor.device_info
         
         assert device_info is not None
         assert "identifiers" in device_info
-        assert (DOMAIN, "test_entry") in device_info["identifiers"]
+        assert (DOMAIN, mock_config_entry.entry_id) in device_info["identifiers"]
