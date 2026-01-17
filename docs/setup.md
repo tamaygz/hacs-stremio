@@ -1,5 +1,7 @@
 # Stremio Home Assistant Integration - Setup Guide
 
+> **Development Environment?** If you're running Home Assistant Core in a development container and don't see the Add-ons menu or HACS, see [Development Environment Setup](dev-environment-hacs.md) for specific instructions.
+
 ## Prerequisites
 
 - Home Assistant 2025.1 or later
