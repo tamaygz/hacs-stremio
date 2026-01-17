@@ -2,7 +2,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Home Assistant",
+            "name": "Home Assistant (with HACS)",
             "type": "debugpy",
             "request": "launch",
             "module": "homeassistant",
@@ -11,7 +11,21 @@
             "console": "integratedTerminal",
             "env": {
                 "PYTHONDONTWRITEBYTECODE": "1"
-            }
+            },
+            "preLaunchTask": "Restore HACS"
+        },
+        {
+            "name": "Home Assistant (without HACS)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "homeassistant",
+            "args": ["-c", "${workspaceFolder}/config", "--debug"],
+            "justMyCode": false,
+            "console": "integratedTerminal",
+            "env": {
+                "PYTHONDONTWRITEBYTECODE": "1"
+            },
+            "preLaunchTask": "Disable HACS"
         },
         {
             "name": "Home Assistant (Verbose)",
@@ -21,6 +35,18 @@
             "args": ["-c", "${workspaceFolder}/config", "--debug", "--verbose"],
             "justMyCode": false,
             "console": "integratedTerminal"
+        },
+        {
+            "name": "Home Assistant (Skip Pip)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "homeassistant",
+            "args": ["-c", "${workspaceFolder}/config", "--debug", "--skip-pip"],
+            "justMyCode": false,
+            "console": "integratedTerminal",
+            "env": {
+                "PYTHONDONTWRITEBYTECODE": "1"
+            }
         },
         {
             "name": "Pytest: Current File",
