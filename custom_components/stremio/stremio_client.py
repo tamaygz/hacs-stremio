@@ -2,14 +2,23 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any
 
-from stremio_api import StremioAPIClient as StremioAPI
+import aiohttp
+from aiohttp import ClientError, ClientTimeout
 
 from homeassistant.exceptions import HomeAssistantError
 
 _LOGGER = logging.getLogger(__name__)
+
+# Stremio API endpoints
+STREMIO_API_BASE = "https://api.strem.io"
+STREMIO_AUTH_URL = f"{STREMIO_API_BASE}/api/login"
+STREMIO_USER_URL = f"{STREMIO_API_BASE}/api/datastoreMeta"
+STREMIO_ADDON_COLLECTION_URL = f"{STREMIO_API_BASE}/api/addonCollectionGet"
+
 
 
 class StremioClient:
@@ -25,7 +34,14 @@ class StremioClient:
         self._email = email
         self._password = password
         self._auth_key: str | None = None
-        self._client: StremioAPI | None = None
+        self._session: aiohttp.ClientSession | None = None
+
+    async def _get_session(self) -> aiohttp.ClientSession:
+        """Get or create aiohttp session."""
+        if self._session is None or self._session.closed:
+            timeout = ClientTimeout(total=30)
+            self._session = aiohttp.ClientSession(timeout=timeout)
+        return self._session
 
     async def async_authenticate(self) -> str:
         """Authenticate with Stremio and get auth key.
@@ -38,30 +54,47 @@ class StremioClient:
             StremioConnectionError: Connection failed
         """
         try:
-            async with StremioAPI(auth_key=None) as client:
-                auth_key = await client.login(self._email, self._password)
+            session = await self._get_session()
+            
+            # Login to Stremio
+            payload = {
+                "email": self._email,
+                "password": self._password,
+                "facebook": False,
+            }
+            
+            async with session.post(STREMIO_AUTH_URL, json=payload) as response:
+                if response.status == 401:
+                    raise StremioAuthError("Invalid email or password")
+                if response.status != 200:
+                    text = await response.text()
+                    raise StremioConnectionError(
+                        f"Authentication failed with status {response.status}: {text}"
+                    )
+                
+                data = await response.json()
+                auth_key = data.get("authKey") or data.get("result", {}).get("authKey")
+                
                 if not auth_key:
-                    raise StremioAuthError("No auth key received")
+                    raise StremioAuthError("No auth key received in response")
+                
                 self._auth_key = auth_key
-
-                # Initialize persistent client
-                self._client = StremioAPI(auth_key=self._auth_key)
-                await self._client.__aenter__()
-
                 return auth_key
+
         except StremioAuthError:
             raise
+        except ClientError as err:
+            _LOGGER.error("Connection error during authentication: %s", err)
+            raise StremioConnectionError(f"Connection failed: {err}") from err
         except Exception as err:
             _LOGGER.error("Authentication failed: %s", err)
-            if "401" in str(err) or "authentication" in str(err).lower():
-                raise StremioAuthError(f"Authentication failed: {err}") from err
-            raise StremioConnectionError(f"Connection failed: {err}") from err
+            raise StremioConnectionError(f"Authentication error: {err}") from err
 
     async def async_close(self) -> None:
         """Close the API client."""
-        if self._client:
-            await self._client.__aexit__(None, None, None)
-            self._client = None
+        if self._session and not self._session.closed:
+            await self._session.close()
+            self._session = None
 
     async def async_get_user(self) -> dict[str, Any]:
         """Get user profile information.
@@ -73,20 +106,40 @@ class StremioClient:
             StremioAuthError: Authentication failed
             StremioConnectionError: Connection failed
         """
-        if not self._client:
-            raise StremioConnectionError("Client not initialized")
+        if not self._auth_key:
+            raise StremioConnectionError("Client not authenticated")
 
         try:
-            user = await self._client.get_user()
-            return {
-                "email": user.email if hasattr(user, "email") else "unknown",
-                "user_id": user.id if hasattr(user, "id") else None,
-            }
+            session = await self._get_session()
+            url = f"{STREMIO_USER_URL}?authKey={self._auth_key}&type=user"
+            
+            async with session.get(url) as response:
+                if response.status == 401:
+                    raise StremioAuthError("Authentication expired or invalid")
+                if response.status != 200:
+                    text = await response.text()
+                    raise StremioConnectionError(
+                        f"Failed to get user with status {response.status}: {text}"
+                    )
+                
+                data = await response.json()
+                user_data = data.get("result", {})
+                
+                return {
+                    "email": self._email,
+                    "user_id": user_data.get("_id"),
+                    "auth_key": self._auth_key,
+                }
+
+        except StremioAuthError:
+            raise
+        except ClientError as err:
+            _LOGGER.error("Connection error getting user: %s", err)
+            raise StremioConnectionError(f"Connection failed: {err}") from err
         except Exception as err:
             _LOGGER.error("Failed to get user profile: %s", err)
-            if "401" in str(err) or "authentication" in str(err).lower():
-                raise StremioAuthError("Authentication failed") from err
             raise StremioConnectionError(f"Failed to get user: {err}") from err
+
 
     async def async_get_library(self) -> list[dict[str, Any]]:
         """Fetch user's library items.
@@ -98,17 +151,36 @@ class StremioClient:
             StremioAuthError: Authentication failed
             StremioConnectionError: Connection failed
         """
-        if not self._client:
-            raise StremioConnectionError("Client not initialized")
+        if not self._auth_key:
+            raise StremioConnectionError("Client not authenticated")
 
         try:
-            library = await self._client.get_library()
-            return self._process_library_items(library)
+            session = await self._get_session()
+            url = f"{STREMIO_USER_URL}?authKey={self._auth_key}&type=libraryItem"
+            
+            async with session.get(url) as response:
+                if response.status == 401:
+                    raise StremioAuthError("Authentication expired or invalid")
+                if response.status != 200:
+                    text = await response.text()
+                    raise StremioConnectionError(
+                        f"Failed to get library with status {response.status}: {text}"
+                    )
+                
+                data = await response.json()
+                library_items = data.get("result", [])
+                
+                return self._process_library_items(library_items)
+
+        except StremioAuthError:
+            raise
+        except ClientError as err:
+            _LOGGER.error("Connection error getting library: %s", err)
+            raise StremioConnectionError(f"Connection failed: {err}") from err
         except Exception as err:
             _LOGGER.error("Failed to get library: %s", err)
-            if "401" in str(err) or "authentication" in str(err).lower():
-                raise StremioAuthError("Authentication failed") from err
             raise StremioConnectionError(f"Failed to get library: {err}") from err
+
 
     async def async_get_continue_watching(
         self, limit: int = 10
@@ -125,19 +197,52 @@ class StremioClient:
             StremioAuthError: Authentication failed
             StremioConnectionError: Connection failed
         """
-        if not self._client:
-            raise StremioConnectionError("Client not initialized")
+        if not self._auth_key:
+            raise StremioConnectionError("Client not authenticated")
 
         try:
-            watching = await self._client.get_continue_watching(limit=limit)
-            return self._process_continue_watching(watching)
+            session = await self._get_session()
+            # Get continue watching from library items with state
+            url = f"{STREMIO_USER_URL}?authKey={self._auth_key}&type=libraryItem"
+            
+            async with session.get(url) as response:
+                if response.status == 401:
+                    raise StremioAuthError("Authentication expired or invalid")
+                if response.status != 200:
+                    text = await response.text()
+                    raise StremioConnectionError(
+                        f"Failed to get continue watching with status {response.status}: {text}"
+                    )
+                
+                data = await response.json()
+                library_items = data.get("result", [])
+                
+                # Filter items with watch progress
+                watching = [
+                    item for item in library_items
+                    if item.get("state", {}).get("timeWatched", 0) > 0
+                ]
+                
+                # Sort by most recently watched and limit
+                watching.sort(
+                    key=lambda x: x.get("state", {}).get("lastWatched", 0),
+                    reverse=True
+                )
+                watching = watching[:limit]
+                
+                return self._process_continue_watching(watching)
+
+        except StremioAuthError:
+            raise
+        except ClientError as err:
+            _LOGGER.error("Connection error getting continue watching: %s", err)
+            raise StremioConnectionError(f"Connection failed: {err}") from err
         except Exception as err:
             _LOGGER.error("Failed to get continue watching: %s", err)
-            if "401" in str(err) or "authentication" in str(err).lower():
-                raise StremioAuthError("Authentication failed") from err
             raise StremioConnectionError(
                 f"Failed to get continue watching: {err}"
             ) from err
+
 
     async def async_get_streams(
         self,
@@ -161,8 +266,8 @@ class StremioClient:
             StremioAuthError: Authentication failed
             StremioConnectionError: Connection failed
         """
-        if not self._client:
-            raise StremioConnectionError("Client not initialized")
+        if not self._auth_key:
+            raise StremioConnectionError("Client not authenticated")
 
         try:
             # Build video ID for series
@@ -171,15 +276,16 @@ class StremioClient:
             else:
                 video_id = media_id
 
-            # Attempt to get streams (API method may vary)
-            streams = await self._client.get_streams(media_type, video_id)
-            return self._process_streams(streams)
-        except AttributeError:
-            _LOGGER.warning("Stream fetching may not be available in stremio-api")
+            # Note: Stream fetching requires addons and is complex
+            # This would need to query the user's installed addons
+            # For now, return empty list
+            _LOGGER.info("Stream fetching for %s not yet implemented", video_id)
             return []
+
         except Exception as err:
             _LOGGER.error("Failed to get streams: %s", err)
             raise StremioConnectionError(f"Failed to get streams: {err}") from err
+
 
     async def async_add_to_library(
         self, media_id: str, media_type: str = "movie"
@@ -196,15 +302,14 @@ class StremioClient:
         Raises:
             StremioConnectionError: Connection failed
         """
-        if not self._client:
-            raise StremioConnectionError("Client not initialized")
+        if not self._auth_key:
+            raise StremioConnectionError("Client not authenticated")
 
         try:
-            await self._client.add_to_library(media_type, media_id)
-            return True
-        except AttributeError:
-            _LOGGER.warning("add_to_library may not be available in stremio-api")
+            _LOGGER.info("Add to library for %s not yet fully implemented", media_id)
+            # This would require posting to the datastore
             return False
+
         except Exception as err:
             _LOGGER.error("Failed to add to library: %s", err)
             raise StremioConnectionError(f"Failed to add to library: {err}") from err
@@ -221,22 +326,22 @@ class StremioClient:
         Raises:
             StremioConnectionError: Connection failed
         """
-        if not self._client:
-            raise StremioConnectionError("Client not initialized")
+        if not self._auth_key:
+            raise StremioConnectionError("Client not authenticated")
 
         try:
-            await self._client.remove_from_library(media_id)
-            return True
-        except AttributeError:
-            _LOGGER.warning("remove_from_library may not be available in stremio-api")
+            _LOGGER.info("Remove from library for %s not yet fully implemented", media_id)
+            # This would require posting to the datastore
             return False
+
         except Exception as err:
             _LOGGER.error("Failed to remove from library: %s", err)
             raise StremioConnectionError(
                 f"Failed to remove from library: {err}"
             ) from err
 
-    def _process_library_items(self, library: Any) -> list[dict[str, Any]]:
+
+    def _process_library_items(self, library: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Process library items into consistent format.
 
         Args:
@@ -251,26 +356,32 @@ class StremioClient:
         items = []
         try:
             for item in library:
+                # Extract item data
+                _id = item.get("_id", "")
+                name = item.get("name", "Unknown")
+                item_type = item.get("type", "unknown")
+                
+                # Parse ID (format: type:id, e.g., "movie:tt1234567")
+                imdb_id = _id.split(":", 1)[1] if ":" in _id else _id
+                
                 processed_item = {
-                    "id": getattr(item, "id", None),
-                    "imdb_id": getattr(item, "imdb_id", None)
-                    or getattr(item, "id", None),
-                    "title": getattr(item, "name", None)
-                    or getattr(item, "title", "Unknown"),
-                    "type": getattr(item, "type", "unknown"),
-                    "poster": getattr(item, "poster", None),
-                    "year": getattr(item, "year", None),
-                    "genres": getattr(item, "genres", []),
-                    "cast": getattr(item, "cast", []),
-                    "added_at": getattr(item, "added_at", None),
+                    "id": _id,
+                    "imdb_id": imdb_id,
+                    "title": name,
+                    "type": item_type,
+                    "poster": item.get("poster"),
+                    "year": item.get("year"),
+                    "genres": item.get("genres", []),
+                    "cast": item.get("cast", []),
+                    "added_at": item.get("mtime"),
                 }
                 items.append(processed_item)
-        except (AttributeError, TypeError) as err:
+        except (AttributeError, TypeError, KeyError) as err:
             _LOGGER.warning("Error processing library items: %s", err)
 
         return items
 
-    def _process_continue_watching(self, watching: Any) -> list[dict[str, Any]]:
+    def _process_continue_watching(self, watching: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Process continue watching items into consistent format.
 
         Args:
@@ -285,23 +396,40 @@ class StremioClient:
         items = []
         try:
             for item in watching:
+                # Extract item data
+                _id = item.get("_id", "")
+                name = item.get("name", "Unknown")
+                item_type = item.get("type", "unknown")
+                state = item.get("state", {})
+                
+                # Parse ID
+                imdb_id = _id.split(":", 1)[1] if ":" in _id else _id
+                
+                # Extract video info from state
+                video_id = state.get("video_id", "")
+                season = None
+                episode = None
+                if ":" in video_id:
+                    parts = video_id.split(":")
+                    if len(parts) >= 3:
+                        season = int(parts[1]) if parts[1].isdigit() else None
+                        episode = int(parts[2]) if parts[2].isdigit() else None
+                
                 processed_item = {
-                    "id": getattr(item, "id", None),
-                    "imdb_id": getattr(item, "imdb_id", None)
-                    or getattr(item, "id", None),
-                    "title": getattr(item, "name", None)
-                    or getattr(item, "title", "Unknown"),
-                    "type": getattr(item, "type", "unknown"),
-                    "poster": getattr(item, "poster", None),
-                    "progress": getattr(item, "progress", 0),
-                    "duration": getattr(item, "duration", 0),
-                    "season": getattr(item, "season", None),
-                    "episode": getattr(item, "episode", None),
-                    "year": getattr(item, "year", None),
-                    "watched_at": getattr(item, "watched_at", None),
+                    "id": _id,
+                    "imdb_id": imdb_id,
+                    "title": name,
+                    "type": item_type,
+                    "poster": item.get("poster"),
+                    "progress": state.get("timeWatched", 0),
+                    "duration": state.get("duration", 0),
+                    "season": season,
+                    "episode": episode,
+                    "year": item.get("year"),
+                    "watched_at": state.get("lastWatched"),
                 }
                 items.append(processed_item)
-        except (AttributeError, TypeError) as err:
+        except (AttributeError, TypeError, KeyError) as err:
             _LOGGER.warning("Error processing continue watching items: %s", err)
 
         return items
