@@ -162,7 +162,8 @@ class StremioClient:
     async def async_get_user(self) -> dict[str, Any]:
         """Get user profile information.
 
-        Uses the datastoreMeta endpoint with type=user to get user profile data.
+        Uses the getUser endpoint to retrieve the user profile.
+        Based on Stremio Core API: APIRequest::GetUser { auth_key }
 
         Returns:
             User profile dictionary
@@ -179,13 +180,13 @@ class StremioClient:
 
         try:
             session = await self._get_session()
+            # Use getUser endpoint - based on Stremio Core API
             payload = {
                 "authKey": self._auth_key,
-                "collection": COLLECTION_USER,
             }
-            _LOGGER.debug("Sending datastoreMeta request for user profile")
+            _LOGGER.debug("Sending getUser request")
 
-            async with session.post(STREMIO_DATASTORE_META_URL, json=payload) as response:
+            async with session.post(f"{STREMIO_API_BASE}/api/getUser", json=payload) as response:
                 if response.status == 401:
                     _LOGGER.warning("Authentication expired while fetching user")
                     raise StremioAuthError("Authentication expired or invalid")
@@ -199,7 +200,7 @@ class StremioClient:
                 data = await response.json()
                 user_data = data.get("result", {})
 
-                _LOGGER.debug("Successfully fetched user profile")
+                _LOGGER.debug("Successfully fetched user profile: %s", list(user_data.keys()) if isinstance(user_data, dict) else type(user_data))
                 return {
                     "email": self._email,
                     "user_id": user_data.get("_id") or self._user_id,
