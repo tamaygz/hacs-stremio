@@ -218,8 +218,10 @@ class StremioClient:
     async def async_get_library(self) -> list[dict[str, Any]]:
         """Fetch user's library items.
 
-        Uses the datastoreMeta endpoint with type=libraryItem to get all library items.
-        This returns items with metadata including watch state, timestamps, etc.
+        Uses the datastoreGet endpoint with all=true to get all library items.
+        Based on Stremio Core API: https://github.com/Stremio/stremio-core
+        
+        DatastoreCommand::Get { ids: [], all: true } fetches all items.
 
         Returns:
             List of library item dictionaries
@@ -236,13 +238,17 @@ class StremioClient:
 
         try:
             session = await self._get_session()
+            # Use datastoreGet with all=true to fetch full library items
+            # Based on Stremio Core: DatastoreRequest { auth_key, collection, command: Get { ids: [], all: true } }
             payload = {
                 "authKey": self._auth_key,
                 "collection": COLLECTION_LIBRARY_ITEM,
+                "all": True,
+                "ids": [],
             }
-            _LOGGER.debug("Sending datastoreMeta request for library items")
+            _LOGGER.debug("Sending datastoreGet request for library items")
 
-            async with session.post(STREMIO_DATASTORE_META_URL, json=payload) as response:
+            async with session.post(STREMIO_DATASTORE_GET_URL, json=payload) as response:
                 if response.status == 401:
                     _LOGGER.warning("Authentication expired while fetching library")
                     raise StremioAuthError("Authentication expired or invalid")
@@ -255,43 +261,17 @@ class StremioClient:
 
                 data = await response.json()
                 _LOGGER.debug("Library API response keys: %s", list(data.keys()))
-                raw_result = data.get("result", [])
                 
-                # Debug: Log structure of first few items
-                if raw_result and len(raw_result) > 0:
-                    sample = raw_result[0]
-                    _LOGGER.debug("Raw result first entry type: %s", type(sample))
-                    if isinstance(sample, list) and sample:
-                        _LOGGER.debug("First entry[0] type: %s", type(sample[0]))
-                        if isinstance(sample[0], list) and sample[0]:
-                            _LOGGER.debug("First entry[0][0] type: %s, value preview: %s", 
-                                type(sample[0][0]), 
-                                str(sample[0][0])[:200] if sample[0][0] else "empty")
+                # datastoreGet returns {"result": [item1, item2, ...]} - flat array of items
+                library_items = data.get("result", [])
                 
-                # Extract library items - handle deeply nested structures
-                # API returns: {"result": [[[item1], [item2], ...metadata]]}
-                library_items = []
+                # Validate response structure
+                if not isinstance(library_items, list):
+                    _LOGGER.warning("Unexpected library response type: %s", type(library_items))
+                    library_items = []
                 
-                def extract_dicts(obj):
-                    """Recursively extract dict items from nested structure."""
-                    if isinstance(obj, dict):
-                        return [obj]
-                    elif isinstance(obj, list):
-                        results = []
-                        for item in obj:
-                            results.extend(extract_dicts(item))
-                        return results
-                    return []
-                
-                # Try to extract all dict items from the nested structure
-                all_dicts = extract_dicts(raw_result)
-                
-                # Filter to only library items (they have _id field)
-                library_items = [d for d in all_dicts if isinstance(d, dict) and "_id" in d]
-                
-                _LOGGER.info("Fetched %d library items from Stremio (extracted from %d total dicts)", 
-                    len(library_items), len(all_dicts))
-                if library_items:
+                _LOGGER.info("Fetched %d library items from Stremio", len(library_items))
+                if library_items and isinstance(library_items[0], dict):
                     _LOGGER.debug("First library item keys: %s", list(library_items[0].keys()))
                 return self._process_library_items(library_items)
 
@@ -330,14 +310,16 @@ class StremioClient:
 
         try:
             session = await self._get_session()
-            # Get library items with state data
+            # Use datastoreGet with all=true to fetch full library items
             payload = {
                 "authKey": self._auth_key,
                 "collection": COLLECTION_LIBRARY_ITEM,
+                "all": True,
+                "ids": [],
             }
-            _LOGGER.debug("Sending datastoreMeta request for continue watching")
+            _LOGGER.debug("Sending datastoreGet request for continue watching")
 
-            async with session.post(STREMIO_DATASTORE_META_URL, json=payload) as response:
+            async with session.post(STREMIO_DATASTORE_GET_URL, json=payload) as response:
                 if response.status == 401:
                     _LOGGER.warning("Authentication expired while fetching continue watching")
                     raise StremioAuthError("Authentication expired or invalid")
@@ -353,28 +335,16 @@ class StremioClient:
                     )
 
                 data = await response.json()
-                raw_result = data.get("result", [])
+                library_items = data.get("result", [])
                 
-                # Extract library items using same recursive extraction
-                def extract_dicts(obj):
-                    """Recursively extract dict items from nested structure."""
-                    if isinstance(obj, dict):
-                        return [obj]
-                    elif isinstance(obj, list):
-                        results = []
-                        for item in obj:
-                            results.extend(extract_dicts(item))
-                        return results
-                    return []
-                
-                all_dicts = extract_dicts(raw_result)
-                library_items = [d for d in all_dicts if isinstance(d, dict) and "_id" in d]
+                if not isinstance(library_items, list):
+                    library_items = []
 
                 # Filter items with watch progress (timeWatched > 0)
                 watching = [
                     item
                     for item in library_items
-                    if item.get("state", {}).get("timeWatched", 0) > 0
+                    if isinstance(item, dict) and item.get("state", {}).get("timeWatched", 0) > 0
                 ]
 
                 # Sort by most recently watched and limit
