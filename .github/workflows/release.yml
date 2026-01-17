@@ -1,14 +1,14 @@
 name: Release
 
 on:
-  workflow_dispatch:  # Allow manual triggering
+  workflow_dispatch: # Allow manual triggering
   release:
     types: [published]
 
 jobs:
   release:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
