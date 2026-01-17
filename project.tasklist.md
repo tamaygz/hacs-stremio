@@ -441,31 +441,31 @@ This document tracks the implementation progress of the Stremio HACS integration
 **Duration**: 2-3 days
 
 ### 7.1 Media Source Implementation
-- [ ] ⬜ **Task 7.1.1**: Create media_source.py
+- [x] ✅ **Task 7.1.1**: Create media_source.py (Completed: 2026-01-17)
   - Implement StremioMediaSource class
   - Register as media source provider
   - Implement async_browse_media for library browsing
   - Return BrowseMedia objects with proper structure
   - **Best Practice**: [Media source integration](https://developers.home-assistant.io/docs/core/platform/media_source/)
   - **Dependencies**: Task 2.2.2
-  - **Output**: Media source registered
+  - **Output**: Media source registered ✓
 
-- [ ] ⬜ **Task 7.1.2**: Implement browsing hierarchy
+- [x] ✅ **Task 7.1.2**: Implement browsing hierarchy (Completed: 2026-01-17)
   - Root level: Library, Continue Watching, Search
   - Library level: Movies, Series, Anime
   - Item level: Individual media with metadata
   - Add proper thumbnails and titles
   - **Best Practice**: Intuitive hierarchy
   - **Dependencies**: Task 7.1.1
-  - **Output**: Browsing hierarchy working
+  - **Output**: Browsing hierarchy working ✓
 
-- [ ] ⬜ **Task 7.1.3**: Implement media playback
+- [x] ✅ **Task 7.1.3**: Implement media playback (Completed: 2026-01-17)
   - Implement async_resolve_media for stream URLs
   - Call get_stream_url service internally
   - Return playable URL with MIME type
   - **Best Practice**: Integration with HA media players
   - **Dependencies**: Task 7.1.1, Task 4.1.3
-  - **Output**: Media playback from browser working
+  - **Output**: Media playback from browser working ✓
 
 ---
 

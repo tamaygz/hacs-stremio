@@ -3,7 +3,7 @@
   "name": "HACS Stremio Integration",
   "codeowners": ["@tamaygz"],
   "config_flow": true,
-  "dependencies": [],
+  "dependencies": ["media_source"],
   "documentation": "https://github.com/tamaygz/hacs-stremio",
   "integration_type": "service",
   "iot_class": "cloud_polling",
