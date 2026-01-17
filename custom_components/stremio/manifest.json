@@ -1,6 +1,6 @@
 {
   "domain": "stremio",
-  "name": "Stremio",
+  "name": "HACS Stremio Integration",
   "codeowners": ["@tamaygz"],
   "config_flow": true,
   "dependencies": [],
