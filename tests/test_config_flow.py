@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from homeassistant import config_entries
 from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
-from homeassistant.data_entry_flow import FlowResultType
+from homeassistant.data_entry_flow import FlowResultType, AbortFlow
 
 from custom_components.stremio.const import DOMAIN, CONF_AUTH_KEY
 from custom_components.stremio.config_flow import ConfigFlow, OptionsFlowHandler
@@ -36,7 +36,7 @@ async def test_form_user_step_success(mock_hass):
     
     # Create mock user object with email attribute
     mock_user = MagicMock()
-    mock_user.email = MOCK_USER_DATA[CONF_EMAIL]
+    mock_user.email = MOCK_CONFIG_ENTRY[CONF_EMAIL]
     
     # Create mock client context manager
     mock_client = AsyncMock()
@@ -49,12 +49,12 @@ async def test_form_user_step_success(mock_hass):
         "custom_components.stremio.config_flow.StremioAPIClient",
         return_value=mock_client,
     ):
-        result = await flow.async_step_user(MOCK_USER_DATA)
+        result = await flow.async_step_user(MOCK_CONFIG_ENTRY)
     
     assert result["type"] == FlowResultType.CREATE_ENTRY
-    assert result["title"] == MOCK_USER_DATA[CONF_EMAIL]
+    assert result["title"] == MOCK_CONFIG_ENTRY[CONF_EMAIL]
     assert CONF_AUTH_KEY in result["data"]
-    assert result["data"][CONF_EMAIL] == MOCK_USER_DATA[CONF_EMAIL]
+    assert result["data"][CONF_EMAIL] == MOCK_CONFIG_ENTRY[CONF_EMAIL]
 
 
 @pytest.mark.asyncio
@@ -73,7 +73,7 @@ async def test_form_user_step_invalid_auth(mock_hass):
         "custom_components.stremio.config_flow.StremioAPIClient",
         return_value=mock_client,
     ):
-        result = await flow.async_step_user(MOCK_USER_DATA)
+        result = await flow.async_step_user(MOCK_CONFIG_ENTRY)
     
     assert result["type"] == FlowResultType.FORM
     assert result["errors"]["base"] == "invalid_auth"
@@ -95,7 +95,7 @@ async def test_form_user_step_connection_error(mock_hass):
         "custom_components.stremio.config_flow.StremioAPIClient",
         return_value=mock_client,
     ):
-        result = await flow.async_step_user(MOCK_USER_DATA)
+        result = await flow.async_step_user(MOCK_CONFIG_ENTRY)
     
     assert result["type"] == FlowResultType.FORM
     assert result["errors"]["base"] == "cannot_connect"
@@ -117,7 +117,7 @@ async def test_form_user_step_no_auth_key(mock_hass):
         "custom_components.stremio.config_flow.StremioAPIClient",
         return_value=mock_client,
     ):
-        result = await flow.async_step_user(MOCK_USER_DATA)
+        result = await flow.async_step_user(MOCK_CONFIG_ENTRY)
     
     assert result["type"] == FlowResultType.FORM
     # Should get invalid_auth error since no auth key means authentication failed
@@ -160,7 +160,7 @@ async def test_duplicate_entry(mock_hass):
     """Test that duplicate entries are not allowed."""
     # Create mock user object with email attribute
     mock_user = MagicMock()
-    mock_user.email = MOCK_USER_DATA[CONF_EMAIL]
+    mock_user.email = MOCK_CONFIG_ENTRY[CONF_EMAIL]
     
     # Create mock client context manager
     mock_client = AsyncMock()
@@ -171,7 +171,7 @@ async def test_duplicate_entry(mock_hass):
     
     # Simulate existing entry
     existing_entry = MagicMock()
-    existing_entry.unique_id = MOCK_USER_DATA[CONF_EMAIL]
+    existing_entry.unique_id = MOCK_CONFIG_ENTRY[CONF_EMAIL]
     
     flow = ConfigFlow()
     flow.hass = mock_hass
@@ -185,9 +185,9 @@ async def test_duplicate_entry(mock_hass):
         with patch.object(
             flow, "async_set_unique_id", new_callable=AsyncMock
         ), patch.object(
-            flow, "_abort_if_unique_id_configured", side_effect=config_entries.AbortFlow("already_configured")
+            flow, "_abort_if_unique_id_configured", side_effect=AbortFlow("already_configured")
         ):
-            result = await flow.async_step_user(MOCK_USER_DATA)
+            result = await flow.async_step_user(MOCK_CONFIG_ENTRY)
         
         assert result["type"] == FlowResultType.ABORT
         assert result["reason"] == "already_configured"
