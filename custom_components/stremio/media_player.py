@@ -142,7 +142,9 @@ class StremioMediaPlayer(
 
         Args:
             media_content_type: Content type to browse
-            media_content_id: Content ID to browse
+            media_content_id: Content ID to browse (can be None for root,
+                            a simple identifier like "library", or a full
+                            media-source:// URI)
 
         Returns:
             BrowseMedia object with browsable content
@@ -153,20 +155,28 @@ class StremioMediaPlayer(
             media_content_id,
         )
 
-        # Create a StremioMediaSource instance
-        media_source = StremioMediaSource(self.hass)
-
-        # Create a MediaSourceItem for the request
+        # Import MediaSourceItem
         from homeassistant.components.media_source import MediaSourceItem
 
-        item = MediaSourceItem(
-            hass=self.hass,
-            domain=DOMAIN,
-            identifier=media_content_id or "",
-            target_media_player=self.entity_id,
-        )
+        # Determine the identifier from media_content_id
+        # It could be:
+        # 1. None (root browsing)
+        # 2. A simple identifier like "library" or "continue_watching"
+        # 3. A full media-source URI like "media-source://stremio/library"
+        if media_content_id and media_content_id.startswith("media-source://"):
+            # Parse the URI to extract the identifier
+            item = MediaSourceItem.from_uri(self.hass, media_content_id, self.entity_id)
+        else:
+            # Create MediaSourceItem directly with the identifier
+            item = MediaSourceItem(
+                hass=self.hass,
+                domain=DOMAIN,
+                identifier=media_content_id or "",
+                target_media_player=self.entity_id,
+            )
 
-        # Delegate to media source implementation
+        # Get the media source and browse
+        media_source = StremioMediaSource(self.hass)
         return await media_source.async_browse_media(item)
 
     async def async_play_media(
