@@ -254,9 +254,26 @@ class StremioClient:
                     )
 
                 data = await response.json()
-                library_items = data.get("result", [])
-
+                _LOGGER.debug("Library API response keys: %s", list(data.keys()))
+                raw_result = data.get("result", [])
+                
+                # Handle different response structures
+                # datastoreMeta may return: {"result": [{item}, {item}]} or {"result": [[item], [item]]}
+                library_items = []
+                if raw_result and isinstance(raw_result, list):
+                    for entry in raw_result:
+                        if isinstance(entry, dict):
+                            # Direct dict item
+                            library_items.append(entry)
+                        elif isinstance(entry, list) and entry:
+                            # Nested list - extract first item
+                            library_items.append(entry[0] if isinstance(entry[0], dict) else entry)
+                        else:
+                            _LOGGER.debug("Unexpected library entry type: %s", type(entry))
+                
                 _LOGGER.info("Fetched %d library items from Stremio", len(library_items))
+                if library_items:
+                    _LOGGER.debug("First library item sample keys: %s", list(library_items[0].keys()) if isinstance(library_items[0], dict) else type(library_items[0]))
                 return self._process_library_items(library_items)
 
         except StremioAuthError:
@@ -317,13 +334,22 @@ class StremioClient:
                     )
 
                 data = await response.json()
-                library_items = data.get("result", [])
+                raw_result = data.get("result", [])
+                
+                # Handle different response structures (same as async_get_library)
+                library_items = []
+                if raw_result and isinstance(raw_result, list):
+                    for entry in raw_result:
+                        if isinstance(entry, dict):
+                            library_items.append(entry)
+                        elif isinstance(entry, list) and entry:
+                            library_items.append(entry[0] if isinstance(entry[0], dict) else entry)
 
                 # Filter items with watch progress (timeWatched > 0)
                 watching = [
                     item
                     for item in library_items
-                    if item.get("state", {}).get("timeWatched", 0) > 0
+                    if isinstance(item, dict) and item.get("state", {}).get("timeWatched", 0) > 0
                 ]
 
                 # Sort by most recently watched and limit
@@ -638,7 +664,8 @@ class StremioClient:
                 items.append(processed_item)
             except (AttributeError, TypeError, KeyError) as err:
                 errors += 1
-                _LOGGER.debug("Error processing library item %s: %s", item.get("_id", "unknown"), err)
+                item_id = item.get("_id", "unknown") if isinstance(item, dict) else "invalid_item"
+                _LOGGER.debug("Error processing library item %s: %s", item_id, err)
 
         if errors > 0:
             _LOGGER.warning("Encountered %d errors processing library items", errors)
