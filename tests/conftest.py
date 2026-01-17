@@ -2,19 +2,16 @@
 
 from __future__ import annotations
 
+import asyncio
 import sys
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-# Enable sockets for all tests by allowing all hosts
-# Required for Home Assistant's async internals to work properly
-
-
-@pytest.fixture(autouse=True)
-def enable_socket_for_tests(socket_enabled):
-    """Enable socket for all tests - uses the socket_enabled fixture from pytest-socket."""
-    yield
+# On Windows, use the SelectorEventLoop instead of the ProactorEventLoop
+# This is required for compatibility with pytest-homeassistant-custom-component
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 
 # Mock the stremio_api module before any imports that might need it
