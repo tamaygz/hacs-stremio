@@ -1,9 +1,7 @@
 name: Release
 
 on:
-  workflow_dispatch: # Allow manual triggering
-  release:
-    types: [published]
+  workflow_dispatch: # Manual trigger only
 
 jobs:
   release:
