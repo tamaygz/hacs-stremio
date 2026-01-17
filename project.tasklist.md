@@ -326,13 +326,13 @@ This document tracks the implementation progress of the Stremio HACS integration
   - **Dependencies**: Task 5.1.1, 5.1.2, 5.1.3
   - **Output**: Handover service complete ✓
 
-- [ ] ⬜ **Task 5.1.5**: Add handover options to config flow
+- [x] ✅ **Task 5.1.5**: Add handover options to config flow (Completed: 2026-01-17)
   - Add toggle for Apple TV handover in options flow
   - Add dropdown for default handover method
   - Store options in config entry
   - **Best Practice**: Optional feature, disabled by default
   - **Dependencies**: Task 2.1.2, Task 5.1.4
-  - **Output**: Handover options configurable
+  - **Output**: Handover options configurable ✓
 
 ---
 
