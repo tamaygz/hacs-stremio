@@ -149,16 +149,16 @@ This document tracks the implementation progress of the Stremio HACS integration
 **Duration**: 4-6 days
 
 ### 3.1 Sensor Platform
-- [ ] ⬜ **Task 3.1.1**: Create sensor.py base structure
+- [x] ✅ **Task 3.1.1**: Create sensor.py base structure (Completed: 2026-01-17)
   - Implement async_setup_entry function
   - Create StremioSensorEntity base class
   - Inherit from CoordinatorEntity for automatic updates
   - Implement common properties (device_info, unique_id)
   - **Best Practice**: Use CoordinatorEntity for efficient updates
   - **Dependencies**: Task 2.2.2
-  - **Output**: Base sensor class ready
+  - **Output**: Base sensor class ready ✓
 
-- [ ] ⬜ **Task 3.1.2**: Implement player state sensors
+- [x] ✅ **Task 3.1.2**: Implement player state sensors (Completed: 2026-01-17)
   - Create CurrentMediaSensor (shows current playing media)
   - Create LastWatchedSensor (last media watched)
   - Create CurrentPositionSensor (playback position in seconds)
@@ -166,15 +166,15 @@ This document tracks the implementation progress of the Stremio HACS integration
   - Add proper icons and device classes
   - **Best Practice**: Use device_class and state_class for proper categorization
   - **Dependencies**: Task 3.1.1
-  - **Output**: Player state sensors working
+  - **Output**: Player state sensors working ✓
 
-- [ ] ⬜ **Task 3.1.3**: Implement library sensors
+- [x] ✅ **Task 3.1.3**: Implement library sensors (Completed: 2026-01-17)
   - Create LibraryCountSensor (total library items)
   - Create ContinueWatchingSensor (shows continue watching list as attributes)
   - Add proper JSON serialization for complex attributes
   - **Best Practice**: Use extra_state_attributes for rich data
   - **Dependencies**: Task 3.1.1
-  - **Output**: Library sensors working
+  - **Output**: Library sensors working ✓
 
 - [ ] ⬜ **Task 3.1.4**: Implement stats sensors
   - Create TotalWatchTimeSensor (total watch time)
@@ -186,24 +186,24 @@ This document tracks the implementation progress of the Stremio HACS integration
   - **Output**: Stats sensors working
 
 ### 3.2 Binary Sensor Platform
-- [ ] ⬜ **Task 3.2.1**: Create binary_sensor.py
+- [x] ✅ **Task 3.2.1**: Create binary_sensor.py (Completed: 2026-01-17)
   - Implement async_setup_entry function
   - Create StreamioBinarySensor base class
   - Inherit from CoordinatorEntity and BinarySensorEntity
   - **Best Practice**: Proper binary sensor device classes
   - **Dependencies**: Task 2.2.2
-  - **Output**: Base binary sensor ready
+  - **Output**: Base binary sensor ready ✓
 
-- [ ] ⬜ **Task 3.2.2**: Implement binary sensors
+- [x] ✅ **Task 3.2.2**: Implement binary sensors (Completed: 2026-01-17)
   - Create IsPlayingBinarySensor (is_on when media is playing)
   - Create HasNewContentBinarySensor (is_on when new library items detected)
   - Add proper device_class (occupancy for playing, update for new content)
   - **Best Practice**: Use appropriate device classes for automations
   - **Dependencies**: Task 3.2.1
-  - **Output**: Binary sensors working
+  - **Output**: Binary sensors working ✓
 
 ### 3.3 Media Player Platform
-- [ ] ⬜ **Task 3.3.1**: Create media_player.py
+- [x] ✅ **Task 3.3.1**: Create media_player.py (Completed: 2026-01-17)
   - Create StremioMediaPlayer extending MediaPlayerEntity
   - Implement state property (playing/paused/idle)
   - Add read-only properties: media_title, media_duration, media_position
@@ -211,7 +211,7 @@ This document tracks the implementation progress of the Stremio HACS integration
   - Add media_image_url (poster)
   - **Best Practice**: [Media player entity](https://developers.home-assistant.io/docs/core/entity/media-player/)
   - **Dependencies**: Task 2.2.2
-  - **Output**: Read-only media player entity
+  - **Output**: Read-only media player entity ✓
 
 - [ ] ⬜ **Task 3.3.2**: Add media player features
   - Implement supported_features (limited to PLAY_MEDIA)
