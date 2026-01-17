@@ -13,6 +13,9 @@ from .const import (
     CONF_PLAYER_SCAN_INTERVAL,
     DEFAULT_PLAYER_SCAN_INTERVAL,
     DOMAIN,
+    EVENT_NEW_CONTENT,
+    EVENT_PLAYBACK_STARTED,
+    EVENT_PLAYBACK_STOPPED,
 )
 from .stremio_client import StremioAuthError, StremioClient, StremioConnectionError
 
@@ -37,6 +40,8 @@ class StremioDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """
         self.client = client
         self.entry = entry
+        self._previous_watching: dict[str, Any] | None = None
+        self._previous_library_count: int = 0
 
         # Get scan interval from options or use default
         scan_interval_seconds = entry.options.get(
@@ -123,6 +128,9 @@ class StremioDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 data["library_count"],
                 len(continue_watching),
             )
+
+            # Fire events based on state changes
+            self._fire_events(data)
 
             return data
 
