@@ -396,6 +396,676 @@ data:
 
 ---
 
+---
+
+## UI Components & Cards
+
+### Overview
+
+Provide rich, interactive UI components for browsing Stremio library, viewing current media, and managing streams. All components emphasize stream URL access and copying for flexibility and external player support.
+
+### Component Architecture
+
+```
+┌─────────────────────────────────────────┐
+│     Stremio Media Player Card           │
+│  (mini-media-player style)              │
+│  - Current media display                │
+│  - Playback controls (read-only)        │
+│  - Quick actions: Get Streams, Play on  │
+│    Apple TV, Copy URL                   │
+└─────────────────────────────────────────┘
+
+┌─────────────────────────────────────────┐
+│     Stremio Library Browser             │
+│  (Media Source Integration)             │
+│  - Browse movies/series                 │
+│  - Filter by type, genre                │
+│  - Search functionality                 │
+│  - Item detail views with actions       │
+└─────────────────────────────────────────┘
+
+┌─────────────────────────────────────────┐
+│     Stream Selector Dialog              │
+│  (browser_mod popup)                    │
+│  - List available streams               │
+│  - Quality/source indicators            │
+│  - Copy URL buttons                     │
+│  - Play on device actions               │
+└─────────────────────────────────────────┘
+```
+
+### 1. Stremio Media Player Card
+
+**Type:** Custom Lovelace Card (inspired by mini-media-player)
+
+**Purpose:** Display current/last watched media with rich controls and actions
+
+**Features:**
+- Display current watching media with artwork
+- Show playback progress (from Continue Watching)
+- Media metadata (title, episode, rating, cast)
+- Quick action buttons
+- Responsive design (mobile & desktop)
+
+**Card Configuration:**
+
+```yaml
+type: custom:stremio-media-card
+entity: media_player.stremio
+artwork: cover  # cover, full-cover, material, none
+info: scroll  # scroll, short
+hide:
+  power: true
+  volume: true
+  controls: true  # Hide play/pause (read-only anyway)
+shortcuts:
+  - name: Get Streams
+    type: service
+    id: stremio.get_streams
+    icon: mdi:play-network
+    data:
+      content_id: "{{ state_attr('media_player.stremio', 'media_content_id') }}"
+  - name: Copy URL
+    type: script
+    id: script.stremio_show_stream_urls
+    icon: mdi:content-copy
+  - name: Play on Apple TV
+    type: service
+    id: stremio.play_on_apple_tv
+    icon: mdi:apple
+    data:
+      entity_id: media_player.living_room_apple_tv
+      content_id: "{{ state_attr('media_player.stremio', 'media_content_id') }}"
+```
+
+**Visual Design:**
+
+```
+┌────────────────────────────────────────┐
+│  [Artwork Background]                  │
+│                                        │
+│  🎬 Movie Title (2024)                 │
+│  ⭐ 8.5/10  •  Action, Sci-Fi          │
+│  ─────────────────── 45%               │
+│                                        │
+│  [Get Streams] [Copy URL] [▶ Apple TV]│
+│                                        │
+│  Director: John Doe                    │
+│  Cast: Actor 1, Actor 2, Actor 3       │
+└────────────────────────────────────────┘
+```
+
+**Implementation:**
+- Extend mini-media-player or create custom card
+- Use LitElement/TypeScript
+- Support HA theme variables
+- Responsive grid layout
+- Service call actions on shortcuts
+
+### 2. Stremio Library Browser
+
+**Type:** Media Source Integration + Optional Custom Card
+
+**Purpose:** Browse and manage Stremio library with advanced filtering
+
+#### 2.1 Media Source Integration (Built-in HA)
+
+**Implementation:**
+```python
+# In Stremio integration
+from homeassistant.components.media_source import MediaSource
+
+class StremioMediaSource(MediaSource):
+    """Stremio media source implementation."""
+    
+    name = "Stremio"
+    
+    async def async_browse_media(self, item):
+        """Browse Stremio library."""
+        # Return library structure:
+        # - Continue Watching
+        # - Movies
+        # - Series
+        # - Recently Added
+```
+
+**Hierarchy:**
+```
+Stremio
+├── Continue Watching (5 items)
+│   ├── Movie Title (45% watched)
+│   └── Series S02E03 (12:30 / 42:00)
+├── Movies (85 items)
+│   ├── Action (25)
+│   ├── Comedy (18)
+│   └── Drama (42)
+└── Series (65 items)
+    ├── Currently Watching (8)
+    └── All Series (65)
+```
+
+**Features:**
+- Browse via standard HA media browser
+- Click item to see details
+- "Play on" action for media_player entities
+- Context menu for actions
+
+#### 2.2 Custom Library Card (Optional)
+
+**Type:** Custom Lovelace Card
+
+**Purpose:** Enhanced library browsing with grid view and filters
+
+```yaml
+type: custom:stremio-library-card
+entity: sensor.stremio_library
+view: grid  # grid, list, compact
+filter:
+  type: all  # all, movies, series
+  sort: recent  # recent, title, rating, year
+search: true
+actions:
+  show_streams: true  # Show "Get Streams" button
+  play_on_devices: true  # Show device selection
+  add_to_continue: true  # Add to continue watching
+```
+
+**Visual Design (Grid View):**
+
+```
+┌──────────────────────────────────────────────┐
+│  Stremio Library                             │
+│  [Movies▾] [Sort: Recent▾] [🔍____________]  │
+│                                              │
+│  ┌──────┐  ┌──────┐  ┌──────┐  ┌──────┐    │
+│  │[img] │  │[img] │  │[img] │  │[img] │    │
+│  │Title │  │Title │  │Title │  │Title │    │
+│  │2024  │  │2024  │  │2023  │  │2024  │    │
+│  │⭐8.5 │  │⭐7.2 │  │⭐9.0 │  │⭐6.8 │    │
+│  │[📡]  │  │[📡]  │  │[📡]  │  │[📡]  │    │
+│  └──────┘  └──────┘  └──────┘  └──────┘    │
+│                                              │
+│  ┌──────┐  ┌──────┐  ┌──────┐  ┌──────┐    │
+│  │ ...  │  │ ...  │  │ ...  │  │ ...  │    │
+└──────────────────────────────────────────────┘
+
+[📡] = Get Streams button on hover/tap
+```
+
+**Implementation:**
+- Custom card with TypeScript/LitElement
+- Virtual scrolling for large libraries
+- Lazy image loading
+- Filter/search in frontend
+- Tap item → Show detail popup
+- Tap [📡] → Show streams dialog
+
+### 3. Stream Selector Dialog
+
+**Type:** browser_mod popup / HA dialog
+
+**Purpose:** Display available streams for content and enable URL copying
+
+**Trigger Methods:**
+1. Click "Get Streams" button on media player card
+2. Click stream icon [📡] on library card
+3. Service call: `stremio.show_stream_selector`
+
+**Service Definition:**
+```yaml
+service: stremio.show_stream_selector
+data:
+  content_id: "tt1234567"
+  browser_id: "this"  # Show on current browser only
+```
+
+**Dialog Content:**
+
+```
+┌────────────────────────────────────────────┐
+│  Available Streams for "Movie Title"       │
+│                                            │
+│  ┌────────────────────────────────────┐   │
+│  │ 🎬 Source: Torrentio                │   │
+│  │ 📊 Quality: 1080p WEBRip            │   │
+│  │ 💾 Size: 2.4 GB                     │   │
+│  │                                     │   │
+│  │ [📋 Copy URL] [▶ Play on Apple TV] │   │
+│  └────────────────────────────────────┘   │
+│                                            │
+│  ┌────────────────────────────────────┐   │
+│  │ 🎬 Source: Torrentio                │   │
+│  │ 📊 Quality: 720p WEBRip             │   │
+│  │ 💾 Size: 1.2 GB                     │   │
+│  │                                     │   │
+│  │ [📋 Copy URL] [▶ Play on Apple TV] │   │
+│  └────────────────────────────────────┘   │
+│                                            │
+│  ┌────────────────────────────────────┐   │
+│  │ 🎬 Source: Streaming Service        │   │
+│  │ 📊 Quality: 1080p Stream            │   │
+│  │                                     │   │
+│  │ [📋 Copy URL] [▶ Play on Apple TV] │   │
+│  └────────────────────────────────────┘   │
+│                                            │
+│                            [Close]         │
+└────────────────────────────────────────────┘
+```
+
+**Implementation:**
+
+```python
+# In Stremio integration
+async def show_stream_selector(hass, content_id, browser_id="this"):
+    """Show stream selector dialog."""
+    # 1. Fetch streams from Stremio
+    streams = await coordinator.client.get_streams(content_id)
+    
+    # 2. Build dialog content
+    card_config = {
+        "type": "custom:stremio-stream-dialog",
+        "streams": streams,
+        "content_id": content_id,
+    }
+    
+    # 3. Show via browser_mod
+    await hass.services.async_call(
+        "browser_mod",
+        "popup",
+        {
+            "browser_id": browser_id,
+            "title": f"Streams for {title}",
+            "card": card_config,
+        },
+    )
+```
+
+**Copy URL Functionality:**
+
+**Option 1: Native Clipboard API (Preferred)**
+```javascript
+// In custom card JavaScript
+async copyToClipboard(url) {
+  try {
+    await navigator.clipboard.writeText(url);
+    // Show success toast
+    this._showToast("URL copied to clipboard!");
+  } catch (err) {
+    // Fallback: show text field for manual copy
+    this._showUrlDialog(url);
+  }
+}
+```
+
+**Option 2: Notification with Copyable Text (Android)**
+```yaml
+# Automation triggered by stream selection
+automation:
+  - trigger:
+      platform: event
+      event_type: stremio_stream_selected
+    action:
+      - service: notify.mobile_app
+        data:
+          title: "Stream URL"
+          message: "{{ trigger.event.data.stream_url }}"
+          data:
+            actions:
+              - action: "COPY_URL"
+                title: "Copy URL"
+```
+
+**Option 3: Display in Input Text Helper**
+```yaml
+# Create helper
+input_text:
+  stremio_stream_url:
+    name: Stremio Stream URL
+    max: 500
+
+# Card to display
+type: entities
+entities:
+  - entity: input_text.stremio_stream_url
+    name: Stream URL
+    icon: mdi:link
+```
+
+### 4. Quick Action Buttons
+
+**Purpose:** Add "Get Streams" and "Copy URL" buttons everywhere media is displayed
+
+**Locations:**
+1. Media player card shortcuts
+2. Library card item actions
+3. Continue Watching list items
+4. Media browser context menu
+5. Sensor cards (current watching, last watched)
+
+**Button Card Example:**
+
+```yaml
+type: custom:button-card
+name: Get Streams
+icon: mdi:play-network
+tap_action:
+  action: call-service
+  service: stremio.show_stream_selector
+  service_data:
+    content_id: "{{ state_attr('sensor.stremio_current_watching', 'imdb_id') }}"
+styles:
+  card:
+    - height: 50px
+  icon:
+    - color: var(--primary-color)
+```
+
+### 5. Continue Watching Quick Resume Card
+
+**Type:** Custom Card with List View
+
+**Purpose:** Quick access to continue watching items with resume actions
+
+```yaml
+type: custom:stremio-continue-watching-card
+entity: sensor.stremio_current_watching
+limit: 5
+show_progress: true
+actions:
+  - resume_on_apple_tv
+  - get_streams
+  - remove_from_list
+```
+
+**Visual Design:**
+
+```
+┌──────────────────────────────────────────────┐
+│  Continue Watching                           │
+│                                              │
+│  ┌────────────────────────────────────────┐ │
+│  │ [Poster] Movie Title (2024)            │ │
+│  │          ████████────────── 45%        │ │
+│  │          [▶ Resume] [📡] [❌]          │ │
+│  └────────────────────────────────────────┘ │
+│                                              │
+│  ┌────────────────────────────────────────┐ │
+│  │ [Poster] Series S02E03                 │ │
+│  │          ███─────────────── 15%        │ │
+│  │          [▶ Resume] [📡] [❌]          │ │
+│  └────────────────────────────────────────┘ │
+│                                              │
+│  View All (12) →                             │
+└──────────────────────────────────────────────┘
+```
+
+### 6. Lovelace Dashboard Examples
+
+#### 6.1 Media Room Dashboard
+
+```yaml
+title: Media Room
+views:
+  - title: Stremio
+    path: stremio
+    cards:
+      # Main player card
+      - type: custom:stremio-media-card
+        entity: media_player.stremio
+        artwork: full-cover
+        shortcuts:
+          - name: Get Streams
+            type: service
+            id: stremio.show_stream_selector
+          - name: Apple TV
+            type: service
+            id: stremio.play_on_apple_tv
+            data:
+              entity_id: media_player.living_room_apple_tv
+
+      # Continue Watching
+      - type: custom:stremio-continue-watching-card
+        entity: sensor.stremio_current_watching
+        limit: 5
+
+      # Quick Stats
+      - type: glance
+        entities:
+          - entity: sensor.stremio_library
+            name: Library
+          - entity: sensor.stremio_watch_time
+            name: Watch Time
+          - entity: sensor.stremio_addons
+            name: Addons
+
+      # Library Browser
+      - type: custom:stremio-library-card
+        entity: sensor.stremio_library
+        view: grid
+```
+
+#### 6.2 Mobile Quick Actions
+
+```yaml
+# For mobile app, use compact view
+type: vertical-stack
+cards:
+  - type: custom:stremio-media-card
+    entity: media_player.stremio
+    artwork: cover
+    info: short
+    hide:
+      controls: true
+      volume: true
+
+  - type: horizontal-stack
+    cards:
+      - type: custom:button-card
+        name: Get Streams
+        icon: mdi:play-network
+        tap_action:
+          action: call-service
+          service: stremio.show_stream_selector
+      - type: custom:button-card
+        name: Copy URL
+        icon: mdi:content-copy
+        tap_action:
+          action: call-service
+          service: script.stremio_copy_stream_url
+      - type: custom:button-card
+        name: Play on TV
+        icon: mdi:apple
+        tap_action:
+          action: call-service
+          service: stremio.play_on_apple_tv
+```
+
+### 7. Automation & Script Examples
+
+#### 7.1 Auto-show Streams on Playback Start
+
+```yaml
+automation:
+  - alias: "Stremio: Show streams when new media starts"
+    trigger:
+      - platform: state
+        entity_id: sensor.stremio_current_watching
+    condition:
+      - condition: template
+        value_template: >
+          {{ trigger.to_state.state != trigger.from_state.state }}
+    action:
+      - service: stremio.show_stream_selector
+        data:
+          content_id: >
+            {{ state_attr('sensor.stremio_current_watching', 'imdb_id') }}
+          browser_id: "this"
+```
+
+#### 7.2 Script: Copy Stream URL to Input Text
+
+```yaml
+script:
+  stremio_copy_stream_url:
+    alias: "Copy Stremio Stream URL"
+    sequence:
+      - service: stremio.get_streams
+        data:
+          content_id: >
+            {{ state_attr('sensor.stremio_current_watching', 'imdb_id') }}
+        response_variable: streams
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.stremio_stream_url
+        data:
+          value: "{{ streams.streams[0].url }}"
+      - service: browser_mod.notification
+        data:
+          message: "Stream URL copied to input_text.stremio_stream_url"
+          duration: 5000
+```
+
+### 8. Development Requirements
+
+#### Frontend (Custom Cards)
+
+**Technology Stack:**
+- TypeScript
+- LitElement (HA standard)
+- Rollup for bundling
+- HACS compatible structure
+
+**File Structure:**
+```
+www/stremio-cards/
+├── stremio-media-card.js
+├── stremio-library-card.js
+├── stremio-stream-dialog.js
+└── stremio-continue-watching-card.js
+```
+
+**Card Registration:**
+```javascript
+customElements.define('stremio-media-card', StremioMediaCard);
+customElements.define('stremio-library-card', StremioLibraryCard);
+customElements.define('stremio-stream-dialog', StremioStreamDialog);
+customElements.define('stremio-continue-watching-card', StremioContinueWatchingCard);
+```
+
+#### Backend (Integration)
+
+**Media Source Implementation:**
+```python
+# media_source.py
+from homeassistant.components.media_source import (
+    BrowseMediaSource,
+    MediaSource,
+    MediaSourceItem,
+    PlayMedia,
+)
+
+async def async_get_media_source(hass):
+    """Set up Stremio media source."""
+    return StremioMediaSource(hass)
+
+class StremioMediaSource(MediaSource):
+    """Stremio media source."""
+    
+    name: str = "Stremio"
+    
+    async def async_resolve_media(self, item: MediaSourceItem) -> PlayMedia:
+        """Resolve media to a playable URL."""
+        # Return stream URL
+        
+    async def async_browse_media(
+        self, item: MediaSourceItem
+    ) -> BrowseMediaSource:
+        """Browse Stremio library."""
+        # Return browseable media structure
+```
+
+**Service: Show Stream Selector:**
+```python
+async def show_stream_selector(call):
+    """Service to show stream selector dialog."""
+    content_id = call.data.get("content_id")
+    browser_id = call.data.get("browser_id", "this")
+    
+    # Fetch streams
+    streams = await coordinator.async_get_streams(content_id)
+    
+    # Fire event for dialog display
+    hass.bus.async_fire(
+        "stremio_show_streams",
+        {
+            "content_id": content_id,
+            "streams": streams,
+            "browser_id": browser_id,
+        },
+    )
+```
+
+### 9. HACS Resources Configuration
+
+**resources.yaml / dashboard resources:**
+
+```yaml
+resources:
+  - url: /hacsfiles/stremio/stremio-media-card.js
+    type: module
+  - url: /hacsfiles/stremio/stremio-library-card.js
+    type: module
+  - url: /hacsfiles/stremio/stremio-stream-dialog.js
+    type: module
+  - url: /hacsfiles/stremio/stremio-continue-watching-card.js
+    type: module
+```
+
+### 10. Implementation Checklist
+
+**Phase 1: Basic Media Player Card**
+- [ ] Create base media player card extending mini-media-player pattern
+- [ ] Display current media with artwork
+- [ ] Add shortcut buttons for actions
+- [ ] Implement service call actions
+- [ ] Test with media player entity
+
+**Phase 2: Stream Selector Dialog**
+- [ ] Create stream dialog component
+- [ ] Implement `stremio.show_stream_selector` service
+- [ ] Add stream URL display with copy button
+- [ ] Integrate clipboard API (with fallbacks)
+- [ ] Test popup display via browser_mod
+
+**Phase 3: Media Source Integration**
+- [ ] Implement `MediaSource` for Stremio
+- [ ] Create library browsing structure
+- [ ] Add continue watching section
+- [ ] Test with HA media browser
+- [ ] Add context menu actions
+
+**Phase 4: Library Card**
+- [ ] Create custom library card with grid/list views
+- [ ] Implement filtering and search
+- [ ] Add stream icons on items
+- [ ] Lazy loading for large libraries
+- [ ] Mobile responsive design
+
+**Phase 5: Continue Watching Card**
+- [ ] Create continue watching list card
+- [ ] Show progress bars
+- [ ] Add resume/remove actions
+- [ ] Integrate with sensors
+
+**Phase 6: Documentation & Examples**
+- [ ] Card configuration examples
+- [ ] Dashboard templates
+- [ ] Automation examples
+- [ ] Troubleshooting guide
+
+---
+
 ## Configuration
 
 ### Config Flow
