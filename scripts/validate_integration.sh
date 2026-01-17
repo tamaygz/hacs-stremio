@@ -21,6 +21,20 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 INTEGRATION_DIR="$PROJECT_ROOT/custom_components/stremio"
 
+# Determine Python command (prefer venv python, then system)
+if [ -f "$PROJECT_ROOT/.venv/bin/python" ]; then
+    PYTHON_CMD="$PROJECT_ROOT/.venv/bin/python"
+elif [ -f "$PROJECT_ROOT/.venv/Scripts/python.exe" ]; then
+    PYTHON_CMD="$PROJECT_ROOT/.venv/Scripts/python.exe"
+elif command -v python &> /dev/null; then
+    PYTHON_CMD="python"
+elif command -v python3 &> /dev/null; then
+    PYTHON_CMD="python3"
+else
+    echo -e "${RED}${CROSS} Python not found${NC}"
+    exit 1
+fi
+
 echo -e "${BLUE}🔍 Validating Stremio Integration${NC}"
 echo ""
 
