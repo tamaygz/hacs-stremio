@@ -1202,11 +1202,18 @@ async def authenticate(email: str, password: str) -> str:
 ### Phase 8: Testing & Polish (Week 5)
 - [ ] Unit tests for all components
 - [ ] Integration tests
-- [ ] Documentation (README, CHANGELOG)
+- [ ] Documentation structure setup
+  - [ ] Create /docs/ directory structure
+  - [ ] Write README.md
+  - [ ] Write installation guide
+  - [ ] Write configuration reference
+  - [ ] Create feature documentation
+  - [ ] Write development guides
 - [ ] HACS validation
 - [ ] Logo and branding
 
 ### Phase 9: Release (Week 5)
+- [ ] Complete CHANGELOG.md
 - [ ] HACS submission
 - [ ] Community announcement
 - [ ] Initial user feedback
@@ -1678,6 +1685,208 @@ homeassistant>=2025.1.0
 
 ---
 
+## Documentation Structure
+
+### Root Level Documentation
+
+**README.md** - Main project documentation
+- Project overview and features
+- Quick installation via HACS
+- Basic configuration steps
+- Links to detailed docs
+- Support and community links
+
+**project.specs.md** (this file) - Complete technical specifications
+- Architecture and design decisions
+- Implementation details
+- API integration specs
+- Feature specifications
+
+**agentinstructions.md** - AI agent development instructions
+- Context for AI assistants
+- Development workflow
+- Code generation guidelines
+- Testing procedures
+
+### /docs/ Directory Structure
+
+```
+docs/
+├── installation.md          # Detailed installation guide
+├── configuration.md         # Complete configuration reference
+├── features/
+│   ├── media-player.md      # Media player entity details
+│   ├── sensors.md           # All sensor entities
+│   ├── services.md          # Service definitions and examples
+│   ├── events.md            # Event types and payloads
+│   ├── apple-tv.md          # Apple TV handover feature
+│   └── ui-components.md     # Custom cards and UI
+├── guides/
+│   ├── quick-start.md       # 5-minute setup guide
+│   ├── automations.md       # Automation examples
+│   ├── dashboards.md        # Dashboard configurations
+│   └── troubleshooting.md   # Common issues and solutions
+├── development/
+│   ├── setup.md             # Development environment
+│   ├── architecture.md      # Code architecture
+│   ├── testing.md           # Testing strategy and tools
+│   ├── contributing.md      # Contribution guidelines
+│   └── release.md           # Release process
+├── api/
+│   ├── stremio-api.md       # Stremio API reference
+│   ├── rate-limits.md       # API rate limiting details
+│   └── authentication.md    # Auth flow details
+└── CHANGELOG.md             # Version history
+```
+
+### Documentation Content Map
+
+#### docs/installation.md
+- HACS installation (recommended)
+- Manual installation
+- Prerequisites and dependencies
+- First-time setup wizard
+- Verification steps
+
+#### docs/configuration.md
+- Config flow options
+- Options flow settings
+- YAML configuration (if supported)
+- Advanced configuration
+- Multiple instances
+
+#### docs/features/media-player.md
+- Entity attributes
+- Supported features
+- State meanings
+- Update frequency
+- Example use cases
+
+#### docs/features/sensors.md
+- All sensor types
+- Attribute descriptions
+- Update intervals
+- Template examples
+- Integration with other systems
+
+#### docs/features/services.md
+- Service definitions
+- Parameter descriptions
+- YAML examples
+- Response handling
+- Error codes
+
+#### docs/features/events.md
+- Event types
+- Event data structures
+- Listening to events
+- Automation triggers
+- Example automations
+
+#### docs/features/apple-tv.md
+- Setup requirements
+- Configuration options
+- Usage examples
+- Troubleshooting
+- Format compatibility
+
+#### docs/features/ui-components.md
+- Custom card installation
+- Card configurations
+- Dashboard examples
+- Theming
+- Mobile optimization
+
+#### docs/guides/quick-start.md
+- 5-minute setup
+- First automation
+- Dashboard setup
+- Common patterns
+
+#### docs/guides/automations.md
+- Playback automations
+- Library notifications
+- Device handover
+- Conditional triggers
+- Blueprint templates
+
+#### docs/guides/dashboards.md
+- Basic dashboard
+- Media room setup
+- Mobile layout
+- Tablet view
+- Complete examples
+
+#### docs/guides/troubleshooting.md
+- Common errors
+- Debug logging
+- Network issues
+- API problems
+- Support resources
+
+#### docs/development/setup.md
+- Development environment
+- Required tools
+- Running locally
+- Hot reload setup
+- VS Code configuration
+
+#### docs/development/architecture.md
+- Component structure
+- Data flow
+- Coordinator pattern
+- Entity lifecycle
+- Service registration
+
+#### docs/development/testing.md
+- Unit testing
+- Integration testing
+- Manual testing
+- Test coverage
+- CI/CD pipeline
+
+#### docs/development/contributing.md
+- Code standards
+- Commit conventions
+- Pull request process
+- Review guidelines
+- Community guidelines
+
+#### docs/development/release.md
+- Version numbering
+- Release checklist
+- HACS validation
+- Announcement template
+- Rollback procedures
+
+#### docs/api/stremio-api.md
+- API endpoints
+- Request/response formats
+- Authentication details
+- Error codes
+- Example requests
+
+#### docs/api/rate-limits.md
+- Rate limit details
+- Backoff strategies
+- Best practices
+- Monitoring
+
+#### docs/api/authentication.md
+- Auth flow
+- Token management
+- Re-authentication
+- Security considerations
+
+#### docs/CHANGELOG.md
+- Version history
+- Breaking changes
+- New features
+- Bug fixes
+- Migration guides
+
+---
+
 ## Testing Strategy
 
 ### Unit Tests
@@ -1687,11 +1896,15 @@ homeassistant>=2025.1.0
 - Entity state calculations
 - Error handling
 
+**Details:** See [docs/development/testing.md](docs/development/testing.md)
+
 ### Integration Tests
 - Full setup flow
 - Entity registration
 - Service calls
 - Event firing
+
+**Details:** See [docs/development/testing.md](docs/development/testing.md)
 
 ### Manual Testing
 - Real Stremio account integration
@@ -1699,25 +1912,7 @@ homeassistant>=2025.1.0
 - Network failure handling
 - Rate limiting behavior
 
----
-
-## Documentation Requirements
-
-### README.md
-- Installation instructions
-- Configuration guide
-- Feature overview
-- Troubleshooting
-
-### CONTRIBUTING.md
-- Development setup
-- Code standards
-- Pull request process
-
-### CHANGELOG.md
-- Version history
-- Breaking changes
-- New features
+**Details:** See [docs/development/testing.md](docs/development/testing.md)
 
 ---
 
@@ -1769,16 +1964,39 @@ MIT License (matching stremio-api library)
 
 - [Stremio API Client (JS)](https://github.com/Stremio/stremio-api-client)
 - [stremio-api Python Library](https://pypi.org/project/stremio-api/)
-- [AboveColin's stremio-ha Integration](https://github.com/AboveColin/stremio-ha)
-- [Home Assistant Developer Docs](https://developers.home-assistant.io/)
-- [HACS Documentation](https://hacs.xyz/)
-- [Stremio Core Library Management](https://deepwiki.com/Stremio/stremio-core/3.1-library-management)
+- [Documentation Files
+
+### Root Files
+- `README.md` - Main project overview and quick start
+- `project.specs.md` - This file, complete technical specifications
+- `agentinstructions.md` - AI agent development instructions
+
+### Documentation Directory (/docs/)
+All detailed documentation lives in the `/docs/` directory. See [Documentation Structure](#documentation-structure) section above for complete file listing.
+
+**Key Documentation:**
+- [Installation Guide](docs/installation.md)
+- [Configuration Reference](docs/configuration.md)
+- [Features Overview](docs/features/)
+- [User Guides](docs/guides/)
+- [Development Guides](docs/development/)
+- [API Reference](docs/api/)
+- [Changelog](docs/CHANGELOG.md)
 
 ---
 
 ## Contact & Support
 
 - **Issues:** GitHub Issues
+- **Discussions:** GitHub Discussions
+- **Community:** Home Assistant Community Forum
+- **Documentation:** [Full Documentation](docs/)
+
+---
+
+**Document Version:** 1.1  
+**Created:** January 17, 2026  
+**Last Updssues:** GitHub Issues
 - **Discussions:** GitHub Discussions
 - **Community:** Home Assistant Community Forum
 
