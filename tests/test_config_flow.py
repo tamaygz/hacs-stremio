@@ -185,7 +185,8 @@ async def test_duplicate_entry(mock_hass):
     ), patch.object(
         flow, "_abort_if_unique_id_configured", side_effect=AbortFlow("already_configured")
     ):
-        result = await flow.async_step_user(MOCK_CONFIG_ENTRY)
+        # The AbortFlow exception should propagate up - the framework handles it
+        with pytest.raises(AbortFlow) as exc_info:
+            await flow.async_step_user(MOCK_CONFIG_ENTRY)
         
-    assert result["type"] == FlowResultType.ABORT
-    assert result["reason"] == "already_configured"
+        assert exc_info.value.reason == "already_configured"
