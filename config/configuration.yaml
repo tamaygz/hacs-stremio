@@ -55,9 +55,12 @@ lovelace:
 # Enable default config components
 default_config:
 
-# Disable components not needed for development
-dhcp:
-discovery:
+# Add HACS
+hacs:
+  token: !secret github_token
+
+# Disable components not needed for development or causing errors
+# Remove discovery as it's deprecated
 
 # Text-to-Speech (optional, can be removed if not needed)
 tts:
