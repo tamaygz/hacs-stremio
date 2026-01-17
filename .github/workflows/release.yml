@@ -1,0 +1,40 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Update version in manifest
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          sed -i "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" custom_components/stremio/manifest.json
+
+      - name: Create release zip
+        run: |
+          cd custom_components
+          zip -r ../stremio.zip stremio
+
+      - name: Upload release asset
+        uses: softprops/action-gh-release@v1
+        with:
+          files: stremio.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update HACS
+        run: |
+          echo "Release ${{ github.ref_name }} published successfully"
+          echo "HACS will automatically detect the new release"
