@@ -12,13 +12,11 @@ import sys
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
 from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
 from homeassistant.core import HomeAssistant
 from homeassistant.setup import async_setup_component
 
 from custom_components.stremio.const import DOMAIN
-
 
 # ============================================================================
 # Mock Data
