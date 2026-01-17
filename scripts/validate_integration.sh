@@ -119,7 +119,7 @@ else
         fail "hacs.json has invalid JSON syntax"
     fi
 
-    if grep -q '"name"' "$HACS_JSON"; then
+    if python3 -c "import json; d=json.load(open('$HACS_JSON')); assert 'name' in d" 2>/dev/null; then
         pass "hacs.json has name"
     else
         warn "hacs.json missing name"
@@ -198,20 +198,32 @@ echo ""
 # ============================================
 check "Checking Python syntax..."
 
-SYNTAX_ERRORS=0
-for pyfile in "$INTEGRATION_DIR"/*.py; do
-    if [ -f "$pyfile" ]; then
-        if python3 -m py_compile "$pyfile" 2>/dev/null; then
-            : # pass silently
-        else
-            fail "Syntax error in $(basename "$pyfile")"
-            ((SYNTAX_ERRORS++))
-        fi
-    fi
-done
+# Determine Python command
+if command -v python &> /dev/null; then
+    PYTHON_CMD="python"
+elif command -v python3 &> /dev/null; then
+    PYTHON_CMD="python3"
+else
+    warn "Python not found, skipping syntax check"
+    PYTHON_CMD=""
+fi
 
-if [ $SYNTAX_ERRORS -eq 0 ]; then
-    pass "All Python files have valid syntax"
+SYNTAX_ERRORS=0
+if [ -n "$PYTHON_CMD" ]; then
+    for pyfile in "$INTEGRATION_DIR"/*.py; do
+        if [ -f "$pyfile" ]; then
+            if $PYTHON_CMD -m py_compile "$pyfile" 2>/dev/null; then
+                : # pass silently
+            else
+                fail "Syntax error in $(basename "$pyfile")"
+                ((SYNTAX_ERRORS++))
+            fi
+        fi
+    done
+
+    if [ $SYNTAX_ERRORS -eq 0 ]; then
+        pass "All Python files have valid syntax"
+    fi
 fi
 
 echo ""
@@ -222,17 +234,17 @@ echo ""
 check "Checking for common issues..."
 
 # Check for print statements (should use _LOGGER)
-if grep -r "print(" "$INTEGRATION_DIR"/*.py 2>/dev/null | grep -v "^Binary"; then
+if grep -r "print(" "$INTEGRATION_DIR"/*.py 2>/dev/null | grep -v "# noqa" | grep -v "__pycache__" > /dev/null; then
     warn "Found print() statements - consider using _LOGGER instead"
 else
     pass "No print() statements found"
 fi
 
 # Check for proper async
-if grep -rL "async def" "$INTEGRATION_DIR/__init__.py" 2>/dev/null; then
-    warn "__init__.py may be missing async setup functions"
+if grep -q "async def async_setup" "$INTEGRATION_DIR/__init__.py" 2>/dev/null; then
+    pass "__init__.py uses async setup functions"
 else
-    pass "__init__.py uses async functions"
+    warn "__init__.py may be missing async setup functions"
 fi
 
 echo ""
