@@ -592,11 +592,18 @@ class StremioClient:
             Processed library items
         """
         if not library:
+            _LOGGER.debug("No library items to process")
             return []
 
         items = []
-        try:
-            for item in library:
+        errors = 0
+
+        for item in library:
+            try:
+                # Skip removed items
+                if item.get("removed", False):
+                    continue
+
                 # Extract item data
                 _id = item.get("_id", "")
                 name = item.get("name", "Unknown")
@@ -617,9 +624,14 @@ class StremioClient:
                     "added_at": item.get("mtime"),
                 }
                 items.append(processed_item)
-        except (AttributeError, TypeError, KeyError) as err:
-            _LOGGER.warning("Error processing library items: %s", err)
+            except (AttributeError, TypeError, KeyError) as err:
+                errors += 1
+                _LOGGER.debug("Error processing library item %s: %s", item.get("_id", "unknown"), err)
 
+        if errors > 0:
+            _LOGGER.warning("Encountered %d errors processing library items", errors)
+
+        _LOGGER.debug("Processed %d library items (filtered from %d)", len(items), len(library))
         return items
 
     def _process_continue_watching(
@@ -634,11 +646,18 @@ class StremioClient:
             Processed continue watching items
         """
         if not watching:
+            _LOGGER.debug("No continue watching items to process")
             return []
 
         items = []
-        try:
-            for item in watching:
+        errors = 0
+
+        for item in watching:
+            try:
+                # Skip removed items
+                if item.get("removed", False):
+                    continue
+
                 # Extract item data
                 _id = item.get("_id", "")
                 name = item.get("name", "Unknown")
@@ -648,7 +667,7 @@ class StremioClient:
                 # Parse ID
                 imdb_id = _id.split(":", 1)[1] if ":" in _id else _id
 
-                # Extract video info from state
+                # Extract video info from state (for series: imdb:season:episode)
                 video_id = state.get("video_id", "")
                 season = None
                 episode = None
@@ -672,26 +691,38 @@ class StremioClient:
                     "watched_at": state.get("lastWatched"),
                 }
                 items.append(processed_item)
-        except (AttributeError, TypeError, KeyError) as err:
-            _LOGGER.warning("Error processing continue watching items: %s", err)
+            except (AttributeError, TypeError, KeyError) as err:
+                errors += 1
+                _LOGGER.debug(
+                    "Error processing continue watching item %s: %s",
+                    item.get("_id", "unknown"),
+                    err,
+                )
 
+        if errors > 0:
+            _LOGGER.warning("Encountered %d errors processing continue watching items", errors)
+
+        _LOGGER.debug("Processed %d continue watching items", len(items))
         return items
 
     def _process_streams(self, streams: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Process streams into consistent format.
 
         Args:
-            streams: Raw stream data from API
+            streams: Raw stream data from addon response
 
         Returns:
             Processed stream items
         """
         if not streams:
+            _LOGGER.debug("No streams to process")
             return []
 
         items = []
-        try:
-            for stream in streams:
+        errors = 0
+
+        for stream in streams:
+            try:
                 url = stream.get("url")
                 if url:
                     processed = {
@@ -700,12 +731,73 @@ class StremioClient:
                         "title": stream.get("title"),
                         "quality": stream.get("quality"),
                         "source": stream.get("source"),
+                        "behaviorHints": stream.get("behaviorHints", {}),
                     }
                     items.append(processed)
-        except (AttributeError, TypeError, KeyError) as err:
-            _LOGGER.warning("Error processing streams: %s", err)
+            except (AttributeError, TypeError, KeyError) as err:
+                errors += 1
+                _LOGGER.debug("Error processing stream: %s", err)
 
+        if errors > 0:
+            _LOGGER.warning("Encountered %d errors processing streams", errors)
+
+        _LOGGER.debug("Processed %d streams from %d raw entries", len(items), len(streams))
         return items
+
+    async def async_get_addon_collection(self) -> list[dict[str, Any]]:
+        """Get user's installed addon collection.
+
+        Uses the addonCollectionGet endpoint to retrieve the user's addon manifests.
+
+        Returns:
+            List of addon manifest dictionaries
+
+        Raises:
+            StremioConnectionError: Connection failed
+        """
+        if not self._auth_key:
+            _LOGGER.error("Cannot get addon collection: client not authenticated")
+            raise StremioConnectionError("Client not authenticated")
+
+        _LOGGER.debug("Fetching addon collection from Stremio API")
+
+        try:
+            session = await self._get_session()
+
+            payload = {
+                "authKey": self._auth_key,
+                "update": True,
+            }
+
+            async with session.post(STREMIO_ADDON_COLLECTION_URL, json=payload) as response:
+                if response.status == 401:
+                    _LOGGER.warning("Authentication expired while fetching addons")
+                    raise StremioAuthError("Authentication expired or invalid")
+                if response.status != 200:
+                    text = await response.text()
+                    _LOGGER.error(
+                        "Failed to get addon collection (status %d): %s",
+                        response.status,
+                        text[:200],
+                    )
+                    raise StremioConnectionError(
+                        f"Failed to get addon collection with status {response.status}: {text}"
+                    )
+
+                data = await response.json()
+                addons = data.get("addons", []) or data.get("result", {}).get("addons", [])
+
+                _LOGGER.info("Fetched %d addons from user's collection", len(addons))
+                return addons
+
+        except (StremioAuthError, StremioConnectionError):
+            raise
+        except ClientError as err:
+            _LOGGER.error("Connection error getting addon collection: %s", err)
+            raise StremioConnectionError(f"Connection failed: {err}") from err
+        except Exception as err:
+            _LOGGER.exception("Failed to get addon collection")
+            raise StremioConnectionError(f"Failed to get addon collection: {err}") from err
 
 
 class StremioAuthError(HomeAssistantError):
