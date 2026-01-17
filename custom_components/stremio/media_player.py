@@ -6,10 +6,14 @@ import logging
 from typing import Any
 
 from homeassistant.components.media_player import (
+    BrowseMedia,
     MediaPlayerEntity,
     MediaPlayerEntityFeature,
     MediaPlayerState,
     MediaType,
+)
+from homeassistant.components.media_player.browse_media import (
+    async_process_play_media_url,
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -19,6 +23,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import DOMAIN
 from .coordinator import StremioDataUpdateCoordinator
 from .entity_helpers import get_device_info
+from .media_source import StremioMediaSource
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -129,6 +134,43 @@ class StremioMediaPlayer(
                 "progress_percent": current.get("progress_percent"),
             }
         return {}
+
+    async def async_browse_media(
+        self, media_content_type: str | None = None, media_content_id: str | None = None
+    ) -> BrowseMedia:
+        """Implement the websocket media browsing helper.
+
+        This method enables the media browser UI in Home Assistant.
+        It delegates to the StremioMediaSource implementation.
+
+        Args:
+            media_content_type: Content type to browse
+            media_content_id: Content ID to browse
+
+        Returns:
+            BrowseMedia object with browsable content
+        """
+        _LOGGER.debug(
+            "Browse media requested - type=%s, id=%s",
+            media_content_type,
+            media_content_id,
+        )
+
+        # Create a StremioMediaSource instance
+        media_source = StremioMediaSource(self.hass)
+
+        # Create a MediaSourceItem for the request
+        from homeassistant.components.media_source import MediaSourceItem
+
+        item = MediaSourceItem(
+            hass=self.hass,
+            domain=DOMAIN,
+            identifier=media_content_id or "",
+            target_media_player=self.entity_id,
+        )
+
+        # Delegate to media source implementation
+        return await media_source.async_browse_media(item)
 
     async def async_play_media(
         self, media_type: str, media_id: str, **kwargs: Any

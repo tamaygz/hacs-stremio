@@ -214,3 +214,42 @@ class TestMediaPlayerSetup:
         entities = async_add_entities.call_args[0][0]
         assert len(entities) == 1
         assert isinstance(entities[0], StremioMediaPlayer)
+
+
+class TestMediaPlayerBrowse:
+    """Tests for media player browsing functionality."""
+
+    @pytest.mark.asyncio
+    async def test_async_browse_media_root(
+        self, mock_hass, mock_media_coordinator, mock_config_entry
+    ):
+        """Test browsing media at root level."""
+        player = StremioMediaPlayer(mock_media_coordinator, mock_config_entry)
+        player.hass = mock_hass
+
+        # Browse root level
+        result = await player.async_browse_media()
+
+        # Should return BrowseMedia object with children
+        assert result is not None
+        assert result.title == "Stremio"
+        assert result.can_expand is True
+        assert result.can_play is False
+        assert result.children is not None
+        assert len(result.children) > 0
+
+    @pytest.mark.asyncio
+    async def test_async_browse_media_library(
+        self, mock_hass, mock_media_coordinator, mock_config_entry
+    ):
+        """Test browsing library section."""
+        player = StremioMediaPlayer(mock_media_coordinator, mock_config_entry)
+        player.hass = mock_hass
+
+        # Browse library
+        result = await player.async_browse_media(media_content_id="library")
+
+        # Should return library items
+        assert result is not None
+        assert result.title == "Library"
+        assert result.can_expand is True
