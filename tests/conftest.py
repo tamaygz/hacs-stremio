@@ -1,17 +1,17 @@
-"""Pytest fixtures and configuration for Stremio integration tests."""
+"""Pytest fixtures and configuration for Stremio integration tests.
+
+NOTE: Tests must be run on Linux/macOS or in a devcontainer/WSL2.
+The pytest-homeassistant-custom-component package uses pytest-socket to block
+network calls, which conflicts with Windows' ProactorEventLoop for asyncio.
+See docs/testing.md for details.
+"""
 
 from __future__ import annotations
 
-import asyncio
 import sys
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
-# On Windows, use the SelectorEventLoop instead of the ProactorEventLoop
-# This is required for compatibility with pytest-homeassistant-custom-component
-if sys.platform == "win32":
-    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 
 # Mock the stremio_api module before any imports that might need it
