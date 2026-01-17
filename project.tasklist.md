@@ -341,25 +341,25 @@ This document tracks the implementation progress of the Stremio HACS integration
 **Duration**: 5-7 days
 
 ### 6.1 Card Infrastructure
-- [ ] ⬜ **Task 6.1.1**: Set up frontend structure
+- [x] ✅ **Task 6.1.1**: Set up frontend structure (Completed: 2026-01-17)
   - Create `www/` folder for card resources
   - Create `stremio-card-bundle.js` entry point
   - Set up build system (Rollup/Webpack) for card bundling
   - Configure lit-element for web components
   - **Best Practice**: [Embedded cards in integration](https://community.home-assistant.io/t/developer-guide-embedded-lovelace-card-in-a-home-assistant-integration/974909)
   - **Dependencies**: Task 1.1.1
-  - **Output**: Card build system ready
+  - **Output**: Card build system ready ✓
 
-- [ ] ⬜ **Task 6.1.2**: Register cards in integration
+- [x] ✅ **Task 6.1.2**: Register cards in integration (Completed: 2026-01-17)
   - Implement __init__.py lovelace resource registration
   - Auto-register cards on integration load
   - Add version hash for cache busting
   - **Best Practice**: No manual resource addition needed
   - **Dependencies**: Task 6.1.1, Task 2.2.3
-  - **Output**: Cards auto-register in Lovelace
+  - **Output**: Cards auto-register in Lovelace ✓
 
 ### 6.2 Stremio Player Card
-- [ ] ⬜ **Task 6.2.1**: Create stremio-player-card.js
+- [x] ✅ **Task 6.2.1**: Create stremio-player-card.js (Completed: 2026-01-17)
   - Extend LitElement for web component
   - Implement setConfig and hass property
   - Display current media (poster, title, progress bar)
@@ -367,38 +367,38 @@ This document tracks the implementation progress of the Stremio HACS integration
   - Add "Open in Stremio" button (deep link)
   - **Best Practice**: Follow [mini-media-player card](https://github.com/kalkih/mini-media-player) pattern
   - **Dependencies**: Task 6.1.1
-  - **Output**: Player card working
+  - **Output**: Player card working ✓
 
-- [ ] ⬜ **Task 6.2.2**: Style player card
+- [x] ✅ **Task 6.2.2**: Style player card (Completed: 2026-01-17)
   - Use HA theme variables (var(--primary-color), etc.)
   - Add responsive design (mobile/desktop)
   - Add hover effects and animations
   - Match HA design language
   - **Best Practice**: Consistent with HA UI/UX
   - **Dependencies**: Task 6.2.1
-  - **Output**: Player card styled
+  - **Output**: Player card styled ✓
 
 ### 6.3 Library Browser Card
-- [ ] ⬜ **Task 6.3.1**: Create stremio-library-card.js
+- [x] ✅ **Task 6.3.1**: Create stremio-library-card.js (Completed: 2026-01-17)
   - Display library items in grid layout
   - Show poster images, titles, progress
   - Add filter/sort options (genre, type, progress)
   - Implement lazy loading for large libraries
   - **Best Practice**: Virtualized list for performance
   - **Dependencies**: Task 6.1.1
-  - **Output**: Library browser card working
+  - **Output**: Library browser card working ✓
 
-- [ ] ⬜ **Task 6.3.2**: Add search and actions to library card
+- [x] ✅ **Task 6.3.2**: Add search and actions to library card (Completed: 2026-01-17)
   - Add search box at top of card
   - Filter library items as user types
   - Add click action to open media details dialog
   - Add "Play in Stremio" action button
   - **Best Practice**: Intuitive search and navigation
   - **Dependencies**: Task 6.3.1
-  - **Output**: Search and actions working
+  - **Output**: Search and actions working ✓
 
 ### 6.4 Stream Selector Dialog
-- [ ] ⬜ **Task 6.4.1**: Create stremio-stream-dialog.js
+- [x] ✅ **Task 6.4.1**: Create stremio-stream-dialog.js (Completed: 2026-01-17)
   - Create modal dialog component
   - List available streams for selected media
   - Show quality, size, seeds (if torrent)
@@ -406,15 +406,15 @@ This document tracks the implementation progress of the Stremio HACS integration
   - Implement clipboard copy (navigator.clipboard.writeText)
   - **Best Practice**: Use browser_mod or native dialog
   - **Dependencies**: Task 6.1.1, Task 4.1.3
-  - **Output**: Stream selector dialog working
+  - **Output**: Stream selector dialog working ✓
 
-- [ ] ⬜ **Task 6.4.2**: Add fallback clipboard methods
+- [x] ✅ **Task 6.4.2**: Add fallback clipboard methods (Completed: 2026-01-17)
   - Implement fallback 1: fire HA event with URL
   - Implement fallback 2: create input_text entity with URL
   - Implement fallback 3: notification with URL
   - **Best Practice**: Multiple fallbacks for clipboard
   - **Dependencies**: Task 6.4.1
-  - **Output**: Clipboard always works
+  - **Output**: Clipboard always works ✓
 
 ### 6.5 Media Details Card
 - [ ] ⬜ **Task 6.5.1**: Create stremio-media-details-card.js
