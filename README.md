@@ -15,15 +15,15 @@ A comprehensive Home Assistant Custom Component (HACS) integration that connects
 
 ## ✨ Features
 
-| Feature | Description |
-|---------|-------------|
-| 🎬 **Media Player Entity** | Track current playback with rich metadata |
-| 📊 **Multiple Sensors** | Library stats, watch time, current media |
-| 🔔 **Events** | React to playback changes and library updates |
-| 📺 **Apple TV Handover** | Stream content directly to Apple TV via AirPlay |
-| 🎨 **Custom UI Cards** | Beautiful Lovelace cards for library browsing |
-| 🔍 **Media Source** | Browse library from HA media browser |
-| 🎯 **Services** | Search, manage library, get stream URLs |
+| Feature                    | Description                                     |
+| -------------------------- | ----------------------------------------------- |
+| 🎬 **Media Player Entity** | Track current playback with rich metadata       |
+| 📊 **Multiple Sensors**    | Library stats, watch time, current media        |
+| 🔔 **Events**              | React to playback changes and library updates   |
+| 📺 **Apple TV Handover**   | Stream content directly to Apple TV via AirPlay |
+| 🎨 **Custom UI Cards**     | Beautiful Lovelace cards for library browsing   |
+| 🔍 **Media Source**        | Browse library from HA media browser            |
+| 🎯 **Services**            | Search, manage library, get stream URLs         |
 
 ---
 
@@ -48,22 +48,25 @@ A comprehensive Home Assistant Custom Component (HACS) integration that connects
 ## 🎯 Entities Created
 
 ### Sensors
-| Entity | Description |
-|--------|-------------|
-| `sensor.stremio_current_media` | Currently playing media |
-| `sensor.stremio_last_watched` | Last watched content |
-| `sensor.stremio_library_count` | Total library items |
-| `sensor.stremio_continue_watching_count` | In-progress items |
+
+| Entity                                   | Description             |
+| ---------------------------------------- | ----------------------- |
+| `sensor.stremio_current_media`           | Currently playing media |
+| `sensor.stremio_last_watched`            | Last watched content    |
+| `sensor.stremio_library_count`           | Total library items     |
+| `sensor.stremio_continue_watching_count` | In-progress items       |
 
 ### Binary Sensors
-| Entity | Description |
-|--------|-------------|
-| `binary_sensor.stremio_is_playing` | On when media is playing |
+
+| Entity                                  | Description                  |
+| --------------------------------------- | ---------------------------- |
+| `binary_sensor.stremio_is_playing`      | On when media is playing     |
 | `binary_sensor.stremio_has_new_content` | On when new content detected |
 
 ### Media Player
-| Entity | Description |
-|--------|-------------|
+
+| Entity                 | Description                      |
+| ---------------------- | -------------------------------- |
 | `media_player.stremio` | Playback state, metadata, poster |
 
 ---
@@ -140,16 +143,16 @@ automation:
 
 ## 📖 Documentation
 
-| Guide | Description |
-|-------|-------------|
-| [Setup Guide](docs/setup.md) | Installation & configuration |
-| [Configuration](docs/configuration.md) | All options explained |
-| [Services](docs/services.md) | Service calls & automation |
-| [Events](docs/events.md) | Event triggers for automations |
-| [UI Cards](docs/ui.md) | Custom Lovelace cards |
-| [API Reference](docs/api.md) | Developer documentation |
-| [Development](docs/development.md) | Contributing guide |
-| [Troubleshooting](docs/troubleshooting.md) | Common issues |
+| Guide                                      | Description                    |
+| ------------------------------------------ | ------------------------------ |
+| [Setup Guide](docs/setup.md)               | Installation & configuration   |
+| [Configuration](docs/configuration.md)     | All options explained          |
+| [Services](docs/services.md)               | Service calls & automation     |
+| [Events](docs/events.md)                   | Event triggers for automations |
+| [UI Cards](docs/ui.md)                     | Custom Lovelace cards          |
+| [API Reference](docs/api.md)               | Developer documentation        |
+| [Development](docs/development.md)         | Contributing guide             |
+| [Troubleshooting](docs/troubleshooting.md) | Common issues                  |
 
 ---
 
@@ -179,7 +182,7 @@ MIT License - see [LICENSE](LICENSE) file.
 
 ## 🙏 Credits
 
-- [stremio-api](https://pypi.org/project/stremio-api/) Python library
+- Native Stremio API integration using aiohttp
 - Inspired by [@AboveColin's stremio-ha](https://github.com/AboveColin/stremio-ha)
 
 ## 💬 Support
