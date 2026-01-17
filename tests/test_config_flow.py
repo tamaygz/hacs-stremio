@@ -48,6 +48,10 @@ async def test_form_user_step_success(mock_hass):
     with patch(
         "custom_components.stremio.config_flow.StremioAPIClient",
         return_value=mock_client,
+    ), patch.object(
+        flow, "async_set_unique_id", new_callable=AsyncMock
+    ), patch.object(
+        flow, "_abort_if_unique_id_configured"
     ):
         result = await flow.async_step_user(MOCK_CONFIG_ENTRY)
     
@@ -169,10 +173,6 @@ async def test_duplicate_entry(mock_hass):
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
     mock_client.__aexit__ = AsyncMock(return_value=None)
     
-    # Simulate existing entry
-    existing_entry = MagicMock()
-    existing_entry.unique_id = MOCK_CONFIG_ENTRY[CONF_EMAIL]
-    
     flow = ConfigFlow()
     flow.hass = mock_hass
     flow.context = {}
@@ -180,14 +180,12 @@ async def test_duplicate_entry(mock_hass):
     with patch(
         "custom_components.stremio.config_flow.StremioAPIClient",
         return_value=mock_client,
+    ), patch.object(
+        flow, "async_set_unique_id", new_callable=AsyncMock
+    ), patch.object(
+        flow, "_abort_if_unique_id_configured", side_effect=AbortFlow("already_configured")
     ):
-        # Mock the async_set_unique_id and _abort_if_unique_id_configured
-        with patch.object(
-            flow, "async_set_unique_id", new_callable=AsyncMock
-        ), patch.object(
-            flow, "_abort_if_unique_id_configured", side_effect=AbortFlow("already_configured")
-        ):
-            result = await flow.async_step_user(MOCK_CONFIG_ENTRY)
+        result = await flow.async_step_user(MOCK_CONFIG_ENTRY)
         
-        assert result["type"] == FlowResultType.ABORT
-        assert result["reason"] == "already_configured"
+    assert result["type"] == FlowResultType.ABORT
+    assert result["reason"] == "already_configured"
