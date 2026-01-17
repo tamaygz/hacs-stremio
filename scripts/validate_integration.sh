@@ -212,32 +212,20 @@ echo ""
 # ============================================
 check "Checking Python syntax..."
 
-# Determine Python command
-if command -v python &> /dev/null; then
-    PYTHON_CMD="python"
-elif command -v python3 &> /dev/null; then
-    PYTHON_CMD="python3"
-else
-    warn "Python not found, skipping syntax check"
-    PYTHON_CMD=""
-fi
-
 SYNTAX_ERRORS=0
-if [ -n "$PYTHON_CMD" ]; then
-    for pyfile in "$INTEGRATION_DIR"/*.py; do
-        if [ -f "$pyfile" ]; then
-            if $PYTHON_CMD -m py_compile "$pyfile" 2>/dev/null; then
-                : # pass silently
-            else
-                fail "Syntax error in $(basename "$pyfile")"
-                ((SYNTAX_ERRORS++))
-            fi
+for pyfile in "$INTEGRATION_DIR"/*.py; do
+    if [ -f "$pyfile" ]; then
+        if $PYTHON_CMD -m py_compile "$pyfile" 2>/dev/null; then
+            : # pass silently
+        else
+            fail "Syntax error in $(basename "$pyfile")"
+            ((SYNTAX_ERRORS++))
         fi
-    done
-
-    if [ $SYNTAX_ERRORS -eq 0 ]; then
-        pass "All Python files have valid syntax"
     fi
+done
+
+if [ $SYNTAX_ERRORS -eq 0 ]; then
+    pass "All Python files have valid syntax"
 fi
 
 echo ""
