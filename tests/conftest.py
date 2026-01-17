@@ -5,6 +5,15 @@ import sys
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+import socket
+
+# Enable socket access for asyncio event loop (needed on Windows)
+# pytest-socket blocks sockets by default, but Windows asyncio requires sockets
+# for the ProactorEventLoop
+@pytest.fixture(autouse=True)
+def socket_enabled(socket_enabled):
+    """Enable socket access for all tests (required for Windows asyncio)."""
+    return
 
 # Mock the stremio_api module before any imports that might need it
 mock_stremio_api_module = MagicMock()
