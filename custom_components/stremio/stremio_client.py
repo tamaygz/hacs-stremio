@@ -49,7 +49,9 @@ class StremioClient:
     - Retrieve stream information from addons
     """
 
-    def __init__(self, email: str, password: str, session: aiohttp.ClientSession | None = None) -> None:
+    def __init__(
+        self, email: str, password: str, session: aiohttp.ClientSession | None = None
+    ) -> None:
         """Initialize the Stremio client.
 
         Args:
@@ -64,7 +66,11 @@ class StremioClient:
         self._session: aiohttp.ClientSession | None = session
         self._owns_session: bool = session is None  # Track if we created the session
         self._last_auth_time: float = 0
-        _LOGGER.debug("StremioClient initialized for user: %s (external_session=%s)", email, session is not None)
+        _LOGGER.debug(
+            "StremioClient initialized for user: %s (external_session=%s)",
+            email,
+            session is not None,
+        )
 
     async def _get_session(self) -> aiohttp.ClientSession:
         """Get or create aiohttp session."""
@@ -155,7 +161,7 @@ class StremioClient:
 
     async def async_close(self) -> None:
         """Close the API client and cleanup resources.
-        
+
         Only closes the session if we own it (i.e., we created it ourselves).
         If using Home Assistant's shared session, we don't close it.
         """
@@ -194,13 +200,19 @@ class StremioClient:
             }
             _LOGGER.debug("Sending getUser request")
 
-            async with session.post(f"{STREMIO_API_BASE}/api/getUser", json=payload) as response:
+            async with session.post(
+                f"{STREMIO_API_BASE}/api/getUser", json=payload
+            ) as response:
                 if response.status == 401:
                     _LOGGER.warning("Authentication expired while fetching user")
                     raise StremioAuthError("Authentication expired or invalid")
                 if response.status != 200:
                     text = await response.text()
-                    _LOGGER.error("Failed to get user (status %d): %s", response.status, text[:200])
+                    _LOGGER.error(
+                        "Failed to get user (status %d): %s",
+                        response.status,
+                        text[:200],
+                    )
                     raise StremioConnectionError(
                         f"Failed to get user with status {response.status}: {text}"
                     )
@@ -208,7 +220,14 @@ class StremioClient:
                 data = await response.json()
                 user_data = data.get("result", {})
 
-                _LOGGER.debug("Successfully fetched user profile: %s", list(user_data.keys()) if isinstance(user_data, dict) else type(user_data))
+                _LOGGER.debug(
+                    "Successfully fetched user profile: %s",
+                    (
+                        list(user_data.keys())
+                        if isinstance(user_data, dict)
+                        else type(user_data)
+                    ),
+                )
                 return {
                     "email": self._email,
                     "user_id": user_data.get("_id") or self._user_id,
@@ -229,7 +248,7 @@ class StremioClient:
 
         Uses the datastoreGet endpoint with all=true to get all library items.
         Based on Stremio Core API: https://github.com/Stremio/stremio-core
-        
+
         DatastoreCommand::Get { ids: [], all: true } fetches all items.
 
         Returns:
@@ -257,31 +276,43 @@ class StremioClient:
             }
             _LOGGER.debug("Sending datastoreGet request for library items")
 
-            async with session.post(STREMIO_DATASTORE_GET_URL, json=payload) as response:
+            async with session.post(
+                STREMIO_DATASTORE_GET_URL, json=payload
+            ) as response:
                 if response.status == 401:
                     _LOGGER.warning("Authentication expired while fetching library")
                     raise StremioAuthError("Authentication expired or invalid")
                 if response.status != 200:
                     text = await response.text()
-                    _LOGGER.error("Failed to get library (status %d): %s", response.status, text[:200])
+                    _LOGGER.error(
+                        "Failed to get library (status %d): %s",
+                        response.status,
+                        text[:200],
+                    )
                     raise StremioConnectionError(
                         f"Failed to get library with status {response.status}: {text}"
                     )
 
                 data = await response.json()
                 _LOGGER.debug("Library API response keys: %s", list(data.keys()))
-                
+
                 # datastoreGet returns {"result": [item1, item2, ...]} - flat array of items
                 library_items = data.get("result", [])
-                
+
                 # Validate response structure
                 if not isinstance(library_items, list):
-                    _LOGGER.warning("Unexpected library response type: %s", type(library_items))
+                    _LOGGER.warning(
+                        "Unexpected library response type: %s", type(library_items)
+                    )
                     library_items = []
-                
-                _LOGGER.info("Fetched %d library items from Stremio", len(library_items))
+
+                _LOGGER.info(
+                    "Fetched %d library items from Stremio", len(library_items)
+                )
                 if library_items and isinstance(library_items[0], dict):
-                    _LOGGER.debug("First library item keys: %s", list(library_items[0].keys()))
+                    _LOGGER.debug(
+                        "First library item keys: %s", list(library_items[0].keys())
+                    )
                 return self._process_library_items(library_items)
 
         except StremioAuthError:
@@ -328,9 +359,13 @@ class StremioClient:
             }
             _LOGGER.debug("Sending datastoreGet request for continue watching")
 
-            async with session.post(STREMIO_DATASTORE_GET_URL, json=payload) as response:
+            async with session.post(
+                STREMIO_DATASTORE_GET_URL, json=payload
+            ) as response:
                 if response.status == 401:
-                    _LOGGER.warning("Authentication expired while fetching continue watching")
+                    _LOGGER.warning(
+                        "Authentication expired while fetching continue watching"
+                    )
                     raise StremioAuthError("Authentication expired or invalid")
                 if response.status != 200:
                     text = await response.text()
@@ -345,7 +380,7 @@ class StremioClient:
 
                 data = await response.json()
                 library_items = data.get("result", [])
-                
+
                 if not isinstance(library_items, list):
                     library_items = []
 
@@ -353,7 +388,8 @@ class StremioClient:
                 watching = [
                     item
                     for item in library_items
-                    if isinstance(item, dict) and item.get("state", {}).get("timeWatched", 0) > 0
+                    if isinstance(item, dict)
+                    and item.get("state", {}).get("timeWatched", 0) > 0
                 ]
 
                 # Sort by most recently watched and limit
@@ -503,7 +539,9 @@ class StremioClient:
 
             _LOGGER.debug("Sending datastorePut request to add library item")
 
-            async with session.post(STREMIO_DATASTORE_PUT_URL, json=payload) as response:
+            async with session.post(
+                STREMIO_DATASTORE_PUT_URL, json=payload
+            ) as response:
                 if response.status == 401:
                     _LOGGER.warning("Authentication expired while adding to library")
                     raise StremioAuthError("Authentication expired or invalid")
@@ -519,7 +557,9 @@ class StremioClient:
                     )
 
                 data = await response.json()
-                success = data.get("success", False) or data.get("result", {}).get("success", False)
+                success = data.get("success", False) or data.get("result", {}).get(
+                    "success", False
+                )
 
                 if success:
                     _LOGGER.info("Successfully added %s to library", media_id)
@@ -586,9 +626,13 @@ class StremioClient:
 
             _LOGGER.debug("Sending datastorePut request to remove library item")
 
-            async with session.post(STREMIO_DATASTORE_PUT_URL, json=payload) as response:
+            async with session.post(
+                STREMIO_DATASTORE_PUT_URL, json=payload
+            ) as response:
                 if response.status == 401:
-                    _LOGGER.warning("Authentication expired while removing from library")
+                    _LOGGER.warning(
+                        "Authentication expired while removing from library"
+                    )
                     raise StremioAuthError("Authentication expired or invalid")
                 if response.status != 200:
                     text = await response.text()
@@ -602,12 +646,16 @@ class StremioClient:
                     )
 
                 data = await response.json()
-                success = data.get("success", False) or data.get("result", {}).get("success", False)
+                success = data.get("success", False) or data.get("result", {}).get(
+                    "success", False
+                )
 
                 if success:
                     _LOGGER.info("Successfully removed %s from library", media_id)
                 else:
-                    _LOGGER.warning("Remove from library returned non-success: %s", data)
+                    _LOGGER.warning(
+                        "Remove from library returned non-success: %s", data
+                    )
 
                 return success
 
@@ -668,13 +716,19 @@ class StremioClient:
                 items.append(processed_item)
             except (AttributeError, TypeError, KeyError) as err:
                 errors += 1
-                item_id = item.get("_id", "unknown") if isinstance(item, dict) else "invalid_item"
+                item_id = (
+                    item.get("_id", "unknown")
+                    if isinstance(item, dict)
+                    else "invalid_item"
+                )
                 _LOGGER.debug("Error processing library item %s: %s", item_id, err)
 
         if errors > 0:
             _LOGGER.warning("Encountered %d errors processing library items", errors)
 
-        _LOGGER.debug("Processed %d library items (filtered from %d)", len(items), len(library))
+        _LOGGER.debug(
+            "Processed %d library items (filtered from %d)", len(items), len(library)
+        )
         return items
 
     def _process_continue_watching(
@@ -743,7 +797,9 @@ class StremioClient:
                 )
 
         if errors > 0:
-            _LOGGER.warning("Encountered %d errors processing continue watching items", errors)
+            _LOGGER.warning(
+                "Encountered %d errors processing continue watching items", errors
+            )
 
         _LOGGER.debug("Processed %d continue watching items", len(items))
         return items
@@ -784,7 +840,9 @@ class StremioClient:
         if errors > 0:
             _LOGGER.warning("Encountered %d errors processing streams", errors)
 
-        _LOGGER.debug("Processed %d streams from %d raw entries", len(items), len(streams))
+        _LOGGER.debug(
+            "Processed %d streams from %d raw entries", len(items), len(streams)
+        )
         return items
 
     async def async_get_addon_collection(self) -> list[dict[str, Any]]:
@@ -812,7 +870,9 @@ class StremioClient:
                 "update": True,
             }
 
-            async with session.post(STREMIO_ADDON_COLLECTION_URL, json=payload) as response:
+            async with session.post(
+                STREMIO_ADDON_COLLECTION_URL, json=payload
+            ) as response:
                 if response.status == 401:
                     _LOGGER.warning("Authentication expired while fetching addons")
                     raise StremioAuthError("Authentication expired or invalid")
@@ -828,7 +888,9 @@ class StremioClient:
                     )
 
                 data = await response.json()
-                addons = data.get("addons", []) or data.get("result", {}).get("addons", [])
+                addons = data.get("addons", []) or data.get("result", {}).get(
+                    "addons", []
+                )
 
                 _LOGGER.info("Fetched %d addons from user's collection", len(addons))
                 return addons
@@ -840,7 +902,9 @@ class StremioClient:
             raise StremioConnectionError(f"Connection failed: {err}") from err
         except Exception as err:
             _LOGGER.exception("Failed to get addon collection")
-            raise StremioConnectionError(f"Failed to get addon collection: {err}") from err
+            raise StremioConnectionError(
+                f"Failed to get addon collection: {err}"
+            ) from err
 
 
 class StremioAuthError(HomeAssistantError):
