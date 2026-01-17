@@ -1,0 +1,58 @@
+{
+    "name": "Stremio HACS Integration",
+    "image": "mcr.microsoft.com/devcontainers/python:3.11",
+    
+    // Forward Home Assistant port
+    "forwardPorts": [8123],
+    "portsAttributes": {
+        "8123": {
+            "label": "Home Assistant",
+            "onAutoForward": "notify"
+        }
+    },
+
+    // Mount workspace
+    "workspaceMount": "source=${localWorkspaceFolder},target=/workspaces/hacs-stremio,type=bind",
+    "workspaceFolder": "/workspaces/hacs-stremio",
+
+    // Environment variables
+    "containerEnv": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONUNBUFFERED": "1"
+    },
+
+    // VS Code customizations
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-python.python",
+                "ms-python.vscode-pylance",
+                "ms-python.black-formatter",
+                "charliermarsh.ruff",
+                "redhat.vscode-yaml",
+                "keesschollaart.vscode-home-assistant",
+                "esbenp.prettier-vscode"
+            ],
+            "settings": {
+                "python.defaultInterpreterPath": "/workspaces/hacs-stremio/.venv/bin/python",
+                "python.testing.pytestEnabled": true,
+                "python.testing.pytestArgs": ["tests"],
+                "editor.formatOnSave": true,
+                "[python]": {
+                    "editor.defaultFormatter": "ms-python.black-formatter"
+                }
+            }
+        }
+    },
+
+    // Features to install
+    "features": {
+        "ghcr.io/devcontainers/features/git:1": {}
+    },
+
+    // Run setup after container creation
+    "postCreateCommand": "bash scripts/setup_dev_environment.sh",
+
+    // Run as non-root user
+    "remoteUser": "vscode"
+}
