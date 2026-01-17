@@ -30,7 +30,6 @@ env/
 .venv
 
 # IDE
-.vscode/
 .idea/
 *.swp
 *.swo
@@ -44,9 +43,32 @@ htmlcov/
 .tox/
 .hypothesis/
 
-# Home Assistant
-.storage/
-*.log
+# Home Assistant Development Config
+config/.storage/
+config/deps/
+config/tts/
+config/*.log
+config/home-assistant.log*
+config/home-assistant_v2.db*
+config/secrets.yaml
+config/.HA_VERSION
+config/.cloud/
+
+# Keep example config but ignore actual HA runtime files
+!config/configuration.yaml
+!config/automations.yaml
+!config/scripts.yaml
+!config/scenes.yaml
+!config/secrets.yaml.example
+
+# Environment
+.env
+.env.local
+*.local
+
+# Home Assistant PID file
+.ha_pid
+homeassistant.log
 
 # OS
 .DS_Store

@@ -5,8 +5,7 @@
     
     // Testing
     "python.testing.pytestArgs": [
-        "tests",
-        "-v"
+        "tests"
     ],
     "python.testing.unittestEnabled": false,
     "python.testing.pytestEnabled": true,
@@ -51,5 +50,12 @@
         "**/.venv": true,
         "**/config/deps": true,
         "**/.git": true
-    }
+    },
+    "python.testing.unittestArgs": [
+        "-v",
+        "-s",
+        ".",
+        "-p",
+        "*test.py"
+    ]
 }
