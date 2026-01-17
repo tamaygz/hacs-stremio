@@ -5,12 +5,16 @@ This integration connects to Stremio and provides:
 - Library sensors
 - Continue watching tracking
 - Apple TV handover support
+- Custom Lovelace cards
 """
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 from typing import Any
 
+from homeassistant.components.frontend import async_register_built_in_panel
+from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_EMAIL, CONF_PASSWORD, Platform
 from homeassistant.core import HomeAssistant
@@ -30,6 +34,12 @@ PLATFORMS: list[Platform] = [
     Platform.MEDIA_PLAYER,
 ]
 
+# Frontend resources
+LOVELACE_CARD_URL = "/stremio_cards/stremio-card-bundle.js"
+LOVELACE_PLAYER_CARD_URL = "/stremio_cards/stremio-player-card.js"
+LOVELACE_LIBRARY_CARD_URL = "/stremio_cards/stremio-library-card.js"
+LOVELACE_DIALOG_URL = "/stremio_cards/stremio-stream-dialog.js"
+
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Set up the Stremio component.
@@ -42,7 +52,53 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         True if setup was successful
     """
     hass.data.setdefault(DOMAIN, {})
+
+    # Register frontend resources
+    await _async_register_frontend(hass)
+
     return True
+
+
+async def _async_register_frontend(hass: HomeAssistant) -> None:
+    """Register frontend resources for Lovelace cards.
+
+    Args:
+        hass: Home Assistant instance
+    """
+    # Get path to www folder
+    www_path = Path(__file__).parent / "www"
+
+    if not www_path.exists():
+        _LOGGER.warning("Frontend resources not found at %s", www_path)
+        return
+
+    # Register static path for card resources
+    await hass.http.async_register_static_paths(
+        [
+            StaticPathConfig(
+                url_path="/stremio_cards",
+                path=str(www_path),
+                cache_headers=True,
+            )
+        ]
+    )
+
+    # Register Lovelace resources
+    # This uses the frontend component's resource registration
+    hass.data.setdefault("lovelace_resources", set())
+
+    resources = [
+        LOVELACE_PLAYER_CARD_URL,
+        LOVELACE_LIBRARY_CARD_URL,
+        LOVELACE_DIALOG_URL,
+    ]
+
+    for resource_url in resources:
+        if resource_url not in hass.data["lovelace_resources"]:
+            hass.data["lovelace_resources"].add(resource_url)
+            _LOGGER.debug("Registered Lovelace resource: %s", resource_url)
+
+    _LOGGER.info("Stremio frontend resources registered")
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
