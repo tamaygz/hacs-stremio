@@ -43,9 +43,18 @@ print_step() {
 
 # Check Python version
 print_step "Checking Python version..."
-PYTHON_VERSION=$(python3 --version 2>&1 | grep -oP '\d+\.\d+' | head -1)
-PYTHON_MAJOR=$(echo "$PYTHON_VERSION" | cut -d. -f1)
-PYTHON_MINOR=$(echo "$PYTHON_VERSION" | cut -d. -f2)
+if command -v python3 &> /dev/null; then
+    PYTHON_CMD="python3"
+elif command -v python &> /dev/null; then
+    PYTHON_CMD="python"
+else
+    print_error "Python not found. Please install Python 3.11 or higher."
+    exit 1
+fi
+
+PYTHON_VERSION=$($PYTHON_CMD -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+PYTHON_MAJOR=$($PYTHON_CMD -c 'import sys; print(sys.version_info.major)')
+PYTHON_MINOR=$($PYTHON_CMD -c 'import sys; print(sys.version_info.minor)')
 
 if [ "$PYTHON_MAJOR" -lt 3 ] || ([ "$PYTHON_MAJOR" -eq 3 ] && [ "$PYTHON_MINOR" -lt 11 ]); then
     print_error "Python 3.11 or higher is required. Found: Python $PYTHON_VERSION"
@@ -57,7 +66,7 @@ print_status "Python $PYTHON_VERSION detected"
 VENV_PATH="$PROJECT_ROOT/.venv"
 if [ ! -d "$VENV_PATH" ]; then
     print_step "Creating virtual environment..."
-    python3 -m venv "$VENV_PATH"
+    $PYTHON_CMD -m venv "$VENV_PATH"
     print_status "Virtual environment created at $VENV_PATH"
 else
     print_status "Virtual environment already exists"
@@ -65,7 +74,14 @@ fi
 
 # Activate virtual environment
 print_step "Activating virtual environment..."
-source "$VENV_PATH/bin/activate"
+if [ -f "$VENV_PATH/bin/activate" ]; then
+    source "$VENV_PATH/bin/activate"
+elif [ -f "$VENV_PATH/Scripts/activate" ]; then
+    source "$VENV_PATH/Scripts/activate"
+else
+    print_error "Could not find virtual environment activation script"
+    exit 1
+fi
 print_status "Virtual environment activated"
 
 # Upgrade pip

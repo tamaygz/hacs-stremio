@@ -35,7 +35,7 @@ print_step() {
 
 # Check if HACS is already installed
 if [ -d "$HACS_DIR" ] && [ -f "$HACS_DIR/manifest.json" ]; then
-    HACS_VERSION=$(grep -oP '"version":\s*"\K[^"]+' "$HACS_DIR/manifest.json" 2>/dev/null || echo "unknown")
+    HACS_VERSION=$(python3 -c "import json; print(json.load(open('$HACS_DIR/manifest.json')).get('version', 'unknown'))" 2>/dev/null || echo "unknown")
     print_status "HACS is already installed (version: $HACS_VERSION)"
     
     # Check for --force flag
