@@ -19,6 +19,26 @@ PLATFORMS: Final = [
 
 # Configuration
 CONF_AUTH_KEY: Final = "auth_key"
+CONF_PLAYER_SCAN_INTERVAL: Final = "player_scan_interval"
+CONF_LIBRARY_SCAN_INTERVAL: Final = "library_scan_interval"
+CONF_ENABLE_APPLE_TV_HANDOVER: Final = "enable_apple_tv_handover"
+CONF_HANDOVER_METHOD: Final = "handover_method"
+
+# Options defaults
+DEFAULT_PLAYER_SCAN_INTERVAL: Final = 30  # seconds
+DEFAULT_LIBRARY_SCAN_INTERVAL: Final = 300  # seconds (5 minutes)
+DEFAULT_ENABLE_APPLE_TV_HANDOVER: Final = False
+DEFAULT_HANDOVER_METHOD: Final = "auto"
+
+# Handover methods
+HANDOVER_METHOD_AUTO: Final = "auto"
+HANDOVER_METHOD_AIRPLAY: Final = "airplay"
+HANDOVER_METHOD_VLC: Final = "vlc"
+HANDOVER_METHODS: Final = [
+    HANDOVER_METHOD_AUTO,
+    HANDOVER_METHOD_AIRPLAY,
+    HANDOVER_METHOD_VLC,
+]
 
 # Sensor Types
 SENSOR_TYPES: Final = {

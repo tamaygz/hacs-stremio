@@ -90,7 +90,7 @@ This document tracks the implementation progress of the Stremio HACS integration
   - **Dependencies**: Task 1.1.1, 1.1.3
   - **Output**: Working config flow ✓
 
-- [ ] ⬜ **Task 2.1.2**: Implement options flow
+- [x] ✅ **Task 2.1.2**: Implement options flow (Completed: 2026-01-17)
   - Create OptionsFlowHandler class
   - Add options for update intervals (player state, library sync)
   - Add toggle for Apple TV handover feature
@@ -98,7 +98,7 @@ This document tracks the implementation progress of the Stremio HACS integration
   - Implement async_step_init and save options
   - **Best Practice**: Allow users to customize polling intervals
   - **Dependencies**: Task 2.1.1
-  - **Output**: Options flow working
+  - **Output**: Options flow working ✓
 
 - [x] ✅ **Task 2.1.3**: Add translations (strings.json) (Completed: 2026-01-17)
   - Create `translations/en.json`
@@ -110,7 +110,7 @@ This document tracks the implementation progress of the Stremio HACS integration
   - **Output**: English translations complete ✓
 
 ### 2.2 API Client & Coordinator
-- [ ] ⬜ **Task 2.2.1**: Create Stremio API client wrapper (stremio_client.py)
+- [x] ✅ **Task 2.2.1**: Create Stremio API client wrapper (stremio_client.py) (Completed: 2026-01-17)
   - Wrap stremio-api library methods
   - Implement async login/authentication
   - Add methods: get_library(), get_continue_watching(), get_streams()
@@ -118,20 +118,20 @@ This document tracks the implementation progress of the Stremio HACS integration
   - Implement error handling and retries
   - **Best Practice**: Abstract external API for easier testing/mocking
   - **Dependencies**: Task 1.1.3
-  - **Output**: StremioClient class ready
+  - **Output**: StremioClient class ready ✓
 
-- [ ] ⬜ **Task 2.2.2**: Implement DataUpdateCoordinator (coordinator.py)
+- [x] ✅ **Task 2.2.2**: Implement DataUpdateCoordinator (coordinator.py) (Completed: 2026-01-17)
   - Create StremioDataUpdateCoordinator extending DataUpdateCoordinator
   - Implement _async_update_data() method
   - Poll player state every 30s
   - Poll library data every 5min
   - Handle API errors and rate limiting
   - Store last successful data
-  - **Best Practice**: [DataUpdateCoordinator pattern](https://developers.home-assistant.io/docs/integration_fetching_data#coordinated-single-api-poll-for-data-for-all-entities)
+  - **Best Practice**: [DataUpdateCoordinator pattern](https://developers.home-assistant.io/docs/integration_fetching_data#coordinated-single-api-poll-for-data-for-all-entities) ✓
   - **Dependencies**: Task 2.2.1
   - **Output**: Working coordinator
 
-- [ ] ⬜ **Task 2.2.3**: Implement __init__.py (integration setup)
+- [x] ✅ **Task 2.2.3**: Implement __init__.py (integration setup) (Completed: 2026-01-17)
   - Create async_setup_entry function
   - Initialize StremioClient with credentials
   - Create and start StremioDataUpdateCoordinator
@@ -140,7 +140,7 @@ This document tracks the implementation progress of the Stremio HACS integration
   - Implement async_unload_entry for cleanup
   - **Best Practice**: Clean entry point with proper lifecycle management
   - **Dependencies**: Task 2.2.1, 2.2.2
-  - **Output**: Integration loads successfully
+  - **Output**: Integration loads successfully ✓
 
 ---
 

@@ -18,5 +18,26 @@
     "abort": {
       "already_configured": "This Stremio account is already configured."
     }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Stremio Options",
+        "description": "Configure update intervals and Apple TV handover settings.",
+        "data": {
+          "player_scan_interval": "Player state update interval (seconds)",
+          "library_scan_interval": "Library sync interval (seconds)",
+          "enable_apple_tv_handover": "Enable Apple TV handover",
+          "handover_method": "Handover method"
+        },
+        "data_description": {
+          "player_scan_interval": "How often to check for player state changes (10-300 seconds)",
+          "library_scan_interval": "How often to sync library data (60-3600 seconds)",
+          "enable_apple_tv_handover": "Allow sending content to Apple TV",
+          "handover_method": "Method to use for Apple TV handover (auto/airplay/vlc)"
+        }
+      }
+    }
   }
 }
+
