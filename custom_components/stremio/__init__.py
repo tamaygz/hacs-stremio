@@ -21,14 +21,6 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.typing import ConfigType
 
-# Try to import StaticPathConfig (HA 2024.6+), fallback for older versions
-try:
-    from homeassistant.components.http import StaticPathConfig
-
-    HAS_STATIC_PATH_CONFIG = True
-except ImportError:
-    HAS_STATIC_PATH_CONFIG = False
-
 from .const import DOMAIN
 from .coordinator import StremioDataUpdateCoordinator
 from .services import async_setup_services, async_unload_services
@@ -84,8 +76,11 @@ async def _async_register_frontend(hass: HomeAssistant) -> None:
         return
 
     # Register static path for card resources
-    # Use StaticPathConfig if available (HA 2024.6+), otherwise use legacy method
-    if HAS_STATIC_PATH_CONFIG:
+    # Note: static path registration depends on Home Assistant version
+    try:
+        # Try modern approach (HA 2024.6+)
+        from homeassistant.components.http import StaticPathConfig
+
         await hass.http.async_register_static_paths(
             [
                 StaticPathConfig(
@@ -95,12 +90,10 @@ async def _async_register_frontend(hass: HomeAssistant) -> None:
                 )
             ]
         )
-    else:
-        # Legacy method for older HA versions
-        hass.http.register_static_path(
-            "/stremio_cards",
-            str(www_path),
-            cache_headers=True,
+    except (ImportError, AttributeError):
+        # Fallback for older Home Assistant versions or different API
+        _LOGGER.debug(
+            "Could not register static paths, skipping frontend resource registration"
         )
 
     # Register Lovelace resources
