@@ -104,7 +104,7 @@ class StremioLibraryCard extends LitElement {
         padding: 16px;
         max-height: var(--card-max-height, none);
         overflow-y: auto;
-        align-items: start;
+        align-items: stretch;
       }
 
       .library-grid.horizontal {
@@ -130,7 +130,8 @@ class StremioLibraryCard extends LitElement {
         position: relative;
         display: flex;
         flex-direction: column;
-        align-self: start;
+        align-self: stretch;
+        height: 100%;
       }
 
       .library-item:hover {
