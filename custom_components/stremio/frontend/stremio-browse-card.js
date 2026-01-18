@@ -640,5 +640,163 @@ if (!customElements.get('stremio-browse-card')) {
   customElements.define('stremio-browse-card', StremioBrowseCard);
 }
 
+// Editor for Browse Card
+class StremioBrowseCardEditor extends LitElement {
+  static get properties() {
+    return {
+      hass: { type: Object },
+      _config: { type: Object },
+    };
+  }
+
+  setConfig(config) {
+    this._config = config;
+  }
+
+  render() {
+    if (!this.hass || !this._config) {
+      return html``;
+    }
+
+    return html`
+      <div class="card-config">
+        <ha-textfield
+          label="Title"
+          .value=${this._config.title || 'Browse Stremio'}
+          .configValue=${'title'}
+          @input=${this._valueChanged}
+        ></ha-textfield>
+
+        <label>Default View</label>
+        <ha-select
+          .value=${this._config.default_view || 'popular'}
+          .configValue=${'default_view'}
+          @selected=${this._valueChanged}
+          @closed=${(e) => e.stopPropagation()}
+        >
+          <mwc-list-item value="popular">Popular</mwc-list-item>
+          <mwc-list-item value="new">New</mwc-list-item>
+        </ha-select>
+
+        <label>Default Media Type</label>
+        <ha-select
+          .value=${this._config.default_type || 'movie'}
+          .configValue=${'default_type'}
+          @selected=${this._valueChanged}
+          @closed=${(e) => e.stopPropagation()}
+        >
+          <mwc-list-item value="movie">Movies</mwc-list-item>
+          <mwc-list-item value="series">TV Series</mwc-list-item>
+        </ha-select>
+
+        <ha-formfield label="Show View Controls">
+          <ha-switch
+            .checked=${this._config.show_view_controls !== false}
+            .configValue=${'show_view_controls'}
+            @change=${this._valueChanged}
+          ></ha-switch>
+        </ha-formfield>
+
+        <ha-formfield label="Show Type Controls">
+          <ha-switch
+            .checked=${this._config.show_type_controls !== false}
+            .configValue=${'show_type_controls'}
+            @change=${this._valueChanged}
+          ></ha-switch>
+        </ha-formfield>
+
+        <ha-formfield label="Show Genre Filter">
+          <ha-switch
+            .checked=${this._config.show_genre_filter !== false}
+            .configValue=${'show_genre_filter'}
+            @change=${this._valueChanged}
+          ></ha-switch>
+        </ha-formfield>
+
+        <ha-textfield
+          label="Max Items"
+          .value=${this._config.max_items || 50}
+          .configValue=${'max_items'}
+          type="number"
+          min="1"
+          max="100"
+          @input=${this._valueChanged}
+        ></ha-textfield>
+
+        <ha-textfield
+          label="Columns"
+          .value=${this._config.columns || 4}
+          .configValue=${'columns'}
+          type="number"
+          min="2"
+          max="8"
+          @input=${this._valueChanged}
+        ></ha-textfield>
+      </div>
+    `;
+  }
+
+  _valueChanged(ev) {
+    if (!this._config || !this.hass) {
+      return;
+    }
+
+    const target = ev.target;
+    let value;
+    
+    if (target.configValue) {
+      if (target.checked !== undefined) {
+        value = target.checked;
+      } else if (target.value !== undefined) {
+        value = target.value;
+        // Convert to number for numeric fields
+        if (target.type === 'number') {
+          value = Number(value);
+        }
+      }
+
+      this._config = { ...this._config, [target.configValue]: value };
+      
+      const event = new CustomEvent('config-changed', {
+        detail: { config: this._config },
+        bubbles: true,
+        composed: true,
+      });
+      this.dispatchEvent(event);
+    }
+  }
+
+  static get styles() {
+    return css`
+      .card-config {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        padding: 16px;
+      }
+
+      ha-textfield {
+        width: 100%;
+      }
+
+      label {
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--primary-text-color);
+        margin-top: 8px;
+      }
+
+      ha-select {
+        width: 100%;
+      }
+    `;
+  }
+}
+
+// Guard against duplicate registration
+if (!customElements.get('stremio-browse-card-editor')) {
+  customElements.define('stremio-browse-card-editor', StremioBrowseCardEditor);
+}
+
 // Note: Card registration with window.customCards is handled in stremio-card-bundle.js
 // to prevent duplicate entries

@@ -294,16 +294,6 @@ class StremioContinueWatchingCard extends LitElement {
     };
   }
 
-  // Define card type for UI editor
-  static getStubConfig() {
-    return {
-      type: 'custom:stremio-continue-watching-card',
-      title: 'Continue Watching',
-      entity: 'sensor.stremio_continue_watching_count',
-      show_filters: true,
-    };
-  }
-
   set hass(hass) {
     const oldHass = this._hass;
     this._hass = hass;
@@ -637,11 +627,160 @@ class StremioContinueWatchingCard extends LitElement {
       min_columns: 3,
     };
   }
+
+  static getConfigElement() {
+    return document.createElement('stremio-continue-watching-card-editor');
+  }
+
+  static getStubConfig() {
+    return {
+      type: 'custom:stremio-continue-watching-card',
+      title: 'Continue Watching',
+      entity: 'sensor.stremio_continue_watching_count',
+      show_filters: true,
+      max_items: 20,
+      columns: 4,
+    };
+  }
 }
 
 // Guard against duplicate registration
 if (!customElements.get('stremio-continue-watching-card')) {
   customElements.define('stremio-continue-watching-card', StremioContinueWatchingCard);
+}
+
+// Editor for Continue Watching Card
+class StremioContinueWatchingCardEditor extends LitElement {
+  static get properties() {
+    return {
+      hass: { type: Object },
+      _config: { type: Object },
+    };
+  }
+
+  setConfig(config) {
+    this._config = config;
+  }
+
+  render() {
+    if (!this.hass || !this._config) {
+      return html``;
+    }
+
+    // Get all continue watching sensors
+    const continueWatchingSensors = Object.keys(this.hass.states).filter(
+      (entityId) => entityId.match(/^sensor\..*_continue_watching_count$/)
+    );
+
+    return html`
+      <div class="card-config">
+        <ha-entity-picker
+          .hass=${this.hass}
+          .value=${this._config.entity || 'sensor.stremio_continue_watching_count'}
+          .configValue=${'entity'}
+          .includeDomains=${['sensor']}
+          .entityFilter=${(entity) => entity.entity_id.includes('continue_watching')}
+          label="Continue Watching Sensor"
+          allow-custom-entity
+          @value-changed=${this._valueChanged}
+        ></ha-entity-picker>
+
+        <ha-textfield
+          label="Title"
+          .value=${this._config.title || 'Continue Watching'}
+          .configValue=${'title'}
+          @input=${this._valueChanged}
+        ></ha-textfield>
+
+        <ha-formfield label="Show Filters">
+          <ha-switch
+            .checked=${this._config.show_filters !== false}
+            .configValue=${'show_filters'}
+            @change=${this._valueChanged}
+          ></ha-switch>
+        </ha-formfield>
+
+        <ha-textfield
+          label="Max Items"
+          .value=${this._config.max_items || 20}
+          .configValue=${'max_items'}
+          type="number"
+          min="1"
+          max="100"
+          @input=${this._valueChanged}
+        ></ha-textfield>
+
+        <ha-textfield
+          label="Columns"
+          .value=${this._config.columns || 4}
+          .configValue=${'columns'}
+          type="number"
+          min="2"
+          max="8"
+          @input=${this._valueChanged}
+        ></ha-textfield>
+      </div>
+    `;
+  }
+
+  _valueChanged(ev) {
+    if (!this._config || !this.hass) {
+      return;
+    }
+
+    const target = ev.target;
+    let value;
+    
+    if (target.configValue) {
+      if (target.checked !== undefined) {
+        value = target.checked;
+      } else if (target.value !== undefined) {
+        value = target.value;
+        // Convert to number for numeric fields
+        if (target.type === 'number') {
+          value = Number(value);
+        }
+      }
+
+      this._config = { ...this._config, [target.configValue]: value };
+      
+      const event = new CustomEvent('config-changed', {
+        detail: { config: this._config },
+        bubbles: true,
+        composed: true,
+      });
+      this.dispatchEvent(event);
+    }
+  }
+
+  static get styles() {
+    return css`
+      .card-config {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        padding: 16px;
+      }
+
+      ha-entity-picker {
+        width: 100%;
+      }
+
+      ha-textfield {
+        width: 100%;
+      }
+    `;
+  }
+}
+
+// Guard against duplicate registration
+if (!customElements.get('stremio-continue-watching-card')) {
+  customElements.define('stremio-continue-watching-card', StremioContinueWatchingCard);
+}
+
+// Guard against duplicate registration
+if (!customElements.get('stremio-continue-watching-card-editor')) {
+  customElements.define('stremio-continue-watching-card-editor', StremioContinueWatchingCardEditor);
 }
 
 // Note: Card registration with window.customCards is handled in stremio-card-bundle.js

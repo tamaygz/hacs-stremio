@@ -718,18 +718,33 @@ class StremioLibraryCardEditor extends LitElement {
   }
 
   render() {
+    if (!this.hass || !this._config) {
+      return html``;
+    }
+
     return html`
       <div class="card-config">
+        <ha-entity-picker
+          .hass=${this.hass}
+          .value=${this._config.entity || 'sensor.stremio_library_count'}
+          .configValue=${'entity'}
+          .includeDomains=${['sensor']}
+          .entityFilter=${(entity) => entity.entity_id.includes('library')}
+          label="Library Sensor"
+          allow-custom-entity
+          @value-changed=${this._valueChanged}
+        ></ha-entity-picker>
+
         <ha-textfield
           label="Title"
-          .value=${this._config?.title || 'Stremio Library'}
+          .value=${this._config.title || 'Stremio Library'}
           .configValue=${'title'}
           @input=${this._valueChanged}
         ></ha-textfield>
 
         <ha-formfield label="Show Search">
           <ha-switch
-            .checked=${this._config?.show_search !== false}
+            .checked=${this._config.show_search !== false}
             .configValue=${'show_search'}
             @change=${this._valueChanged}
           ></ha-switch>
@@ -737,30 +752,62 @@ class StremioLibraryCardEditor extends LitElement {
 
         <ha-formfield label="Show Filters">
           <ha-switch
-            .checked=${this._config?.show_filters !== false}
+            .checked=${this._config.show_filters !== false}
             .configValue=${'show_filters'}
             @change=${this._valueChanged}
           ></ha-switch>
         </ha-formfield>
+
+        <ha-textfield
+          label="Max Items"
+          .value=${this._config.max_items || 50}
+          .configValue=${'max_items'}
+          type="number"
+          min="1"
+          max="200"
+          @input=${this._valueChanged}
+        ></ha-textfield>
+
+        <ha-textfield
+          label="Columns"
+          .value=${this._config.columns || 4}
+          .configValue=${'columns'}
+          type="number"
+          min="2"
+          max="8"
+          @input=${this._valueChanged}
+        ></ha-textfield>
       </div>
     `;
   }
 
   _valueChanged(ev) {
-    const target = ev.target;
-    const configValue = target.configValue;
-    const value = target.checked !== undefined ? target.checked : target.value;
+    if (!this._config || !this.hass) {
+      return;
+    }
 
-    if (configValue) {
-      this._config = { ...this._config, [configValue]: value };
-      // Dispatch config-changed with bubbles and composed for HA compatibility
-      this.dispatchEvent(
-        new CustomEvent('config-changed', {
-          bubbles: true,
-          composed: true,
-          detail: { config: this._config },
-        })
-      );
+    const target = ev.target;
+    let value;
+    
+    if (target.configValue) {
+      if (target.checked !== undefined) {
+        value = target.checked;
+      } else if (target.value !== undefined) {
+        value = target.value;
+        // Convert to number for numeric fields
+        if (target.type === 'number') {
+          value = Number(value);
+        }
+      }
+
+      this._config = { ...this._config, [target.configValue]: value };
+      
+      const event = new CustomEvent('config-changed', {
+        detail: { config: this._config },
+        bubbles: true,
+        composed: true,
+      });
+      this.dispatchEvent(event);
     }
   }
 
@@ -771,6 +818,14 @@ class StremioLibraryCardEditor extends LitElement {
         flex-direction: column;
         gap: 16px;
         padding: 16px;
+      }
+
+      ha-entity-picker {
+        width: 100%;
+      }
+
+      ha-textfield {
+        width: 100%;
       }
     `;
   }
