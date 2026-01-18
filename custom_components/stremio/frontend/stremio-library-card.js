@@ -96,16 +96,33 @@ class StremioLibraryCard extends LitElement {
 
       .library-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+        grid-template-columns: repeat(var(--grid-columns, 4), 1fr);
         gap: 12px;
         padding: 16px;
         max-height: 400px;
         overflow-y: auto;
       }
 
+      .library-grid.horizontal {
+        display: flex;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        overflow-y: hidden;
+        scroll-snap-type: x mandatory;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      .library-grid.horizontal .library-item {
+        flex: 0 0 auto;
+        width: calc(100% / var(--grid-columns, 4) - 10px);
+        min-width: 100px;
+        scroll-snap-align: start;
+      }
+
       .library-item {
         cursor: pointer;
         transition: transform 0.2s ease;
+        position: relative;
       }
 
       .library-item:hover {
@@ -125,7 +142,7 @@ class StremioLibraryCard extends LitElement {
 
       .item-poster {
         width: 100%;
-        aspect-ratio: 2/3;
+        aspect-ratio: var(--poster-aspect-ratio, 2/3);
         object-fit: cover;
         border-radius: 6px;
         background: var(--secondary-background-color);
@@ -133,7 +150,7 @@ class StremioLibraryCard extends LitElement {
 
       .item-poster-placeholder {
         width: 100%;
-        aspect-ratio: 2/3;
+        aspect-ratio: var(--poster-aspect-ratio, 2/3);
         border-radius: 6px;
         background: var(--secondary-background-color);
         display: flex;
@@ -153,6 +170,19 @@ class StremioLibraryCard extends LitElement {
         text-overflow: ellipsis;
         white-space: nowrap;
         color: var(--primary-text-color);
+      }
+
+      .media-type-badge {
+        position: absolute;
+        top: 6px;
+        left: 6px;
+        background: rgba(0, 0, 0, 0.7);
+        color: #fff;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-size: 0.65em;
+        text-transform: uppercase;
+        font-weight: 600;
       }
 
       .item-progress {
@@ -352,13 +382,32 @@ class StremioLibraryCard extends LitElement {
       throw new Error('Invalid configuration');
     }
     this.config = {
+      // Basic
       title: 'Stremio Library',
+      entity: '', // Auto-discovered if empty
+      
+      // Display toggles
       show_search: true,
       show_filters: true,
       show_view_toggle: true,
+      show_title: true, // Show title below poster
+      show_media_type_badge: false, // Show movie/series badge
+      
+      // Layout
       default_view: 'library',
       columns: 4,
       max_items: 50,
+      card_height: 400, // Max height in pixels (0 = no limit)
+      poster_aspect_ratio: '2/3', // 2/3, 16/9, 1/1, 4/3
+      horizontal_scroll: false, // Use horizontal scroll instead of grid
+      
+      // Behavior
+      tap_action: 'show_detail', // show_detail, get_streams, open_stremio
+      default_sort: 'recent', // recent, alphabetical, year
+      
+      // Device
+      apple_tv_entity: '', // For handover functionality
+      
       ...config,
     };
     this._viewMode = this.config.default_view;
@@ -374,7 +423,13 @@ class StremioLibraryCard extends LitElement {
       type: 'custom:stremio-library-card',
       title: 'Stremio Library',
       show_view_toggle: true,
+      show_title: true,
       default_view: 'library',
+      columns: 4,
+      max_items: 50,
+      card_height: 400,
+      poster_aspect_ratio: '2/3',
+      tap_action: 'show_detail',
     };
   }
 
@@ -854,7 +909,12 @@ class StremioLibraryCard extends LitElement {
           </div>
 
           ${filteredItems.length > 0 ? html`
-            <div class="library-grid" role="list" aria-label="Library items">
+            <div 
+              class="library-grid ${this.config.horizontal_scroll ? 'horizontal' : ''}" 
+              role="list" 
+              aria-label="Library items"
+              style="${this.config.card_height > 0 ? `max-height: ${this.config.card_height}px` : ''}; --grid-columns: ${this.config.columns || 4}; --poster-aspect-ratio: ${this.config.poster_aspect_ratio || '2/3'}"
+            >
               ${filteredItems.map(item => this._renderItem(item))}
             </div>
           ` : html`
@@ -966,15 +1026,21 @@ class StremioLibraryCard extends LitElement {
         @click=${() => this._handleItemClick(item)}
         @keydown=${(e) => e.key === 'Enter' && this._handleItemClick(item)}
         aria-label="${title}${progress > 0 ? `, ${progress.toFixed(0)}% watched` : ''}"
+        style="--poster-aspect-ratio: ${this.config.poster_aspect_ratio || '2/3'}"
       >
         ${item.poster ? html`
-          <img class="item-poster" src="${item.poster}" alt="" loading="lazy" />
+          <img class="item-poster" src="${item.poster}" alt="" loading="lazy" style="aspect-ratio: ${this.config.poster_aspect_ratio || '2/3'}" />
         ` : html`
-          <div class="item-poster-placeholder">
+          <div class="item-poster-placeholder" style="aspect-ratio: ${this.config.poster_aspect_ratio || '2/3'}">
             <ha-icon icon="mdi:movie-outline"></ha-icon>
           </div>
         `}
-        <div class="item-title" title="${title}">${title}</div>
+        ${this.config.show_media_type_badge && item.type ? html`
+          <span class="media-type-badge ${item.type}">${item.type === 'series' ? 'TV' : 'Movie'}</span>
+        ` : ''}
+        ${this.config.show_title !== false ? html`
+          <div class="item-title" title="${title}">${title}</div>
+        ` : ''}
         ${progress > 0 ? html`
           <div class="item-progress" role="progressbar" aria-valuenow="${progress}" aria-valuemin="0" aria-valuemax="100">
             <div class="item-progress-fill" style="width: ${progress}%"></div>
@@ -1007,7 +1073,10 @@ class StremioLibraryCard extends LitElement {
       title: 'Stremio Library',
       show_search: true,
       show_filters: true,
+      show_title: true,
       max_items: 50,
+      columns: 4,
+      card_height: 400,
     };
   }
 }
