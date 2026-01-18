@@ -18,6 +18,8 @@ from .apple_tv_handover import HandoverError, HandoverManager
 from .const import (
     CONF_APPLE_TV_CREDENTIALS,
     CONF_APPLE_TV_IDENTIFIER,
+    CONF_HANDOVER_METHOD,
+    DEFAULT_HANDOVER_METHOD,
     DOMAIN,
     EVENT_NEW_CONTENT,
     EVENT_PLAYBACK_STARTED,
@@ -85,9 +87,7 @@ HANDOVER_SCHEMA = vol.Schema(
         vol.Required(ATTR_DEVICE_ID): cv.entity_id,
         vol.Optional(ATTR_MEDIA_ID): cv.string,
         vol.Optional(ATTR_STREAM_URL): cv.string,
-        vol.Optional(ATTR_METHOD, default="auto"): vol.In(
-            ["auto", "airplay", "vlc", "direct"]
-        ),
+        vol.Optional(ATTR_METHOD): vol.In(["auto", "airplay", "vlc", "direct"]),
     }
 )
 
@@ -300,7 +300,17 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         device_id = call.data[ATTR_DEVICE_ID]
         media_id = call.data.get(ATTR_MEDIA_ID)
         stream_url = call.data.get(ATTR_STREAM_URL)
-        method = call.data.get(ATTR_METHOD, "auto")
+
+        # Get configured default method from entry options
+        entry = hass.config_entries.async_get_entry(entry_id)
+        configured_method = DEFAULT_HANDOVER_METHOD
+        if entry:
+            configured_method = entry.options.get(
+                CONF_HANDOVER_METHOD, DEFAULT_HANDOVER_METHOD
+            )
+
+        # Use service call method if provided, otherwise use configured default
+        method = call.data.get(ATTR_METHOD) or configured_method
 
         _LOGGER.info(
             "Handover to Apple TV: device=%s, media=%s, method=%s",
@@ -385,6 +395,9 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             )
 
             _LOGGER.info("Handover result: %s", result)
+
+            # Track the stream URL in the coordinator
+            coordinator.set_current_stream_url(stream_url)
 
         except HandoverError as err:
             raise HomeAssistantError(f"Handover failed: {err}") from err

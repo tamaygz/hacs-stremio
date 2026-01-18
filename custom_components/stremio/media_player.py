@@ -14,13 +14,25 @@ from homeassistant.components.media_player import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN
+from .apple_tv_handover import HandoverError, HandoverManager
+from .const import (
+    CONF_APPLE_TV_CREDENTIALS,
+    CONF_APPLE_TV_ENTITY_ID,
+    CONF_APPLE_TV_IDENTIFIER,
+    CONF_ENABLE_APPLE_TV_HANDOVER,
+    CONF_HANDOVER_METHOD,
+    DEFAULT_ENABLE_APPLE_TV_HANDOVER,
+    DEFAULT_HANDOVER_METHOD,
+    DOMAIN,
+)
 from .coordinator import StremioDataUpdateCoordinator
 from .entity_helpers import get_device_info
 from .media_source import StremioMediaSource
+from .stremio_client import StremioClient, StremioConnectionError
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -40,9 +52,10 @@ async def async_setup_entry(
     coordinator: StremioDataUpdateCoordinator = hass.data[DOMAIN][entry.entry_id][
         "coordinator"
     ]
+    client: StremioClient = hass.data[DOMAIN][entry.entry_id]["client"]
 
     # Create media player entity
-    async_add_entities([StremioMediaPlayer(coordinator, entry)])
+    async_add_entities([StremioMediaPlayer(coordinator, client, entry)])
 
 
 class StremioMediaPlayer(
@@ -57,15 +70,19 @@ class StremioMediaPlayer(
     def __init__(
         self,
         coordinator: StremioDataUpdateCoordinator,
+        client: StremioClient,
         entry: ConfigEntry,
     ) -> None:
         """Initialize the media player.
 
         Args:
             coordinator: Data update coordinator
+            client: Stremio API client
             entry: Config entry
         """
         super().__init__(coordinator)
+        self._client = client
+        self._entry = entry
         self._attr_unique_id = f"{entry.entry_id}_media_player"
         self._attr_translation_key = "stremio"
         self._attr_has_entity_name = True
@@ -211,14 +228,204 @@ class StremioMediaPlayer(
     async def async_play_media(
         self, media_type: str, media_id: str, **kwargs: Any
     ) -> None:
-        """Play media from a URL or file.
+        """Play media from the media browser.
 
-        Note: Stremio's API does not support remote playback control.
-        This method logs the request but cannot initiate playback.
-        Use the handover service to send content to external players.
+        When a media item is selected from the browser, this method extracts the
+        media information and triggers a handover to Apple TV if configured.
+
+        The media_id format from StremioMediaSource (via async_resolve_media):
+        - media-source://stremio/{type}/{imdb_id}#{stream_index}
+        - media-source://stremio/{type}/{imdb_id}/{season}/{episode}#{stream_index}
+
+        Direct URL format (from external calls):
+        - http(s)://... (direct stream URL)
+
+        Args:
+            media_type: The type of media content
+            media_id: The media content identifier or URL
+            **kwargs: Additional arguments (e.g., extra for metadata)
         """
-        _LOGGER.info(
-            "Play media requested - type=%s, id=%s. Use handover service for playback.",
+        _LOGGER.debug(
+            "Play media requested - type=%s, id=%s, kwargs=%s",
             media_type,
             media_id,
+            kwargs,
         )
+
+        # Check if Apple TV handover is enabled
+        options = self._entry.options
+        enable_handover = options.get(
+            CONF_ENABLE_APPLE_TV_HANDOVER, DEFAULT_ENABLE_APPLE_TV_HANDOVER
+        )
+        apple_tv_entity_id = options.get(CONF_APPLE_TV_ENTITY_ID)
+
+        if not enable_handover or not apple_tv_entity_id:
+            _LOGGER.info(
+                "Apple TV handover not configured. Enable it in integration options "
+                "to play media on Apple TV. media_id=%s",
+                media_id,
+            )
+            return
+
+        # Parse the media_id to extract stream information
+        stream_url = None
+        title = None
+
+        # Case 1: Direct HTTP(S) URL
+        if media_id.startswith(("http://", "https://")):
+            stream_url = media_id
+            _LOGGER.debug("Direct stream URL provided: %s", stream_url[:100])
+
+        # Case 2: media-source:// URI format from media browser
+        elif media_id.startswith("media-source://stremio/"):
+            # Format: media-source://stremio/{type}/{imdb_id}[/{season}/{episode}][#{stream_index}]
+            identifier = media_id.replace("media-source://stremio/", "")
+            stream_url, title = await self._resolve_media_source_identifier(identifier)
+
+        # Case 3: Direct identifier format (type/imdb_id or type/imdb_id/s/e)
+        elif "/" in media_id:
+            stream_url, title = await self._resolve_media_source_identifier(media_id)
+
+        else:
+            _LOGGER.warning(
+                "Unknown media_id format: %s. Expected media-source:// URI or HTTP URL.",
+                media_id,
+            )
+            raise HomeAssistantError(
+                f"Unknown media format: {media_id}. "
+                "Please select a stream from the media browser."
+            )
+
+        # Check if we have a valid stream URL
+        if not stream_url:
+            _LOGGER.warning(
+                "Could not determine stream URL for media_id=%s. "
+                "Ensure streams are available for this media.",
+                media_id,
+            )
+            raise HomeAssistantError(
+                f"No stream URL found for media: {media_id}. "
+                "Please try selecting a specific stream from the media browser."
+            )
+
+        # Get handover configuration
+        handover_method = options.get(CONF_HANDOVER_METHOD, DEFAULT_HANDOVER_METHOD)
+        credentials = options.get(CONF_APPLE_TV_CREDENTIALS)
+        device_identifier = options.get(CONF_APPLE_TV_IDENTIFIER)
+
+        _LOGGER.info(
+            "Starting Apple TV handover: device=%s, method=%s, title=%s",
+            apple_tv_entity_id,
+            handover_method,
+            title,
+        )
+
+        # Create handover manager and perform handover
+        handover_manager = HandoverManager(
+            self.hass,
+            credentials=credentials,
+            device_identifier=device_identifier,
+        )
+
+        try:
+            result = await handover_manager.handover(
+                device_identifier=apple_tv_entity_id,
+                stream_url=stream_url,
+                method=handover_method,
+                title=title,
+            )
+
+            _LOGGER.info(
+                "Apple TV handover completed: method=%s, success=%s",
+                result.get("method"),
+                result.get("success"),
+            )
+
+            # Track the stream URL in the coordinator
+            self.coordinator.set_current_stream_url(stream_url)
+
+        except HandoverError as err:
+            _LOGGER.error("Apple TV handover failed: %s", err)
+            raise HomeAssistantError(f"Apple TV handover failed: {err}") from err
+
+    async def _resolve_media_source_identifier(
+        self, identifier: str
+    ) -> tuple[str | None, str | None]:
+        """Resolve a media source identifier to a stream URL.
+
+        Args:
+            identifier: Format: {type}/{imdb_id}[/{season}/{episode}][#{stream_index}]
+
+        Returns:
+            Tuple of (stream_url, title) or (None, None) if not found
+        """
+        # Extract stream index if present
+        stream_index: int = 0
+        if "#" in identifier:
+            identifier, stream_index_str = identifier.rsplit("#", 1)
+            try:
+                stream_index = int(stream_index_str)
+            except ValueError:
+                _LOGGER.warning("Invalid stream index: %s, using 0", stream_index_str)
+                stream_index = 0
+
+        # Parse identifier: type/media_id or type/media_id/season/episode
+        parts = identifier.split("/")
+        if len(parts) < 2:
+            _LOGGER.warning("Invalid identifier format: %s", identifier)
+            return None, None
+
+        media_type = parts[0]
+        media_id = parts[1]
+        season = int(parts[2]) if len(parts) > 2 else None
+        episode = int(parts[3]) if len(parts) > 3 else None
+
+        _LOGGER.debug(
+            "Resolving media: type=%s, id=%s, S%sE%s, stream_index=%d",
+            media_type,
+            media_id,
+            season,
+            episode,
+            stream_index,
+        )
+
+        # Get streams from API
+        try:
+            streams = await self._client.async_get_streams(
+                media_id=media_id,
+                media_type=media_type,
+                season=season,
+                episode=episode,
+            )
+
+            if not streams:
+                _LOGGER.warning("No streams found for %s", identifier)
+                return None, None
+
+            # Get the requested stream by index
+            if 0 <= stream_index < len(streams):
+                selected_stream = streams[stream_index]
+            else:
+                _LOGGER.warning(
+                    "Stream index %d out of range (available: %d), using first stream",
+                    stream_index,
+                    len(streams),
+                )
+                selected_stream = streams[0]
+
+            stream_url = selected_stream.get("url") or selected_stream.get(
+                "externalUrl"
+            )
+            title = selected_stream.get("title") or selected_stream.get("name")
+
+            _LOGGER.debug(
+                "Resolved stream: url=%s, title=%s",
+                stream_url[:100] if stream_url else None,
+                title,
+            )
+
+            return stream_url, title
+
+        except StremioConnectionError as err:
+            _LOGGER.error("Failed to get streams for %s: %s", identifier, err)
+            return None, None

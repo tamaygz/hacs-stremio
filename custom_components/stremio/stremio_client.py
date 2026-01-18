@@ -951,6 +951,7 @@ class StremioClient:
                     "duration": state.get("duration", 0),
                     "season": season,
                     "episode": episode,
+                    "episode_title": None,  # Will be populated if metadata is fetched
                     "year": item.get("year"),
                     "watched_at": state.get("lastWatched"),
                 }

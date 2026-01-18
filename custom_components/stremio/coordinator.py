@@ -66,6 +66,7 @@ class StremioDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._consecutive_failures: int = 0
         self._state_change_unsub: list[Any] = []
         self._is_polling_gated: bool = False
+        self._current_stream_url: str | None = None  # Track current stream URL
 
         # Get scan interval from options or use default
         self._configured_scan_interval = entry.options.get(
@@ -263,6 +264,24 @@ class StremioDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # Recalculate interval with new settings
         self._update_polling_interval()
 
+    def set_current_stream_url(self, stream_url: str | None) -> None:
+        """Set the current stream URL being played.
+
+        This is called when a handover is performed to track the stream URL.
+
+        Args:
+            stream_url: The stream URL being played, or None to clear
+        """
+        self._current_stream_url = stream_url
+        _LOGGER.debug(
+            "Current stream URL set to: %s", stream_url[:100] if stream_url else None
+        )
+
+        # Update the data if we have current_watching
+        if self.data and self.data.get("current_watching"):
+            self.data["current_watching"]["stream_url"] = stream_url
+            self.async_set_updated_data(self.data)
+
     async def async_shutdown(self) -> None:
         """Clean up resources on shutdown."""
         # Unsubscribe from state change events
@@ -305,6 +324,89 @@ class StremioDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     await asyncio.sleep(delay)
 
         raise last_error  # type: ignore[misc]
+
+    async def _enrich_with_episode_titles(self, data: dict[str, Any]) -> None:
+        """Enrich current_watching and last_watched with episode titles for series.
+
+        Fetches metadata from Cinemeta to get episode titles for TV shows.
+        This is only done for the current and last watched items, not the full list.
+
+        Args:
+            data: The coordinator data dictionary to enrich
+        """
+        items_to_enrich = []
+
+        # Collect series items that need episode title enrichment
+        if data.get("current_watching"):
+            current = data["current_watching"]
+            if (
+                current.get("type") == "series"
+                and current.get("season") is not None
+                and current.get("episode") is not None
+                and not current.get("episode_title")
+            ):
+                items_to_enrich.append(("current_watching", current))
+
+        if data.get("last_watched"):
+            last = data["last_watched"]
+            if (
+                last.get("type") == "series"
+                and last.get("season") is not None
+                and last.get("episode") is not None
+                and not last.get("episode_title")
+            ):
+                # Don't fetch again if it's the same as current_watching
+                current = data.get("current_watching", {})
+                if (
+                    last.get("imdb_id") != current.get("imdb_id")
+                    or last.get("season") != current.get("season")
+                    or last.get("episode") != current.get("episode")
+                ):
+                    items_to_enrich.append(("last_watched", last))
+                else:
+                    # Copy episode title from current if same episode
+                    if current.get("episode_title"):
+                        last["episode_title"] = current["episode_title"]
+
+        # Fetch metadata for unique series
+        fetched_metadata: dict[str, dict[str, Any] | None] = {}
+
+        for key, item in items_to_enrich:
+            imdb_id = item.get("imdb_id")
+            if not imdb_id:
+                continue
+
+            # Fetch metadata if not already fetched
+            if imdb_id not in fetched_metadata:
+                try:
+                    metadata = await self.client.async_get_series_metadata(imdb_id)
+                    fetched_metadata[imdb_id] = metadata
+                except Exception as err:
+                    _LOGGER.debug("Failed to fetch metadata for %s: %s", imdb_id, err)
+                    fetched_metadata[imdb_id] = None
+
+            metadata = fetched_metadata.get(imdb_id)
+            if not metadata:
+                continue
+
+            # Find the episode title
+            season_num = item.get("season")
+            episode_num = item.get("episode")
+
+            for season_data in metadata.get("seasons", []):
+                if season_data.get("number") == season_num:
+                    for ep_data in season_data.get("episodes", []):
+                        if ep_data.get("number") == episode_num:
+                            episode_title = ep_data.get("title")
+                            if episode_title:
+                                data[key]["episode_title"] = episode_title
+                                _LOGGER.debug(
+                                    "Enriched %s with episode title: %s",
+                                    key,
+                                    episode_title,
+                                )
+                            break
+                    break
 
     async def _async_update_data(self) -> dict[str, Any]:
         """Fetch data from Stremio API.
@@ -364,6 +466,7 @@ class StremioDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                             **item,
                             "progress_percent": round(progress_percent, 1),
                             "time_offset": progress,
+                            "stream_url": self._current_stream_url,
                         }
                         break
 
@@ -385,6 +488,9 @@ class StremioDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                             else 0
                         ),
                     }
+
+            # Fetch episode titles for series items
+            await self._enrich_with_episode_titles(data)
 
             _LOGGER.debug(
                 "Fetched data: %d library items, %d continue watching",
