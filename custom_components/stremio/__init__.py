@@ -41,7 +41,7 @@ PLATFORMS: list[Platform] = [
 
 async def _async_register_frontend(hass: HomeAssistant) -> None:
     """Register frontend modules after Home Assistant startup.
-    
+
     Args:
         hass: Home Assistant instance
     """

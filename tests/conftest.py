@@ -195,7 +195,7 @@ def mock_config_entry(hass: HomeAssistant):
 @pytest.fixture
 def mock_hass(hass: HomeAssistant):
     """Create a mock HomeAssistant instance using pytest-homeassistant-custom-component.
-    
+
     This fixture wraps the 'hass' fixture from pytest-homeassistant-custom-component
     and adds additional mock data structures needed by the Stremio integration tests.
     """
@@ -245,7 +245,9 @@ def create_mock_entity(entity_id: str, state: str, attributes: dict | None = Non
 async def setup_integration(hass: HomeAssistant, config_entry):
     """Set up the Stremio integration for testing."""
     # Entry should already be added via mock_config_entry fixture
-    if config_entry.entry_id not in [e.entry_id for e in hass.config_entries.async_entries(DOMAIN)]:
+    if config_entry.entry_id not in [
+        e.entry_id for e in hass.config_entries.async_entries(DOMAIN)
+    ]:
         config_entry.add_to_hass(hass)
 
     with patch(

@@ -17,12 +17,13 @@ from homeassistant.helpers.event import async_call_later
 # Try to import StaticPathConfig for modern HA versions (2024.6+)
 try:
     from homeassistant.components.http import StaticPathConfig  # type: ignore[attr-defined]
+
     HAS_STATIC_PATH_CONFIG = True
 except ImportError:
     HAS_STATIC_PATH_CONFIG = False
     StaticPathConfig = None  # type: ignore[assignment, misc]
 
-from ..const import INTEGRATION_VERSION, JSMODULES, URL_BASE
+from ..const import JSMODULES, URL_BASE
 
 if TYPE_CHECKING:
     from homeassistant.components.lovelace import LovelaceData
@@ -32,7 +33,7 @@ _LOGGER = logging.getLogger(__name__)
 
 class JSModuleRegistration:
     """Registers JavaScript modules in Home Assistant.
-    
+
     This class handles:
     - Static HTTP path registration for serving JS files
     - Automatic Lovelace resource registration (storage mode)
@@ -41,7 +42,7 @@ class JSModuleRegistration:
 
     def __init__(self, hass: HomeAssistant) -> None:
         """Initialize the registrar.
-        
+
         Args:
             hass: Home Assistant instance
         """
@@ -64,7 +65,7 @@ class JSModuleRegistration:
     async def _async_register_path(self) -> None:
         """Register the static HTTP path for serving JS files."""
         frontend_path = Path(__file__).parent
-        
+
         # Try modern method first (HA 2024.6+)
         if HAS_STATIC_PATH_CONFIG and StaticPathConfig is not None:
             try:
@@ -77,7 +78,7 @@ class JSModuleRegistration:
                 return
             except (RuntimeError, AttributeError) as err:
                 _LOGGER.debug("Modern registration failed: %s, trying fallback", err)
-        
+
         # Fallback for older Home Assistant versions
         try:
             self.hass.http.register_static_path(URL_BASE, str(frontend_path))  # type: ignore[attr-defined]
@@ -157,10 +158,10 @@ class JSModuleRegistration:
 
     def _get_path(self, url: str) -> str:
         """Extract path without query parameters.
-        
+
         Args:
             url: Full URL with potential query string
-            
+
         Returns:
             URL path without query parameters
         """

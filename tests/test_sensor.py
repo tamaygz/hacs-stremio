@@ -6,6 +6,7 @@ import pytest
 from unittest.mock import MagicMock, patch
 
 from homeassistant.const import STATE_UNKNOWN
+from homeassistant.core import HomeAssistant
 
 from custom_components.stremio.const import DOMAIN
 from custom_components.stremio.sensor import (
@@ -58,30 +59,34 @@ class TestCurrentWatchingSensor:
         return sensor
 
     @pytest.mark.asyncio
-    async def test_sensor_state_playing(self, mock_hass, current_watching_sensor):
+    async def test_sensor_state_playing(
+        self, hass: HomeAssistant, current_watching_sensor
+    ):
         """Test sensor state when media is playing."""
-        current_watching_sensor.hass = mock_hass
+        current_watching_sensor.hass = hass
 
         assert current_watching_sensor.native_value == "The Shawshank Redemption"
         assert current_watching_sensor.available is True
 
     @pytest.mark.asyncio
     async def test_sensor_state_idle(
-        self, mock_hass, mock_coordinator, mock_config_entry
+        self, hass: HomeAssistant, mock_coordinator, mock_config_entry
     ):
         """Test sensor state when idle."""
         mock_coordinator.data = {"current_watching": None}
         description = next(d for d in SENSOR_TYPES if d.key == "current_watching")
         sensor = StremioSensor(mock_coordinator, mock_config_entry, description)
-        sensor.hass = mock_hass
+        sensor.hass = hass
 
         # Should show "Nothing" when no current watching
         assert sensor.native_value == "Nothing"
 
     @pytest.mark.asyncio
-    async def test_sensor_attributes(self, mock_hass, current_watching_sensor):
+    async def test_sensor_attributes(
+        self, hass: HomeAssistant, current_watching_sensor
+    ):
         """Test sensor extra state attributes."""
-        current_watching_sensor.hass = mock_hass
+        current_watching_sensor.hass = hass
 
         attrs = current_watching_sensor.extra_state_attributes
 
@@ -102,9 +107,9 @@ class TestLibraryCountSensor:
         return sensor
 
     @pytest.mark.asyncio
-    async def test_sensor_value(self, mock_hass, library_count_sensor):
+    async def test_sensor_value(self, hass: HomeAssistant, library_count_sensor):
         """Test library count value."""
-        library_count_sensor.hass = mock_hass
+        library_count_sensor.hass = hass
 
         assert library_count_sensor.native_value == len(MOCK_LIBRARY_ITEMS)
 
@@ -132,16 +137,18 @@ class TestContinueWatchingCountSensor:
         return sensor
 
     @pytest.mark.asyncio
-    async def test_sensor_value(self, mock_hass, continue_watching_sensor):
+    async def test_sensor_value(self, hass: HomeAssistant, continue_watching_sensor):
         """Test continue watching count."""
-        continue_watching_sensor.hass = mock_hass
+        continue_watching_sensor.hass = hass
 
         assert continue_watching_sensor.native_value == len(MOCK_CONTINUE_WATCHING)
 
     @pytest.mark.asyncio
-    async def test_sensor_attributes(self, mock_hass, continue_watching_sensor):
+    async def test_sensor_attributes(
+        self, hass: HomeAssistant, continue_watching_sensor
+    ):
         """Test continue watching attributes."""
-        continue_watching_sensor.hass = mock_hass
+        continue_watching_sensor.hass = hass
 
         attrs = continue_watching_sensor.extra_state_attributes
 
@@ -160,16 +167,16 @@ class TestLastWatchedSensor:
         return sensor
 
     @pytest.mark.asyncio
-    async def test_sensor_value(self, mock_hass, last_watched_sensor):
+    async def test_sensor_value(self, hass: HomeAssistant, last_watched_sensor):
         """Test last watched sensor value."""
-        last_watched_sensor.hass = mock_hass
+        last_watched_sensor.hass = hass
 
         assert last_watched_sensor.native_value == "The Dark Knight"
 
     @pytest.mark.asyncio
-    async def test_sensor_attributes(self, mock_hass, last_watched_sensor):
+    async def test_sensor_attributes(self, hass: HomeAssistant, last_watched_sensor):
         """Test last watched attributes."""
-        last_watched_sensor.hass = mock_hass
+        last_watched_sensor.hass = hass
 
         attrs = last_watched_sensor.extra_state_attributes
 
@@ -182,12 +189,12 @@ class TestSensorDeviceInfo:
 
     @pytest.mark.asyncio
     async def test_device_info(
-        self, mock_hass, mock_sensor_coordinator, mock_config_entry
+        self, hass: HomeAssistant, mock_sensor_coordinator, mock_config_entry
     ):
         """Test that sensors have proper device info."""
         description = SENSOR_TYPES[0]
         sensor = StremioSensor(mock_sensor_coordinator, mock_config_entry, description)
-        sensor.hass = mock_hass
+        sensor.hass = hass
 
         device_info = sensor.device_info
 
@@ -197,12 +204,12 @@ class TestSensorDeviceInfo:
 
     @pytest.mark.asyncio
     async def test_unique_id(
-        self, mock_hass, mock_sensor_coordinator, mock_config_entry
+        self, hass: HomeAssistant, mock_sensor_coordinator, mock_config_entry
     ):
         """Test sensor unique ID."""
         description = SENSOR_TYPES[0]
         sensor = StremioSensor(mock_sensor_coordinator, mock_config_entry, description)
-        sensor.hass = mock_hass
+        sensor.hass = hass
 
         assert sensor.unique_id is not None
         assert mock_config_entry.entry_id in sensor.unique_id
@@ -238,10 +245,10 @@ class TestSensorSetup:
 
     @pytest.mark.asyncio
     async def test_async_setup_entry(
-        self, mock_hass, mock_config_entry, mock_coordinator
+        self, hass: HomeAssistant, mock_config_entry, mock_coordinator
     ):
         """Test sensor platform setup."""
-        mock_hass.data[DOMAIN] = {
+        hass.data[DOMAIN] = {
             mock_config_entry.entry_id: {
                 "coordinator": mock_coordinator,
             }
@@ -249,7 +256,7 @@ class TestSensorSetup:
 
         async_add_entities = MagicMock()
 
-        await async_setup_entry(mock_hass, mock_config_entry, async_add_entities)
+        await async_setup_entry(hass, mock_config_entry, async_add_entities)
 
         # Should add sensors for each description
         async_add_entities.assert_called_once()

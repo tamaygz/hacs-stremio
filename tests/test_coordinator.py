@@ -75,7 +75,9 @@ async def test_coordinator_fetch_data_success(
 
 
 @pytest.mark.asyncio
-async def test_coordinator_fetch_data_connection_failure(hass: HomeAssistant, mock_config_entry):
+async def test_coordinator_fetch_data_connection_failure(
+    hass: HomeAssistant, mock_config_entry
+):
     """Test data fetch failure handling."""
     mock_client = AsyncMock()
     mock_client.async_get_user = AsyncMock(
@@ -93,7 +95,9 @@ async def test_coordinator_fetch_data_connection_failure(hass: HomeAssistant, mo
 
 
 @pytest.mark.asyncio
-async def test_coordinator_fetch_data_auth_failure(hass: HomeAssistant, mock_config_entry):
+async def test_coordinator_fetch_data_auth_failure(
+    hass: HomeAssistant, mock_config_entry
+):
     """Test authentication failure handling."""
     mock_client = AsyncMock()
     mock_client.async_get_user = AsyncMock(
@@ -136,7 +140,9 @@ async def test_coordinator_library_sync(
 
 
 @pytest.mark.asyncio
-async def test_coordinator_current_watching_detection(hass: HomeAssistant, mock_config_entry):
+async def test_coordinator_current_watching_detection(
+    hass: HomeAssistant, mock_config_entry
+):
     """Test current watching detection logic."""
     mock_client = AsyncMock()
     mock_client.async_get_user = AsyncMock(return_value=MOCK_USER_DATA)

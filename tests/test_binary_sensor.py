@@ -6,6 +6,7 @@ import pytest
 from unittest.mock import MagicMock
 
 from homeassistant.components.binary_sensor import BinarySensorDeviceClass
+from homeassistant.core import HomeAssistant
 
 from custom_components.stremio.const import DOMAIN
 from custom_components.stremio.binary_sensor import (
@@ -29,7 +30,7 @@ class TestIsWatchingBinarySensor:
 
     @pytest.mark.asyncio
     async def test_is_on_when_watching(
-        self, mock_hass, mock_coordinator, is_watching_sensor
+        self, hass: HomeAssistant, mock_coordinator, is_watching_sensor
     ):
         """Test sensor is on when media is being watched."""
         mock_coordinator.data = {
@@ -39,17 +40,17 @@ class TestIsWatchingBinarySensor:
                 "progress_percent": 50,
             }
         }
-        is_watching_sensor.hass = mock_hass
+        is_watching_sensor.hass = hass
 
         assert is_watching_sensor.is_on is True
 
     @pytest.mark.asyncio
     async def test_is_off_when_not_watching(
-        self, mock_hass, mock_coordinator, is_watching_sensor
+        self, hass: HomeAssistant, mock_coordinator, is_watching_sensor
     ):
         """Test sensor is off when no media is being watched."""
         mock_coordinator.data = {"current_watching": None}
-        is_watching_sensor.hass = mock_hass
+        is_watching_sensor.hass = hass
 
         assert is_watching_sensor.is_on is False
 
@@ -67,7 +68,7 @@ class TestIsWatchingBinarySensor:
 
     @pytest.mark.asyncio
     async def test_extra_state_attributes(
-        self, mock_hass, mock_coordinator, is_watching_sensor
+        self, hass: HomeAssistant, mock_coordinator, is_watching_sensor
     ):
         """Test extra state attributes."""
         mock_coordinator.data = {
@@ -77,7 +78,7 @@ class TestIsWatchingBinarySensor:
                 "progress_percent": 75,
             }
         }
-        is_watching_sensor.hass = mock_hass
+        is_watching_sensor.hass = hass
 
         attrs = is_watching_sensor.extra_state_attributes
 
@@ -101,37 +102,37 @@ class TestHasContinueWatchingBinarySensor:
 
     @pytest.mark.asyncio
     async def test_is_on_when_has_continue_watching(
-        self, mock_hass, mock_coordinator, continue_watching_sensor
+        self, hass: HomeAssistant, mock_coordinator, continue_watching_sensor
     ):
         """Test sensor is on when there are items to continue watching."""
         mock_coordinator.data = {
             "continue_watching": MOCK_CONTINUE_WATCHING,
         }
-        continue_watching_sensor.hass = mock_hass
+        continue_watching_sensor.hass = hass
 
         assert continue_watching_sensor.is_on is True
 
     @pytest.mark.asyncio
     async def test_is_off_when_no_continue_watching(
-        self, mock_hass, mock_coordinator, continue_watching_sensor
+        self, hass: HomeAssistant, mock_coordinator, continue_watching_sensor
     ):
         """Test sensor is off when no items to continue watching."""
         mock_coordinator.data = {
             "continue_watching": [],
         }
-        continue_watching_sensor.hass = mock_hass
+        continue_watching_sensor.hass = hass
 
         assert continue_watching_sensor.is_on is False
 
     @pytest.mark.asyncio
     async def test_extra_state_attributes(
-        self, mock_hass, mock_coordinator, continue_watching_sensor
+        self, hass: HomeAssistant, mock_coordinator, continue_watching_sensor
     ):
         """Test extra state attributes contain count."""
         mock_coordinator.data = {
             "continue_watching": MOCK_CONTINUE_WATCHING,
         }
-        continue_watching_sensor.hass = mock_hass
+        continue_watching_sensor.hass = hass
 
         attrs = continue_watching_sensor.extra_state_attributes
 
@@ -145,10 +146,10 @@ class TestBinarySensorSetup:
 
     @pytest.mark.asyncio
     async def test_async_setup_entry(
-        self, mock_hass, mock_config_entry, mock_coordinator
+        self, hass: HomeAssistant, mock_config_entry, mock_coordinator
     ):
         """Test binary sensor platform setup."""
-        mock_hass.data[DOMAIN] = {
+        hass.data[DOMAIN] = {
             mock_config_entry.entry_id: {
                 "coordinator": mock_coordinator,
             }
@@ -156,7 +157,7 @@ class TestBinarySensorSetup:
 
         async_add_entities = MagicMock()
 
-        await async_setup_entry(mock_hass, mock_config_entry, async_add_entities)
+        await async_setup_entry(hass, mock_config_entry, async_add_entities)
 
         # Should add binary sensors for each description
         async_add_entities.assert_called_once()
@@ -168,11 +169,11 @@ class TestBinarySensorDeviceInfo:
     """Tests for binary sensor device info."""
 
     @pytest.mark.asyncio
-    async def test_device_info(self, mock_hass, mock_coordinator, mock_config_entry):
+    async def test_device_info(self, hass: HomeAssistant, mock_coordinator, mock_config_entry):
         """Test device info is set correctly."""
         description = BINARY_SENSOR_TYPES[0]
         sensor = StremioBinarySensor(mock_coordinator, mock_config_entry, description)
-        sensor.hass = mock_hass
+        sensor.hass = hass
 
         device_info = sensor.device_info
 

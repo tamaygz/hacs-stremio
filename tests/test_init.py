@@ -79,7 +79,9 @@ async def test_async_setup_entry_auth_failure(hass: HomeAssistant, mock_config_e
 
 
 @pytest.mark.asyncio
-async def test_async_setup_entry_connection_failure(hass: HomeAssistant, mock_config_entry):
+async def test_async_setup_entry_connection_failure(
+    hass: HomeAssistant, mock_config_entry
+):
     """Test setup failure due to connection error."""
     from custom_components.stremio.stremio_client import StremioConnectionError
 
@@ -107,7 +109,9 @@ async def test_async_setup_entry_connection_failure(hass: HomeAssistant, mock_co
 
 
 @pytest.mark.asyncio
-async def test_async_unload_entry(hass: HomeAssistant, mock_config_entry, mock_coordinator):
+async def test_async_unload_entry(
+    hass: HomeAssistant, mock_config_entry, mock_coordinator
+):
     """Test unloading config entry."""
     # Create mock client
     mock_client = AsyncMock()
@@ -138,7 +142,9 @@ async def test_async_reload_entry(hass: HomeAssistant, mock_config_entry):
     """Test reloading config entry."""
     from custom_components.stremio import async_reload_entry
 
-    with patch.object(hass.config_entries, "async_reload", new_callable=AsyncMock) as mock_reload:
+    with patch.object(
+        hass.config_entries, "async_reload", new_callable=AsyncMock
+    ) as mock_reload:
         await async_reload_entry(hass, mock_config_entry)
 
         mock_reload.assert_called_once_with(mock_config_entry.entry_id)
