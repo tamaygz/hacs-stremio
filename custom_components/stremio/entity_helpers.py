@@ -38,11 +38,21 @@ def format_time(seconds: int | float | None) -> str:
 
     Returns:
         Formatted string like "1:30:00" or "45:30".
+        Returns "0:00" for None, negative, or zero values.
     """
-    if not seconds or seconds <= 0:
+    if seconds is None or seconds <= 0:
         return "0:00"
 
-    seconds = int(seconds)
+    # Ensure we have a valid integer
+    try:
+        seconds = int(seconds)
+    except (ValueError, TypeError):
+        return "0:00"
+
+    # Guard against unreasonably large values (> 24 hours)
+    if seconds > 86400:
+        seconds = 86400
+
     hours = seconds // 3600
     mins = (seconds % 3600) // 60
     secs = seconds % 60
@@ -52,7 +62,9 @@ def format_time(seconds: int | float | None) -> str:
     return f"{mins}:{secs:02d}"
 
 
-def calculate_progress_percent(position: int | float, duration: int | float) -> float:
+def calculate_progress_percent(
+    position: int | float | None, duration: int | float | None
+) -> float:
     """Calculate progress percentage.
 
     Args:
@@ -61,7 +73,26 @@ def calculate_progress_percent(position: int | float, duration: int | float) -> 
 
     Returns:
         Progress as percentage (0-100), rounded to 1 decimal place.
+        Returns 0.0 for invalid inputs (None, negative, or zero duration).
+        Clamps result to 0-100 range.
     """
-    if not duration or duration <= 0:
+    # Validate inputs
+    if position is None or duration is None:
         return 0.0
-    return round((position / duration) * 100, 1)
+
+    try:
+        pos = float(position)
+        dur = float(duration)
+    except (ValueError, TypeError):
+        return 0.0
+
+    if dur <= 0:
+        return 0.0
+
+    # Handle negative position gracefully
+    if pos < 0:
+        return 0.0
+
+    # Calculate and clamp to valid range
+    percent = (pos / dur) * 100
+    return round(min(max(percent, 0.0), 100.0), 1)

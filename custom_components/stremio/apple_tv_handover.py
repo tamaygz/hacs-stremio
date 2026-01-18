@@ -74,15 +74,56 @@ class UnsupportedFormatError(HandoverError):
 class HandoverManager:
     """Manages handover of streams to Apple TV devices."""
 
-    def __init__(self, hass: HomeAssistant) -> None:
+    # Content types that Apple TV native player supports
+    SUPPORTED_CONTENT_TYPES = {
+        StreamFormat.HLS: "application/x-mpegURL",
+        StreamFormat.MP4: "video/mp4",
+    }
+
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        credentials: str | None = None,
+        device_identifier: str | None = None,
+    ) -> None:
         """Initialize the HandoverManager.
 
         Args:
             hass: Home Assistant instance
+            credentials: Optional stored AirPlay credentials from pairing
+            device_identifier: Optional device identifier for faster reconnection
         """
         self.hass = hass
         self._discovered_devices: dict[str, Any] = {}
         self._discovery_lock = asyncio.Lock()
+        self._credentials = credentials
+        self._device_identifier = device_identifier
+
+    @staticmethod
+    def validate_stream_url(url: str) -> tuple[bool, str | None]:
+        """Validate a stream URL for handover.
+
+        Args:
+            url: The stream URL to validate
+
+        Returns:
+            Tuple of (is_valid, error_message)
+        """
+        if not url:
+            return False, "Stream URL is empty"
+
+        if not url.startswith(("http://", "https://")):
+            return False, f"Invalid URL scheme. Expected http:// or https://, got: {url[:50]}"
+
+        # Check for common problematic patterns
+        if "localhost" in url or "127.0.0.1" in url:
+            return False, "Localhost URLs are not accessible from Apple TV"
+
+        if "192.168." in url or "10.0." in url or "172.16." in url:
+            # Local network - this is fine, just log a debug message
+            _LOGGER.debug("Stream URL is on local network: %s", url[:100])
+
+        return True, None
 
     @staticmethod
     def detect_stream_format(url: str) -> StreamFormat:
@@ -329,6 +370,7 @@ class HandoverManager:
         device_name: str,
         stream_url: str,
         title: str | None = None,
+        credentials: str | None = None,
     ) -> bool:
         """Send stream to Apple TV via AirPlay.
 
@@ -336,6 +378,7 @@ class HandoverManager:
             device_name: Name of the target Apple TV
             stream_url: URL of the stream to play
             title: Optional title for the stream
+            credentials: Optional AirPlay credentials (overrides stored credentials)
 
         Returns:
             True if handover was successful
@@ -353,9 +396,19 @@ class HandoverManager:
             stream_url[:100],
         )
 
+        # Use provided credentials, fall back to stored credentials
+        airplay_credentials = credentials or self._credentials
+
         try:
             # Get device configuration
             device_config = await self.get_device_by_name(device_name)
+
+            # Apply stored credentials if available
+            if airplay_credentials:
+                from pyatv.const import Protocol
+
+                _LOGGER.debug("Using stored AirPlay credentials for '%s'", device_name)
+                device_config.set_credentials(Protocol.AirPlay, airplay_credentials)
 
             # Connect to device
             atv = await pyatv.connect(device_config, self.hass.loop)
@@ -506,6 +559,12 @@ class HandoverManager:
         This attempts to play the stream URL directly on Apple TV without
         using VLC. Works best with HLS (.m3u8) and MP4 streams.
 
+        Note: The Apple TV integration uses HTTP GET to verify URLs before
+        playback, which can fail (500 error) if:
+        - The URL requires special headers or authentication
+        - The server doesn't respond to HEAD/GET requests properly
+        - The stream format isn't natively supported
+
         Args:
             device_entity_id: Entity ID of the target media player
             stream_url: URL of the stream to play
@@ -534,15 +593,32 @@ class HandoverManager:
         if state is None:
             raise HandoverError(f"Entity '{device_entity_id}' not found.")
 
+        # Validate stream URL
+        is_valid, validation_error = self.validate_stream_url(stream_url)
+        if not is_valid:
+            raise HandoverError(f"Invalid stream URL: {validation_error}")
+
+        # Detect stream format and check compatibility
+        stream_format = self.detect_stream_format(stream_url)
+        content_type = self.SUPPORTED_CONTENT_TYPES.get(stream_format, "video/mp4")
+
+        if stream_format not in (StreamFormat.HLS, StreamFormat.MP4):
+            _LOGGER.warning(
+                "Stream format '%s' may not be supported by Apple TV native player. "
+                "Consider using AirPlay method or an HLS/MP4 stream. URL: %s",
+                stream_format.value,
+                stream_url[:100],
+            )
+
         try:
-            # For direct playback, use media_content_type: video
-            # This tells Apple TV to try playing the URL directly
+            # For direct playback, use the appropriate content type
+            # HLS streams work better with application/x-mpegURL
             await self.hass.services.async_call(
                 "media_player",
                 "play_media",
                 {
                     "entity_id": device_entity_id,
-                    "media_content_type": "video",
+                    "media_content_type": content_type,
                     "media_content_id": stream_url,
                 },
                 blocking=True,
@@ -554,6 +630,39 @@ class HandoverManager:
             return True
 
         except Exception as err:
+            error_msg = str(err)
+
+            # Provide more helpful error messages for common issues
+            if "500" in error_msg:
+                _LOGGER.error(
+                    "Direct handover failed with HTTP 500: The Apple TV could not "
+                    "process the stream URL. This usually means:\n"
+                    "  1. The stream URL requires authentication or special headers\n"
+                    "  2. The stream format (%s) is not supported by Apple TV\n"
+                    "  3. The stream server doesn't respond correctly to URL verification\n"
+                    "Recommendation: Use AirPlay method instead (requires pyatv).\n"
+                    "Stream URL: %s",
+                    stream_format.value,
+                    stream_url[:150],
+                )
+                raise HandoverError(
+                    f"Direct handover failed: Apple TV returned HTTP 500. "
+                    f"The stream format ({stream_format.value}) or URL may not be supported. "
+                    f"Try using AirPlay method instead (set handover_method to 'airplay' in options)."
+                ) from err
+
+            if "404" in error_msg:
+                raise HandoverError(
+                    f"Direct handover failed: Stream URL not found (404). "
+                    f"Please verify the stream URL is accessible."
+                ) from err
+
+            if "timeout" in error_msg.lower():
+                raise HandoverError(
+                    f"Direct handover failed: Connection timeout. "
+                    f"The stream server may be slow or unreachable from Apple TV."
+                ) from err
+
             _LOGGER.error("Direct handover failed: %s", err)
             raise HandoverError(f"Direct handover failed: {err}") from err
 
@@ -625,11 +734,51 @@ class HandoverManager:
                 return result
 
             if method == HandoverMethod.DIRECT:
-                await self.handover_direct(entity_id, stream_url)
-                result["success"] = True
-                result["method"] = "direct"
-                result["entity_id"] = entity_id
-                return result
+                try:
+                    await self.handover_direct(entity_id, stream_url)
+                    result["success"] = True
+                    result["method"] = "direct"
+                    result["entity_id"] = entity_id
+                    return result
+                except HandoverError as direct_err:
+                    # If direct fails with HTTP 500 and AirPlay is available, try AirPlay
+                    if PYATV_AVAILABLE and "500" in str(direct_err):
+                        _LOGGER.warning(
+                            "Direct handover failed with HTTP 500, attempting AirPlay fallback"
+                        )
+                        try:
+                            # For AirPlay, we need the device name, not entity_id
+                            # Try to extract from the original identifier or entity
+                            device_name = device_identifier
+                            if device_identifier.startswith("media_player."):
+                                # Try to get friendly name from entity state
+                                state = self.hass.states.get(device_identifier)
+                                if state:
+                                    device_name = state.attributes.get(
+                                        "friendly_name", device_identifier
+                                    )
+
+                            await self.handover_via_airplay(device_name, stream_url, title)
+                            result["success"] = True
+                            result["method"] = "airplay"
+                            result["fallback"] = True
+                            result["original_error"] = str(direct_err)
+                            _LOGGER.info(
+                                "AirPlay fallback successful after direct handover failed"
+                            )
+                            return result
+                        except Exception as airplay_err:
+                            _LOGGER.error(
+                                "AirPlay fallback also failed: %s", airplay_err
+                            )
+                            # Re-raise the original direct error with additional context
+                            raise HandoverError(
+                                f"Direct handover failed ({direct_err}) and AirPlay "
+                                f"fallback also failed ({airplay_err}). "
+                                f"Please check your stream URL and Apple TV configuration."
+                            ) from direct_err
+                    # No fallback available or different error, re-raise
+                    raise
 
         except Exception as err:
             result["error"] = str(err)

@@ -67,7 +67,7 @@ class StremioMediaPlayer(
         """
         super().__init__(coordinator)
         self._attr_unique_id = f"{entry.entry_id}_media_player"
-        self._attr_name = "Stremio"
+        self._attr_translation_key = "stremio"
         self._attr_has_entity_name = True
         self._attr_device_info = get_device_info(entry)
         # Track previous state to avoid unnecessary updates

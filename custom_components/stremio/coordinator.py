@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import timedelta
 from typing import Any
@@ -21,6 +22,11 @@ from .const import (
 from .stremio_client import StremioAuthError, StremioClient, StremioConnectionError
 
 _LOGGER = logging.getLogger(__name__)
+
+# Retry configuration
+MAX_RETRIES = 3
+BASE_RETRY_DELAY = 1.0  # seconds
+MAX_RETRY_DELAY = 10.0  # seconds
 
 
 class StremioDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
@@ -43,6 +49,7 @@ class StremioDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.entry = entry
         self._previous_watching: dict[str, Any] | None = None
         self._previous_library_count: int = 0
+        self._consecutive_failures: int = 0
 
         # Get scan interval from options or use default
         scan_interval_seconds = entry.options.get(
@@ -56,6 +63,43 @@ class StremioDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             update_interval=timedelta(seconds=scan_interval_seconds),
         )
 
+    async def _async_fetch_with_retry(self, fetch_func, description: str) -> Any:
+        """Execute a fetch function with exponential backoff retry.
+
+        Args:
+            fetch_func: Async function to execute
+            description: Description for logging
+
+        Returns:
+            Result from fetch_func
+
+        Raises:
+            StremioConnectionError: After all retries exhausted
+        """
+        last_error: Exception | None = None
+
+        for attempt in range(MAX_RETRIES):
+            try:
+                return await fetch_func()
+            except StremioConnectionError as err:
+                last_error = err
+                if attempt < MAX_RETRIES - 1:
+                    delay = min(
+                        BASE_RETRY_DELAY * (2 ** attempt),
+                        MAX_RETRY_DELAY
+                    )
+                    _LOGGER.debug(
+                        "Retry %d/%d for %s after %.1fs: %s",
+                        attempt + 1,
+                        MAX_RETRIES,
+                        description,
+                        delay,
+                        err,
+                    )
+                    await asyncio.sleep(delay)
+
+        raise last_error  # type: ignore[misc]
+
     async def _async_update_data(self) -> dict[str, Any]:
         """Fetch data from Stremio API.
 
@@ -66,14 +110,21 @@ class StremioDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             UpdateFailed: When update fails
         """
         try:
-            # Fetch user profile
-            user = await self.client.async_get_user()
+            # Fetch user profile with retry
+            user = await self._async_fetch_with_retry(
+                self.client.async_get_user, "user profile"
+            )
 
-            # Fetch library items
-            library = await self.client.async_get_library()
+            # Fetch library items with retry
+            library = await self._async_fetch_with_retry(
+                self.client.async_get_library, "library"
+            )
 
-            # Fetch continue watching
-            continue_watching = await self.client.async_get_continue_watching(limit=10)
+            # Fetch continue watching with retry
+            continue_watching = await self._async_fetch_with_retry(
+                lambda: self.client.async_get_continue_watching(limit=10),
+                "continue watching",
+            )
 
             # Prepare data structure
             data = {
@@ -138,17 +189,31 @@ class StremioDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # Fire events based on state changes
             self._fire_events(data)
 
+            # Reset failure counter on success
+            if self._consecutive_failures > 0:
+                _LOGGER.info(
+                    "Connection restored after %d consecutive failures",
+                    self._consecutive_failures,
+                )
+            self._consecutive_failures = 0
+
             return data
 
         except StremioAuthError as err:
             # Authentication error - trigger reauth
+            self._consecutive_failures += 1
             _LOGGER.error("Authentication failed: %s", err)
             self.entry.async_start_reauth(self.hass)
             raise UpdateFailed(f"Authentication failed: {err}") from err
 
         except StremioConnectionError as err:
-            # Connection error - retry next cycle
-            _LOGGER.warning("Connection failed, will retry: %s", err)
+            # Connection error - retry next cycle (after all retries exhausted)
+            self._consecutive_failures += 1
+            _LOGGER.warning(
+                "Connection failed (attempt %d), will retry next cycle: %s",
+                self._consecutive_failures,
+                err,
+            )
             raise UpdateFailed(f"Connection failed: {err}") from err
 
         except Exception as err:

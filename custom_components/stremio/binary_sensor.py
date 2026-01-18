@@ -24,7 +24,7 @@ from .entity_helpers import get_device_info
 _LOGGER = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class StremioBinarySensorEntityDescription(BinarySensorEntityDescription):
     """Describes Stremio binary sensor entity."""
 

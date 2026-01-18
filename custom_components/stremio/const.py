@@ -5,8 +5,6 @@ from datetime import timedelta
 from pathlib import Path
 from typing import Final
 
-from homeassistant.const import Platform
-
 # Read version from manifest.json
 MANIFEST_PATH = Path(__file__).parent / "manifest.json"
 with open(MANIFEST_PATH, encoding="utf-8") as f:
@@ -30,13 +28,6 @@ JSMODULES: Final[list[dict[str, str]]] = [
 DEFAULT_SCAN_INTERVAL: Final = timedelta(seconds=30)
 LIBRARY_SCAN_INTERVAL: Final = timedelta(minutes=5)
 
-# Platforms
-PLATFORMS: Final = [
-    Platform.SENSOR,
-    Platform.BINARY_SENSOR,
-    Platform.MEDIA_PLAYER,
-]
-
 # Configuration
 CONF_AUTH_KEY: Final = "auth_key"
 CONF_PLAYER_SCAN_INTERVAL: Final = "player_scan_interval"
@@ -45,6 +36,8 @@ CONF_ENABLE_APPLE_TV_HANDOVER: Final = "enable_apple_tv_handover"
 CONF_HANDOVER_METHOD: Final = "handover_method"
 CONF_APPLE_TV_DEVICE: Final = "apple_tv_device"
 CONF_APPLE_TV_ENTITY_ID: Final = "apple_tv_entity_id"
+CONF_APPLE_TV_CREDENTIALS: Final = "apple_tv_credentials"
+CONF_APPLE_TV_IDENTIFIER: Final = "apple_tv_identifier"
 
 # Options defaults
 DEFAULT_PLAYER_SCAN_INTERVAL: Final = 30  # seconds

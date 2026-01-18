@@ -2,19 +2,23 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any
 
 import voluptuous as vol
 from homeassistant import config_entries
-from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
+from homeassistant.const import CONF_EMAIL, CONF_PASSWORD, CONF_PIN
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .const import (
+    CONF_APPLE_TV_CREDENTIALS,
     CONF_APPLE_TV_DEVICE,
     CONF_APPLE_TV_ENTITY_ID,
+    CONF_APPLE_TV_IDENTIFIER,
     CONF_AUTH_KEY,
     CONF_ENABLE_APPLE_TV_HANDOVER,
     CONF_HANDOVER_METHOD,
@@ -27,11 +31,23 @@ from .const import (
     DEFAULT_LIBRARY_SCAN_INTERVAL,
     DEFAULT_PLAYER_SCAN_INTERVAL,
     DOMAIN,
+    HANDOVER_METHOD_AIRPLAY,
     HANDOVER_METHODS,
 )
 from .stremio_client import StremioAuthError, StremioClient, StremioConnectionError
 
 _LOGGER = logging.getLogger(__name__)
+
+# Try to import pyatv for Apple TV pairing
+try:
+    import pyatv
+    from pyatv.const import PairingRequirement, Protocol
+    from pyatv.interface import BaseConfig, PairingHandler
+
+    PYATV_AVAILABLE = True
+except ImportError:
+    PYATV_AVAILABLE = False
+    _LOGGER.debug("pyatv not installed, Apple TV pairing will not be available")
 
 STEP_USER_DATA_SCHEMA = vol.Schema(
     {
@@ -145,13 +161,38 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
     def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
         """Initialize options flow."""
         self._config_entry = config_entry
+        # State for Apple TV pairing flow
+        self._discovered_devices: dict[str, Any] = {}
+        self._selected_device: str | None = None
+        self._atv_config: Any = None
+        self._pairing: Any = None
+        self._pending_options: dict[str, Any] = {}
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Manage the options."""
+        """Manage the options - step 1: basic settings."""
+        errors: dict[str, str] = {}
+
         if user_input is not None:
-            return self.async_create_entry(title="", data=user_input)
+            # Store the options for later
+            self._pending_options = user_input
+
+            # Check if we need to configure Apple TV
+            enable_handover = user_input.get(
+                CONF_ENABLE_APPLE_TV_HANDOVER, DEFAULT_ENABLE_APPLE_TV_HANDOVER
+            )
+            method = user_input.get(CONF_HANDOVER_METHOD, DEFAULT_HANDOVER_METHOD)
+
+            # If AirPlay is enabled and pyatv is available, proceed to device selection
+            if enable_handover and method in (HANDOVER_METHOD_AIRPLAY, "auto"):
+                if not PYATV_AVAILABLE:
+                    # pyatv not installed - show warning and continue with manual config
+                    return await self.async_step_pyatv_missing()
+                return await self.async_step_apple_tv_discover()
+
+            # No Apple TV config needed, save options
+            return self._create_options_entry()
 
         return self.async_show_form(
             step_id="init",
@@ -183,17 +224,6 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                         ),
                     ): vol.In(HANDOVER_METHODS),
                     vol.Optional(
-                        CONF_APPLE_TV_DEVICE,
-                        default=self._config_entry.options.get(
-                            CONF_APPLE_TV_DEVICE, DEFAULT_APPLE_TV_DEVICE
-                        ),
-                        description={
-                            "suggested_value": self._config_entry.options.get(
-                                CONF_APPLE_TV_DEVICE, ""
-                            )
-                        },
-                    ): str,
-                    vol.Optional(
                         CONF_APPLE_TV_ENTITY_ID,
                         default=self._config_entry.options.get(
                             CONF_APPLE_TV_ENTITY_ID, DEFAULT_APPLE_TV_ENTITY_ID
@@ -206,4 +236,318 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                     ): str,
                 }
             ),
+            errors=errors,
         )
+
+    async def async_step_pyatv_missing(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Inform user that pyatv is not installed."""
+        if user_input is not None:
+            # Continue with manual device name entry
+            return await self.async_step_apple_tv_manual()
+
+        return self.async_show_form(step_id="pyatv_missing")
+
+    async def async_step_apple_tv_manual(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Manual Apple TV configuration (when pyatv not available)."""
+        if user_input is not None:
+            self._pending_options[CONF_APPLE_TV_DEVICE] = user_input.get(
+                CONF_APPLE_TV_DEVICE, ""
+            )
+            return self._create_options_entry()
+
+        return self.async_show_form(
+            step_id="apple_tv_manual",
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(
+                        CONF_APPLE_TV_DEVICE,
+                        default=self._config_entry.options.get(
+                            CONF_APPLE_TV_DEVICE, DEFAULT_APPLE_TV_DEVICE
+                        ),
+                    ): str,
+                }
+            ),
+        )
+
+    async def async_step_apple_tv_discover(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Discover and select Apple TV device."""
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            selected_device = user_input.get("device")
+            if selected_device and selected_device in self._discovered_devices:
+                self._selected_device = selected_device
+                device_info = self._discovered_devices[selected_device]
+                self._atv_config = device_info.get("config")
+
+                # Store device info in pending options
+                self._pending_options[CONF_APPLE_TV_DEVICE] = selected_device
+                self._pending_options[CONF_APPLE_TV_IDENTIFIER] = device_info.get(
+                    "identifier"
+                )
+
+                # Check if pairing is required
+                return await self._check_pairing_requirement()
+            else:
+                errors["base"] = "device_not_found"
+
+        # Discover devices
+        try:
+            await self._discover_apple_tv_devices()
+        except Exception as err:
+            _LOGGER.error("Failed to discover Apple TV devices: %s", err)
+            errors["base"] = "discovery_failed"
+
+        if not self._discovered_devices:
+            errors["base"] = "no_devices_found"
+
+        # Build device selection dropdown
+        device_options = {
+            name: f"{name} ({info.get('address', 'unknown')})"
+            for name, info in self._discovered_devices.items()
+        }
+
+        # Add option to enter manually
+        device_options["__manual__"] = "Enter device name manually..."
+
+        return self.async_show_form(
+            step_id="apple_tv_discover",
+            data_schema=vol.Schema(
+                {
+                    vol.Required("device"): vol.In(device_options),
+                }
+            ),
+            errors=errors,
+            description_placeholders={
+                "device_count": str(len(self._discovered_devices))
+            },
+        )
+
+    async def _discover_apple_tv_devices(self) -> None:
+        """Discover Apple TV devices on the network."""
+        if not PYATV_AVAILABLE:
+            return
+
+        _LOGGER.debug("Scanning for Apple TV devices...")
+        devices = await pyatv.scan(self.hass.loop, timeout=5)
+
+        self._discovered_devices = {}
+        for device in devices:
+            self._discovered_devices[device.name] = {
+                "name": device.name,
+                "address": str(device.address),
+                "identifier": device.identifier,
+                "config": device,
+                "services": [str(s.protocol) for s in device.services],
+            }
+            _LOGGER.debug(
+                "Found Apple TV: %s at %s (services: %s)",
+                device.name,
+                device.address,
+                [str(s.protocol) for s in device.services],
+            )
+
+    async def _check_pairing_requirement(self) -> FlowResult:
+        """Check if pairing is required for the selected device."""
+        if not PYATV_AVAILABLE or not self._atv_config:
+            return self._create_options_entry()
+
+        # Check if we have existing credentials
+        existing_credentials = self._config_entry.options.get(CONF_APPLE_TV_CREDENTIALS)
+        existing_identifier = self._config_entry.options.get(CONF_APPLE_TV_IDENTIFIER)
+
+        # If same device and we have credentials, skip pairing
+        current_identifier = self._pending_options.get(CONF_APPLE_TV_IDENTIFIER)
+        if (
+            existing_credentials
+            and existing_identifier
+            and existing_identifier == current_identifier
+        ):
+            _LOGGER.debug(
+                "Using existing credentials for Apple TV '%s'", self._selected_device
+            )
+            self._pending_options[CONF_APPLE_TV_CREDENTIALS] = existing_credentials
+            return self._create_options_entry()
+
+        # Check AirPlay service for pairing requirement
+        airplay_service = self._atv_config.get_service(Protocol.AirPlay)
+        if airplay_service is None:
+            _LOGGER.warning(
+                "Apple TV '%s' does not have AirPlay service", self._selected_device
+            )
+            return self._create_options_entry()
+
+        pairing_req = airplay_service.pairing
+        _LOGGER.debug(
+            "Apple TV '%s' AirPlay pairing requirement: %s",
+            self._selected_device,
+            pairing_req,
+        )
+
+        if pairing_req == PairingRequirement.NotNeeded:
+            _LOGGER.debug("Pairing not required for '%s'", self._selected_device)
+            return self._create_options_entry()
+
+        if pairing_req == PairingRequirement.Unsupported:
+            _LOGGER.debug("Pairing not supported for '%s'", self._selected_device)
+            return self._create_options_entry()
+
+        if pairing_req == PairingRequirement.Disabled:
+            return await self.async_step_pairing_disabled()
+
+        # Pairing is required (Mandatory or Optional)
+        return await self.async_step_apple_tv_pair_start()
+
+    async def async_step_pairing_disabled(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Inform user that pairing is disabled on the device."""
+        if user_input is not None:
+            # User acknowledged, continue without credentials
+            return self._create_options_entry()
+
+        return self.async_show_form(
+            step_id="pairing_disabled",
+            description_placeholders={"device": self._selected_device or "Unknown"},
+        )
+
+    async def async_step_apple_tv_pair_start(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Start the pairing process with Apple TV."""
+        if not PYATV_AVAILABLE or not self._atv_config:
+            return self._create_options_entry()
+
+        errors: dict[str, str] = {}
+
+        try:
+            # Start pairing
+            session = async_get_clientsession(self.hass)
+            self._pairing = await pyatv.pair(
+                self._atv_config,
+                Protocol.AirPlay,
+                self.hass.loop,
+                session=session,
+                name="Home Assistant Stremio",
+            )
+            await self._pairing.begin()
+
+            # Check if device provides PIN (most common for Apple TV)
+            if self._pairing.device_provides_pin:
+                return await self.async_step_apple_tv_pair_pin()
+            else:
+                # Rare case: we provide PIN, device enters it
+                return await self.async_step_apple_tv_pair_pin_device()
+
+        except Exception as err:
+            _LOGGER.error("Failed to start pairing: %s", err)
+            errors["base"] = "pairing_start_failed"
+            await self._cleanup_pairing()
+            # Fall through to show error and continue
+            return self._create_options_entry()
+
+    async def async_step_apple_tv_pair_pin(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Handle PIN entry for Apple TV pairing (device shows PIN)."""
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            pin = user_input.get(CONF_PIN)
+            if pin and self._pairing:
+                try:
+                    self._pairing.pin(pin)
+                    await self._pairing.finish()
+
+                    if self._pairing.has_paired:
+                        # Store credentials
+                        credentials = self._pairing.service.credentials
+                        self._pending_options[CONF_APPLE_TV_CREDENTIALS] = credentials
+                        _LOGGER.info(
+                            "Successfully paired with Apple TV '%s'",
+                            self._selected_device,
+                        )
+                    else:
+                        _LOGGER.warning(
+                            "Pairing completed but device reports not paired"
+                        )
+
+                    await self._cleanup_pairing()
+                    return self._create_options_entry()
+
+                except Exception as err:
+                    _LOGGER.error("Pairing failed: %s", err)
+                    if "invalid" in str(err).lower() or "pin" in str(err).lower():
+                        errors["base"] = "invalid_pin"
+                    else:
+                        errors["base"] = "pairing_failed"
+
+        return self.async_show_form(
+            step_id="apple_tv_pair_pin",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_PIN): vol.All(
+                        vol.Coerce(int), vol.Range(min=0, max=9999)
+                    ),
+                }
+            ),
+            errors=errors,
+            description_placeholders={"device": self._selected_device or "Apple TV"},
+        )
+
+    async def async_step_apple_tv_pair_pin_device(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Handle pairing when user must enter PIN on device."""
+        import random
+
+        if user_input is not None and self._pairing:
+            try:
+                await self._pairing.finish()
+
+                if self._pairing.has_paired:
+                    credentials = self._pairing.service.credentials
+                    self._pending_options[CONF_APPLE_TV_CREDENTIALS] = credentials
+                    _LOGGER.info(
+                        "Successfully paired with Apple TV '%s'", self._selected_device
+                    )
+
+                await self._cleanup_pairing()
+                return self._create_options_entry()
+
+            except Exception as err:
+                _LOGGER.error("Pairing failed: %s", err)
+                await self._cleanup_pairing()
+                return self._create_options_entry()
+
+        # Generate random PIN for user to enter on device
+        pin = random.randint(1000, 9999)
+        if self._pairing:
+            self._pairing.pin(pin)
+
+        return self.async_show_form(
+            step_id="apple_tv_pair_pin_device",
+            description_placeholders={
+                "device": self._selected_device or "Apple TV",
+                "pin": str(pin),
+            },
+        )
+
+    async def _cleanup_pairing(self) -> None:
+        """Clean up pairing resources."""
+        if self._pairing:
+            try:
+                await self._pairing.close()
+            except Exception as err:
+                _LOGGER.debug("Error closing pairing: %s", err)
+            self._pairing = None
+
+    def _create_options_entry(self) -> FlowResult:
+        """Create the options entry with all collected data."""
+        return self.async_create_entry(title="", data=self._pending_options)

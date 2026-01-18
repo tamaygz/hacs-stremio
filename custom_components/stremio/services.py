@@ -16,6 +16,8 @@ from homeassistant.helpers import config_validation as cv
 
 from .apple_tv_handover import HandoverError, HandoverManager
 from .const import (
+    CONF_APPLE_TV_CREDENTIALS,
+    CONF_APPLE_TV_IDENTIFIER,
     DOMAIN,
     EVENT_NEW_CONTENT,
     EVENT_PLAYBACK_STARTED,
@@ -311,6 +313,12 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         if not stream_url:
             if not media_id:
                 # Try to get from current watching
+                if coordinator.data is None:
+                    raise ServiceValidationError(
+                        "Coordinator data not available",
+                        translation_domain=DOMAIN,
+                        translation_key="no_data_available",
+                    )
                 current = coordinator.data.get("current_watching")
                 if not current:
                     raise ServiceValidationError(
@@ -348,12 +356,25 @@ async def async_setup_services(hass: HomeAssistant) -> None:
 
         # Get current watching title for display
         title = None
-        current = coordinator.data.get("current_watching")
-        if current:
-            title = current.get("title")
+        if coordinator.data:
+            current = coordinator.data.get("current_watching")
+            if current:
+                title = current.get("title")
 
-        # Use HandoverManager for proper handover
-        handover_manager = HandoverManager(hass)
+        # Get stored Apple TV credentials from config entry options
+        entry = hass.config_entries.async_get_entry(entry_id)
+        credentials = None
+        device_identifier = None
+        if entry:
+            credentials = entry.options.get(CONF_APPLE_TV_CREDENTIALS)
+            device_identifier = entry.options.get(CONF_APPLE_TV_IDENTIFIER)
+
+        # Use HandoverManager for proper handover with credentials
+        handover_manager = HandoverManager(
+            hass,
+            credentials=credentials,
+            device_identifier=device_identifier,
+        )
 
         try:
             result = await handover_manager.handover(
