@@ -7,7 +7,7 @@ This guide covers setting up a development environment for the Stremio HACS Inte
 - **Docker** (for devcontainer, recommended)
 - **VS Code** with [Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers)
 - **Git**
-- **Python 3.11+** (for local development without Docker)
+- **Python 3.12+** (for local development without Docker)
 
 ---
 

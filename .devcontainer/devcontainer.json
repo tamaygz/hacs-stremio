@@ -1,6 +1,6 @@
 {
     "name": "Stremio HACS Integration",
-    "image": "mcr.microsoft.com/devcontainers/python:3.11",
+    "image": "mcr.microsoft.com/devcontainers/python:3.13",
     
     // Forward Home Assistant port
     "forwardPorts": [8123],

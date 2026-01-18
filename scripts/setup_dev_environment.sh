@@ -48,7 +48,7 @@ if command -v python3 &> /dev/null; then
 elif command -v python &> /dev/null; then
     PYTHON_CMD="python"
 else
-    print_error "Python not found. Please install Python 3.11 or higher."
+    print_error "Python not found. Please install Python 3.12 or higher."
     exit 1
 fi
 
@@ -56,8 +56,8 @@ PYTHON_VERSION=$($PYTHON_CMD -c 'import sys; print(f"{sys.version_info.major}.{s
 PYTHON_MAJOR=$($PYTHON_CMD -c 'import sys; print(sys.version_info.major)')
 PYTHON_MINOR=$($PYTHON_CMD -c 'import sys; print(sys.version_info.minor)')
 
-if [ "$PYTHON_MAJOR" -lt 3 ] || ([ "$PYTHON_MAJOR" -eq 3 ] && [ "$PYTHON_MINOR" -lt 11 ]); then
-    print_error "Python 3.11 or higher is required. Found: Python $PYTHON_VERSION"
+if [ "$PYTHON_MAJOR" -lt 3 ] || ([ "$PYTHON_MAJOR" -eq 3 ] && [ "$PYTHON_MINOR" -lt 12 ]); then
+    print_error "Python 3.12 or higher is required. Found: Python $PYTHON_VERSION"
     exit 1
 fi
 print_status "Python $PYTHON_VERSION detected"

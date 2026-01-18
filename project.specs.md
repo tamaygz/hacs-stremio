@@ -7,7 +7,7 @@ A Home Assistant Custom Component (HACS) integration that connects to the Stremi
 **Project Status:** Specification Phase  
 **Last Updated:** January 17, 2026  
 **Target HA Version:** 2025.1+  
-**Python Version:** 3.11+
+**Python Version:** 3.12+
 
 ---
 

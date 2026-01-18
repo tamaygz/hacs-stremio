@@ -47,7 +47,7 @@ This is a Home Assistant custom integration distributed via HACS (Home Assistant
 
 #### `devcontainer.json`
 Configure a development container that:
-- Uses `mcr.microsoft.com/devcontainers/python:3.11` as base image
+- Uses `mcr.microsoft.com/devcontainers/python:3.13` as base image
 - Exposes port 8123 for Home Assistant UI
 - Mounts the integration code into the container's `custom_components/stremio` directory
 - Sets up appropriate environment variables
@@ -71,7 +71,7 @@ Only if multi-service setup needed:
 
 #### `setup_dev_environment.sh`
 Main setup script that:
-- Checks for required dependencies (Python 3.11+, pip)
+- Checks for required dependencies (Python 3.12+, pip)
 - Creates virtual environment if not exists
 - Installs development dependencies from `requirements_dev.txt`
 - Downloads and installs HACS automatically (calls `install_hacs.sh`)
@@ -287,7 +287,7 @@ HA_CONFIG_PATH=./config
 ### 6. GitHub Workflows (Already Implemented ✅)
 
 The existing `.github/workflows/test.yml` already includes:
-- Matrix testing (Python 3.11, 3.12)
+- Matrix testing (Python 3.12, 3.13)
 - Linting (black, flake8)
 - Pytest with coverage
 - HACS validation
