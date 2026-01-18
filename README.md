@@ -79,7 +79,7 @@ A comprehensive Home Assistant Custom Component (HACS) integration that connects
 Browse your entire Stremio library through Home Assistant's media browser:
 
 <a href="docs/screenshots/media_browser_support.png">
-  <img src="docs/screenshots/media_browser_support.png" alt="Media Browser Support" width="600" />
+  <img src="docs/screenshots/media_browser_support.png" alt="Media Browser Support" width="400" />
 </a>
 
 ---
