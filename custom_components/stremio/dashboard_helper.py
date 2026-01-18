@@ -13,6 +13,7 @@ _LOGGER = logging.getLogger(__name__)
 DASHBOARD_URL_PATH = "stremio-testing"
 DASHBOARD_TITLE = "Stremio Testing"
 DASHBOARD_ICON = "mdi:filmstrip"
+EVENT_LOVELACE_UPDATED = "lovelace_updated"
 
 
 def get_testing_dashboard_config(entity_id: str) -> dict[str, Any]:
@@ -374,130 +375,67 @@ async def async_create_testing_dashboard(
         HomeAssistantError: If dashboard creation fails
     """
     try:
-        from homeassistant.components.lovelace.const import LOVELACE_DATA
-        from homeassistant.components.lovelace.dashboard import DashboardsCollection
+        from homeassistant.components import lovelace
+        from homeassistant.helpers import storage
 
-        lovelace_data = hass.data.get(LOVELACE_DATA)
-        if not lovelace_data:
-            raise HomeAssistantError("Lovelace not initialized")
-
-        # Get or create the dashboards collection
-        dashboards_collection: DashboardsCollection | None = None
-
-        # Try to find existing collection
-        for item in hass.data.values():
-            if isinstance(item, dict):
-                for value in item.values():
-                    if isinstance(value, DashboardsCollection):
-                        dashboards_collection = value
-                        break
-
-        # If we didn't find it, try to access from LOVELACE_DATA directly
-        if not dashboards_collection:
-            # The collection is managed internally by the lovelace component
-            # We need to use the websocket API to create the dashboard
-            _LOGGER.info(
-                "Creating Stremio testing dashboard using service call approach"
-            )
-            await _create_dashboard_via_service(hass, entity_id)
-            return
-
-        # Create dashboard data
-        dashboard_data = {
-            "url_path": DASHBOARD_URL_PATH,
-            "title": DASHBOARD_TITLE,
-            "icon": DASHBOARD_ICON,
-            "show_in_sidebar": True,
-            "require_admin": False,
-        }
-
+        # Access the lovelace storage directly
+        dashboards_store = storage.Store(
+            hass, 
+            lovelace.dashboard.DASHBOARDS_STORAGE_VERSION, 
+            lovelace.dashboard.DASHBOARDS_STORAGE_KEY
+        )
+        
+        # Load existing dashboards
+        dashboards_data = await dashboards_store.async_load() or {"items": []}
+        
         # Check if dashboard already exists
-        existing_dashboards = dashboards_collection.async_items()
-        for dashboard in existing_dashboards:
+        existing_dashboard = None
+        for dashboard in dashboards_data.get("items", []):
             if dashboard.get("url_path") == DASHBOARD_URL_PATH:
-                _LOGGER.info("Stremio testing dashboard already exists, updating it")
-                dashboard_id = dashboard.get("id")
-                if dashboard_id:
-                    await dashboards_collection.async_update_item(
-                        dashboard_id, dashboard_data
-                    )
-                    # Update the dashboard config
-                    await _update_dashboard_config(hass, entity_id)
-                    return
-
-        # Create new dashboard
-        await dashboards_collection.async_create_item(dashboard_data)
-        _LOGGER.info("Created Stremio testing dashboard metadata")
-
-        # Now update the dashboard content
-        await _update_dashboard_config(hass, entity_id)
-
-    except Exception as err:
-        _LOGGER.exception("Failed to create testing dashboard: %s", err)
-        raise HomeAssistantError(f"Failed to create testing dashboard: {err}") from err
-
-
-async def _update_dashboard_config(hass: HomeAssistant, entity_id: str) -> None:
-    """Update the dashboard configuration.
-
-    Args:
-        hass: Home Assistant instance
-        entity_id: The entity ID of the Stremio media player
-    """
-    from homeassistant.components.lovelace.const import LOVELACE_DATA
-
-    lovelace_data = hass.data.get(LOVELACE_DATA)
-    if not lovelace_data:
-        return
-
-    # Get the dashboard config
-    dashboards = lovelace_data.dashboards
-    dashboard_config = dashboards.get(DASHBOARD_URL_PATH)
-
-    if dashboard_config:
-        # Generate and save the config
-        config = get_testing_dashboard_config(entity_id)
-        await dashboard_config.async_save(config)
-        _LOGGER.info("Updated Stremio testing dashboard configuration")
-
-
-async def _create_dashboard_via_service(
-    hass: HomeAssistant, entity_id: str
-) -> None:
-    """Create dashboard by directly calling the websocket service.
-
-    This is a fallback method that creates the dashboard using Home Assistant's
-    internal service calls.
-
-    Args:
-        hass: Home Assistant instance
-        entity_id: The entity ID of the Stremio media player
-    """
-    try:
-        # Use Home Assistant's service to create the dashboard
-        await hass.services.async_call(
-            "lovelace",
-            "create_dashboard",
-            {
+                existing_dashboard = dashboard
+                break
+        
+        # Create or update dashboard metadata
+        if existing_dashboard:
+            _LOGGER.info("Stremio testing dashboard already exists, will update content")
+            dashboard_id = existing_dashboard["id"]
+        else:
+            # Generate a unique ID for the dashboard
+            import uuid
+            dashboard_id = str(uuid.uuid4())
+            
+            # Add new dashboard to storage
+            new_dashboard = {
+                "id": dashboard_id,
                 "url_path": DASHBOARD_URL_PATH,
                 "title": DASHBOARD_TITLE,
                 "icon": DASHBOARD_ICON,
                 "show_in_sidebar": True,
                 "require_admin": False,
-            },
-            blocking=True,
+            }
+            dashboards_data.setdefault("items", []).append(new_dashboard)
+            await dashboards_store.async_save(dashboards_data)
+            _LOGGER.info("Created Stremio testing dashboard metadata with ID: %s", dashboard_id)
+
+        # Now create/update the dashboard content
+        config_store = storage.Store(
+            hass,
+            lovelace.dashboard.CONFIG_STORAGE_VERSION,
+            lovelace.dashboard.CONFIG_STORAGE_KEY.format(dashboard_id)
         )
-
-        # Give it a moment to be created
-        import asyncio
-
-        await asyncio.sleep(0.5)
-
-        # Now update the content
-        await _update_dashboard_config(hass, entity_id)
+        
+        # Generate the dashboard configuration
+        config = get_testing_dashboard_config(entity_id)
+        
+        # Save the dashboard content
+        await config_store.async_save({"config": config})
+        _LOGGER.info("Updated Stremio testing dashboard configuration")
+        
+        # Fire lovelace updated event to refresh the UI
+        hass.bus.async_fire(EVENT_LOVELACE_UPDATED, {"url_path": DASHBOARD_URL_PATH})
+        
+        _LOGGER.info("Successfully created Stremio testing dashboard at /%s", DASHBOARD_URL_PATH)
 
     except Exception as err:
-        _LOGGER.error("Failed to create dashboard via service: %s", err)
-        raise HomeAssistantError(
-            "Failed to create dashboard. Please create it manually."
-        ) from err
+        _LOGGER.exception("Failed to create testing dashboard: %s", err)
+        raise HomeAssistantError(f"Failed to create testing dashboard: {err}") from err

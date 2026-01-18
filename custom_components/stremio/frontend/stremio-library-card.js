@@ -108,9 +108,9 @@ class StremioLibraryCard extends LitElement {
         gap: 12px;
         padding: 16px;
         overflow-y: auto;
+        overflow-x: hidden;
         flex: 1;
         min-height: 0;
-        align-items: start; /* Prevent items from stretching to fill row height */
       }
 
       .library-grid.horizontal {
@@ -120,6 +120,7 @@ class StremioLibraryCard extends LitElement {
         overflow-y: hidden;
         scroll-snap-type: x mandatory;
         -webkit-overflow-scrolling: touch;
+        align-items: flex-start;
       }
 
       .library-grid.horizontal .library-item {
@@ -135,6 +136,9 @@ class StremioLibraryCard extends LitElement {
         position: relative;
         display: flex;
         flex-direction: column;
+        /* Ensure all items have same internal heights */
+        --item-title-height: 20px;
+        --item-year-height: 16px;
       }
 
       .library-item:hover {
@@ -162,6 +166,7 @@ class StremioLibraryCard extends LitElement {
         border-radius: 6px;
         background: var(--secondary-background-color);
         flex-shrink: 0;
+        flex-grow: 0;
         height: 0; /* Required for padding-bottom technique to work */
       }
 
@@ -172,6 +177,7 @@ class StremioLibraryCard extends LitElement {
         position: absolute;
         top: 0;
         left: 0;
+        display: block;
       }
 
       .item-poster-placeholder {
@@ -197,12 +203,24 @@ class StremioLibraryCard extends LitElement {
         text-overflow: ellipsis;
         white-space: nowrap;
         color: var(--primary-text-color);
+        height: var(--item-title-height, 20px);
+        line-height: var(--item-title-height, 20px);
+        flex-shrink: 0;
+        flex-grow: 0;
+      }
+
+      .item-title.hidden {
+        visibility: hidden;
       }
 
       .item-year {
         font-size: 0.7em;
         color: var(--secondary-text-color);
         margin-top: 2px;
+        height: var(--item-year-height, 16px);
+        line-height: var(--item-year-height, 16px);
+        flex-shrink: 0;
+        flex-grow: 0;
       }
 
       .media-type-badge {
@@ -216,14 +234,17 @@ class StremioLibraryCard extends LitElement {
         font-size: 0.65em;
         text-transform: uppercase;
         font-weight: 600;
+        z-index: 1;
       }
 
       .item-progress {
-        height: 3px;
+        height: 4px;
         background: var(--secondary-background-color);
         border-radius: 2px;
         margin-top: 4px;
         overflow: hidden;
+        flex-shrink: 0;
+        flex-grow: 0;
       }
 
       .item-progress-fill {
@@ -1233,7 +1254,10 @@ class StremioLibraryCard extends LitElement {
   _renderItem(item) {
     const title = item.title || item.name || 'Unknown';
     const progress = item.progress_percent || 0;
+    const showTitle = this.config.show_title !== false;
+    const showProgress = this.config.show_progress !== false;
 
+    // Always render all slots to maintain alignment across items in the same row
     return html`
       <div 
         class="library-item" 
@@ -1251,18 +1275,14 @@ class StremioLibraryCard extends LitElement {
               <ha-icon icon="mdi:movie-outline"></ha-icon>
             </div>
           `}
+          ${this.config.show_media_type_badge && item.type ? html`
+            <span class="media-type-badge ${item.type}">${item.type === 'series' ? 'TV' : 'Movie'}</span>
+          ` : ''}
         </div>
-        ${this.config.show_media_type_badge && item.type ? html`
-          <span class="media-type-badge ${item.type}">${item.type === 'series' ? 'TV' : 'Movie'}</span>
-        ` : ''}
-        ${this.config.show_title !== false ? html`
-          <div class="item-title" title="${title}">${title}</div>
-        ` : ''}
-        ${progress > 0 ? html`
-          <div class="item-progress" role="progressbar" aria-valuenow="${progress}" aria-valuemin="0" aria-valuemax="100">
-            <div class="item-progress-fill" style="width: ${progress}%"></div>
-          </div>
-        ` : ''}
+        <div class="item-title${showTitle ? '' : ' hidden'}" title="${title}">${showTitle ? title : ''}</div>
+        <div class="item-progress" role="progressbar" aria-valuenow="${progress}" aria-valuemin="0" aria-valuemax="100">
+          <div class="item-progress-fill" style="width: ${showProgress ? progress : 0}%"></div>
+        </div>
       </div>
     `;
   }

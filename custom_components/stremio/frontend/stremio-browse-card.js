@@ -101,7 +101,7 @@ class StremioBrowseCard extends LitElement {
 
       .catalog-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+        grid-template-columns: repeat(var(--grid-columns, 4), 1fr);
         gap: 12px;
         padding: 16px;
         overflow-y: auto;
@@ -110,9 +110,25 @@ class StremioBrowseCard extends LitElement {
         min-height: 0;
       }
 
+      .catalog-grid.horizontal {
+        display: flex;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        overflow-y: hidden;
+        scroll-snap-type: x mandatory;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      .catalog-grid.horizontal .catalog-item {
+        flex: 0 0 auto;
+        width: calc(100% / var(--grid-columns, 4) - 10px);
+        min-width: 100px;
+        scroll-snap-align: start;
+      }
+
       @media (max-width: 768px) {
         .catalog-grid {
-          grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+          grid-template-columns: repeat(var(--grid-columns, 3), 1fr);
           gap: 8px;
           padding: 12px;
         }
