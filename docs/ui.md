@@ -165,6 +165,7 @@ default_view: popular
 default_type: movie
 show_view_controls: true
 show_type_controls: true
+show_genre_filter: true
 columns: 4
 max_items: 50
 ```
@@ -178,6 +179,7 @@ max_items: 50
 | `default_type` | string | "movie" | Default media type ("movie" or "series") |
 | `show_view_controls` | boolean | true | Show Popular/New toggle buttons |
 | `show_type_controls` | boolean | true | Show Movies/TV Shows toggle buttons |
+| `show_genre_filter` | boolean | true | Show genre filter dropdown |
 | `columns` | number | 4 | Grid columns (desktop) |
 | `max_items` | number | 50 | Maximum items to display |
 
@@ -185,6 +187,7 @@ max_items: 50
 
 - **View Modes**: Toggle between Popular and New content
 - **Media Types**: Switch between Movies and TV Shows
+- **Genre Filtering**: Filter content by genre (Action, Drama, Comedy, etc.)
 - **Click Actions**: Click any item for details and streaming options
 - **Responsive**: Adapts to mobile and desktop screens
 - **Direct Integration**: Uses Stremio's catalog API via media browser
@@ -242,6 +245,26 @@ views:
         title: 🆕 New Releases
         default_view: new
         columns: 6
+```
+
+### Genre-Focused Dashboard
+
+```yaml
+views:
+  - title: Browse by Genre
+    cards:
+      - type: custom:stremio-browse-card
+        title: Browse Movies by Genre
+        default_type: movie
+        show_view_controls: false
+        show_type_controls: false
+        show_genre_filter: true
+      - type: custom:stremio-browse-card
+        title: Browse TV Shows by Genre
+        default_type: series
+        show_view_controls: false
+        show_type_controls: false
+        show_genre_filter: true
 ```
 
 ### Mobile-Optimized Dashboard

@@ -39,6 +39,8 @@ POPULAR_MOVIES_IDENTIFIER = "popular_movies"
 POPULAR_SERIES_IDENTIFIER = "popular_series"
 NEW_MOVIES_IDENTIFIER = "new_movies"
 NEW_SERIES_IDENTIFIER = "new_series"
+MOVIE_GENRES_IDENTIFIER = "movie_genres"
+SERIES_GENRES_IDENTIFIER = "series_genres"
 
 
 async def async_get_media_source(hass: HomeAssistant) -> StremioMediaSource:
@@ -215,6 +217,16 @@ class StremioMediaSource(MediaSource):
             return await self._build_new_movies_browse()
         if identifier == NEW_SERIES_IDENTIFIER:
             return await self._build_new_series_browse()
+        if identifier == MOVIE_GENRES_IDENTIFIER:
+            return self._build_movie_genres_browse()
+        if identifier == SERIES_GENRES_IDENTIFIER:
+            return self._build_series_genres_browse()
+
+        # Handle genre browsing with format: movie_genres/Genre or series_genres/Genre
+        if identifier.startswith(f"{MOVIE_GENRES_IDENTIFIER}/"):
+            return await self._build_genre_content_browse(identifier, "movie")
+        if identifier.startswith(f"{SERIES_GENRES_IDENTIFIER}/"):
+            return await self._build_genre_content_browse(identifier, "series")
 
         # Handle individual series items (series/imdb_id or series/imdb_id/season)
         if identifier.startswith(f"{SERIES_IDENTIFIER}/"):
@@ -957,6 +969,26 @@ class StremioMediaSource(MediaSource):
                     can_expand=True,
                     thumbnail=None,
                 ),
+                BrowseMediaSource(
+                    domain=DOMAIN,
+                    identifier=MOVIE_GENRES_IDENTIFIER,
+                    media_class=MediaClass.DIRECTORY,
+                    media_content_type=MediaType.MOVIE,
+                    title="🎭 Movie Genres",
+                    can_play=False,
+                    can_expand=True,
+                    thumbnail=None,
+                ),
+                BrowseMediaSource(
+                    domain=DOMAIN,
+                    identifier=SERIES_GENRES_IDENTIFIER,
+                    media_class=MediaClass.DIRECTORY,
+                    media_content_type=MediaType.TVSHOW,
+                    title="🎭 TV Show Genres",
+                    can_play=False,
+                    can_expand=True,
+                    thumbnail=None,
+                ),
             ],
         )
 
@@ -1089,6 +1121,122 @@ class StremioMediaSource(MediaSource):
         except Exception as err:
             _LOGGER.error("Error fetching new series: %s", err)
             return self._build_empty_browse(NEW_SERIES_IDENTIFIER, "New TV Shows")
+
+    def _build_movie_genres_browse(self) -> BrowseMediaSource:
+        """Build movie genres list view."""
+        from .const import CINEMETA_GENRES
+
+        children = []
+        for genre in CINEMETA_GENRES:
+            children.append(
+                BrowseMediaSource(
+                    domain=DOMAIN,
+                    identifier=f"{MOVIE_GENRES_IDENTIFIER}/{genre}",
+                    media_class=MediaClass.DIRECTORY,
+                    media_content_type=MediaType.MOVIE,
+                    title=genre,
+                    can_play=False,
+                    can_expand=True,
+                    thumbnail=None,
+                )
+            )
+
+        return BrowseMediaSource(
+            domain=DOMAIN,
+            identifier=MOVIE_GENRES_IDENTIFIER,
+            media_class=MediaClass.DIRECTORY,
+            media_content_type=MediaType.MOVIE,
+            title="Movie Genres",
+            can_play=False,
+            can_expand=True,
+            children=children,
+        )
+
+    def _build_series_genres_browse(self) -> BrowseMediaSource:
+        """Build TV show genres list view."""
+        from .const import CINEMETA_GENRES
+
+        children = []
+        for genre in CINEMETA_GENRES:
+            children.append(
+                BrowseMediaSource(
+                    domain=DOMAIN,
+                    identifier=f"{SERIES_GENRES_IDENTIFIER}/{genre}",
+                    media_class=MediaClass.DIRECTORY,
+                    media_content_type=MediaType.TVSHOW,
+                    title=genre,
+                    can_play=False,
+                    can_expand=True,
+                    thumbnail=None,
+                )
+            )
+
+        return BrowseMediaSource(
+            domain=DOMAIN,
+            identifier=SERIES_GENRES_IDENTIFIER,
+            media_class=MediaClass.DIRECTORY,
+            media_content_type=MediaType.TVSHOW,
+            title="TV Show Genres",
+            can_play=False,
+            can_expand=True,
+            children=children,
+        )
+
+    async def _build_genre_content_browse(
+        self, identifier: str, media_type: str
+    ) -> BrowseMediaSource:
+        """Build genre content view showing movies/series for a specific genre.
+
+        Args:
+            identifier: Format is movie_genres/Genre or series_genres/Genre
+            media_type: "movie" or "series"
+
+        Returns:
+            BrowseMediaSource with genre-filtered catalog items
+        """
+        # Extract genre from identifier
+        parts = identifier.split("/")
+        genre = parts[1] if len(parts) > 1 else None
+
+        if not genre:
+            raise BrowseError("Invalid genre identifier")
+
+        coordinator = self._get_coordinator()
+        if not coordinator:
+            return self._build_empty_browse(identifier, f"{genre} {media_type.title()}s")
+
+        try:
+            client = coordinator.client
+            # Fetch catalog with genre filter
+            if media_type == "movie":
+                catalog_items = await client.async_get_popular_movies(
+                    genre=genre, limit=50
+                )
+            else:
+                catalog_items = await client.async_get_popular_series(
+                    genre=genre, limit=50
+                )
+
+            children = []
+            for item in catalog_items:
+                child = self._build_catalog_item(item)
+                if child:
+                    children.append(child)
+
+            title = f"{genre} {media_type.title()}s"
+            return BrowseMediaSource(
+                domain=DOMAIN,
+                identifier=identifier,
+                media_class=MediaClass.DIRECTORY,
+                media_content_type=MediaType.MOVIE if media_type == "movie" else MediaType.TVSHOW,
+                title=title,
+                can_play=False,
+                can_expand=True,
+                children=children,
+            )
+        except Exception as err:
+            _LOGGER.error("Error fetching %s genre content: %s", genre, err)
+            return self._build_empty_browse(identifier, f"{genre} {media_type.title()}s")
 
     def _build_catalog_item(self, item: dict[str, Any]) -> BrowseMediaSource | None:
         """Build a BrowseMediaSource for a catalog item.

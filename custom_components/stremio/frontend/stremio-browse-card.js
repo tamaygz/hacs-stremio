@@ -31,6 +31,7 @@ class StremioBrowseCard extends LitElement {
       config: { type: Object },
       _viewMode: { type: String },
       _mediaType: { type: String },
+      _selectedGenre: { type: String },
       _catalogItems: { type: Array },
       _loading: { type: Boolean },
       _selectedItem: { type: Object },
@@ -246,9 +247,15 @@ class StremioBrowseCard extends LitElement {
     super();
     this._viewMode = 'popular';
     this._mediaType = 'movie';
+    this._selectedGenre = null;
     this._catalogItems = [];
     this._loading = false;
     this._selectedItem = null;
+    this._genres = [
+      'Action', 'Adventure', 'Animation', 'Biography', 'Comedy', 'Crime',
+      'Documentary', 'Drama', 'Family', 'Fantasy', 'History', 'Horror',
+      'Mystery', 'Romance', 'Sci-Fi', 'Sport', 'Thriller', 'War', 'Western'
+    ];
   }
 
   setConfig(config) {
@@ -261,6 +268,7 @@ class StremioBrowseCard extends LitElement {
       default_type: 'movie',
       show_view_controls: true,
       show_type_controls: true,
+      show_genre_filter: true,
       columns: 4,
       max_items: 50,
       ...config,
@@ -328,9 +336,23 @@ class StremioBrowseCard extends LitElement {
   }
 
   _getCatalogId() {
-    // Build catalog identifier from current view and media type
+    // Build catalog identifier from current view, media type, and optional genre
     const mediaTypeSuffix = this._mediaType === 'movie' ? 'movies' : 'series';
+    
+    // If genre is selected, use genre-based browsing
+    if (this._selectedGenre) {
+      const genrePrefix = this._mediaType === 'movie' ? 'movie_genres' : 'series_genres';
+      return `${genrePrefix}/${this._selectedGenre}`;
+    }
+    
+    // Otherwise use view-based browsing (popular/new)
     return `${this._viewMode}_${mediaTypeSuffix}`;
+  }
+
+  _handleGenreChange(e) {
+    const genre = e.target.value;
+    this._selectedGenre = genre === 'all' ? null : genre;
+    this._loadCatalog();
   }
 
   _handleViewChange(view) {
@@ -426,6 +448,22 @@ class StremioBrowseCard extends LitElement {
               >
                 📺 TV Shows
               </button>
+            </div>
+          ` : ''}
+
+          ${this.config.show_genre_filter ? html`
+            <div class="control-row">
+              <select 
+                class="control-button"
+                style="width: 100%; cursor: pointer;"
+                @change=${this._handleGenreChange}
+                .value=${this._selectedGenre || 'all'}
+              >
+                <option value="all">🎭 All Genres</option>
+                ${this._genres.map(genre => html`
+                  <option value="${genre}">${genre}</option>
+                `)}
+              </select>
             </div>
           ` : ''}
         </div>
