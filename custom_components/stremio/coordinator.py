@@ -91,6 +91,13 @@ class StremioDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     def config_entry(self):
         """Return the config entry associated with this coordinator."""
         return self.entry
+    
+    @config_entry.setter
+    def config_entry(self, value):
+        """Set the config entry (for Home Assistant compatibility)."""
+        # Home Assistant may try to set this during initialization
+        # We store it as self.entry instead
+        self.entry = value
 
     async def _async_setup(self) -> None:
         """Set up the coordinator.
