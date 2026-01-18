@@ -7,7 +7,7 @@
  * @customElement stremio-browse-card
  * @extends LitElement
  * @version 0.4.0
- * @cacheBust 20260119a
+ * @cacheBust 20260119b
  */
 
 // Safe LitElement access - wait for HA frontend to be ready
@@ -135,9 +135,7 @@ class StremioBrowseCard extends LitElement {
 
       .catalog-item {
         cursor: pointer;
-        border-radius: 8px;
-        overflow: hidden;
-        transition: transform 0.2s;
+        transition: transform 0.2s ease;
         position: relative;
       }
 
@@ -158,9 +156,8 @@ class StremioBrowseCard extends LitElement {
         padding-bottom: calc(var(--poster-height-ratio, 150) * 1%);
         position: relative;
         overflow: hidden;
-        border-radius: 8px 8px 0 0;
+        border-radius: 6px;
         background: var(--secondary-background-color);
-        flex-shrink: 0;
         height: 0; /* Required for padding-bottom technique to work */
       }
 
