@@ -35,6 +35,7 @@ class StremioEpisodePicker extends LitElement {
       _selectedSeason: { type: Number },
       _loading: { type: Boolean },
       _episodes: { type: Array },
+      _seriesMetadata: { type: Object },
     };
   }
 
@@ -302,70 +303,89 @@ class StremioEpisodePicker extends LitElement {
 
   updated(changedProps) {
     if (changedProps.has('mediaItem') && this.mediaItem) {
-      this._loadSeasons();
+      this._fetchSeriesMetadata();
     }
-    if (changedProps.has('_selectedSeason')) {
-      this._loadEpisodes();
+    if (changedProps.has('_selectedSeason') && !this._loading) {
+      this._updateEpisodesForSeason();
     }
   }
 
-  _loadSeasons() {
-    // Extract season info from mediaItem
-    // This could come from library data or we might need to fetch it
-    if (this.mediaItem?.seasons) {
-      this.seasons = this.mediaItem.seasons;
-      this._selectedSeason = this.mediaItem.lastWatchedSeason || 1;
-    } else if (this.mediaItem?.total_seasons) {
-      // Generate season list from count
-      this.seasons = Array.from({ length: this.mediaItem.total_seasons }, (_, i) => ({
-        number: i + 1,
-        name: `Season ${i + 1}`,
-      }));
-      this._selectedSeason = this.mediaItem.lastWatchedSeason || 1;
-    } else {
-      // Default to showing seasons 1-10 as options
-      this.seasons = Array.from({ length: 10 }, (_, i) => ({
-        number: i + 1,
-        name: `Season ${i + 1}`,
-      }));
-      this._selectedSeason = 1;
+  async _fetchSeriesMetadata() {
+    const mediaId = this.mediaItem?.imdb_id;
+    if (!mediaId || !this.hass) {
+      console.warn('[Episode Picker] Cannot fetch metadata: missing mediaId or hass');
+      this._loadFallbackData();
+      return;
     }
-    this._loadEpisodes();
+
+    this._loading = true;
+    console.log('[Episode Picker] Fetching series metadata for:', mediaId);
+
+    try {
+      // Call the get_series_metadata service via WebSocket
+      const response = await this.hass.callWS({
+        type: 'call_service',
+        domain: 'stremio',
+        service: 'get_series_metadata',
+        service_data: { media_id: mediaId },
+        return_response: true,
+      });
+
+      console.log('[Episode Picker] Metadata response:', response);
+
+      // Extract metadata from response
+      const metadata = response?.response?.metadata || response?.metadata;
+
+      if (metadata && metadata.seasons && metadata.seasons.length > 0) {
+        this._seriesMetadata = metadata;
+        this.seasons = metadata.seasons.map(s => ({
+          number: s.number,
+          name: s.title || `Season ${s.number}`,
+          episodes: s.episodes || [],
+        }));
+
+        // Set selected season to last watched or first available
+        this._selectedSeason = this.mediaItem.lastWatchedSeason || this.seasons[0]?.number || 1;
+        this._updateEpisodesForSeason();
+        
+        console.log('[Episode Picker] Loaded', this.seasons.length, 'seasons');
+      } else {
+        console.warn('[Episode Picker] No metadata returned, using fallback');
+        this._loadFallbackData();
+      }
+    } catch (err) {
+      console.error('[Episode Picker] Error fetching metadata:', err);
+      this._loadFallbackData();
+    } finally {
+      this._loading = false;
+    }
   }
 
-  _loadEpisodes() {
-    // Get episodes for the selected season
-    // Episodes might be in mediaItem or need to be fetched
-    if (this.mediaItem?.episodes?.[this._selectedSeason]) {
-      this._episodes = this.mediaItem.episodes[this._selectedSeason];
-    } else if (this.mediaItem?.watched_episodes) {
-      // Build episode list from watched data
-      const watchedInSeason = this.mediaItem.watched_episodes.filter(
-        ep => ep.season === this._selectedSeason
-      );
-      
-      // Estimate episode count from watched data or default to 20
-      const maxEpisode = Math.max(
-        ...watchedInSeason.map(ep => ep.episode),
-        this.mediaItem.episodes_per_season || 20
-      );
-      
-      this._episodes = Array.from({ length: maxEpisode }, (_, i) => {
-        const epNum = i + 1;
-        const watched = watchedInSeason.find(w => w.episode === epNum);
+  _updateEpisodesForSeason() {
+    const seasonData = this.seasons.find(s => s.number === this._selectedSeason);
+    
+    if (seasonData && seasonData.episodes && seasonData.episodes.length > 0) {
+      // Use real episode data from metadata
+      this._episodes = seasonData.episodes.map(ep => {
+        const isWatched = this._isEpisodeWatched(this._selectedSeason, ep.number);
+        const isLastWatched = (
+          this.mediaItem.lastWatchedSeason === this._selectedSeason &&
+          this.mediaItem.lastWatchedEpisode === ep.number
+        );
+        
         return {
-          number: epNum,
-          title: watched?.title || `Episode ${epNum}`,
-          watched: !!watched,
-          progress: watched?.progress_percent || 0,
-          isLastWatched: (
-            this.mediaItem.lastWatchedSeason === this._selectedSeason &&
-            this.mediaItem.lastWatchedEpisode === epNum
-          ),
+          number: ep.number,
+          title: ep.title || `Episode ${ep.number}`,
+          overview: ep.overview,
+          thumbnail: ep.thumbnail,
+          released: ep.released,
+          watched: isWatched,
+          progress: 0, // Could be enhanced with actual progress data
+          isLastWatched: isLastWatched,
         };
       });
     } else {
-      // Default episode list - show 20 episodes
+      // Fallback to placeholder episodes
       this._episodes = Array.from({ length: 20 }, (_, i) => ({
         number: i + 1,
         title: `Episode ${i + 1}`,
@@ -374,6 +394,47 @@ class StremioEpisodePicker extends LitElement {
         isLastWatched: false,
       }));
     }
+  }
+
+  _isEpisodeWatched(season, episode) {
+    const watched = this.mediaItem?.watched_episodes || [];
+    return watched.some(w => w.season === season && w.episode === episode);
+  }
+
+  _loadFallbackData() {
+    // Fallback when metadata fetch fails - use mediaItem data or defaults
+    if (this.mediaItem?.seasons) {
+      this.seasons = this.mediaItem.seasons;
+      this._selectedSeason = this.mediaItem.lastWatchedSeason || 1;
+    } else if (this.mediaItem?.total_seasons) {
+      this.seasons = Array.from({ length: this.mediaItem.total_seasons }, (_, i) => ({
+        number: i + 1,
+        name: `Season ${i + 1}`,
+        episodes: [],
+      }));
+      this._selectedSeason = this.mediaItem.lastWatchedSeason || 1;
+    } else {
+      // Minimal fallback - just show seasons 1-5
+      this.seasons = Array.from({ length: 5 }, (_, i) => ({
+        number: i + 1,
+        name: `Season ${i + 1}`,
+        episodes: [],
+      }));
+      this._selectedSeason = 1;
+    }
+    this._updateEpisodesForSeason();
+  }
+
+  _loadSeasons() {
+    // This method is now replaced by _fetchSeriesMetadata
+    // Kept for backwards compatibility
+    this._fetchSeriesMetadata();
+  }
+
+  _loadEpisodes() {
+    // This method is now replaced by _updateEpisodesForSeason
+    // Kept for backwards compatibility
+    this._updateEpisodesForSeason();
   }
 
   _selectSeason(seasonNum) {
