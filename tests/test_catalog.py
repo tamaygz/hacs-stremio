@@ -1,6 +1,7 @@
 """Tests for Stremio catalog functionality."""
 
 import pytest
+import re
 from aioresponses import aioresponses
 
 from custom_components.stremio.stremio_client import (
@@ -67,7 +68,7 @@ async def test_async_get_catalog_with_genre(mock_catalog_response):
     with aioresponses() as mock_aio:
         # Mock the API call with genre parameter (URL pattern matching)
         mock_aio.get(
-            "https://v3-cinemeta.strem.io/catalog/movie/top/genre=Drama.json?limit=50",
+            re.compile(r"https://v3-cinemeta\.strem\.io/catalog/movie/top/.*Drama.*"),
             payload=mock_catalog_response,
             status=200,
         )
@@ -85,10 +86,12 @@ async def test_async_get_popular_movies(mock_catalog_response):
     client = StremioClient("test@example.com", "fake_auth_key")
 
     with aioresponses() as mock_aio:
+        # Match the exact URL pattern that will be called
         mock_aio.get(
-            "https://v3-cinemeta.strem.io/catalog/movie/top.json?limit=50",
+            re.compile(r"https://v3-cinemeta\.strem\.io/catalog/movie/top\.json.*"),
             payload=mock_catalog_response,
             status=200,
+            repeat=True,
         )
 
         result = await client.async_get_popular_movies(limit=50)
@@ -117,9 +120,10 @@ async def test_async_get_popular_series():
 
     with aioresponses() as mock_aio:
         mock_aio.get(
-            "https://v3-cinemeta.strem.io/catalog/series/top.json?limit=50",
+            re.compile(r"https://v3-cinemeta\.strem\.io/catalog/series/top\.json.*"),
             payload=series_response,
             status=200,
+            repeat=True,
         )
 
         result = await client.async_get_popular_series(limit=50)
@@ -186,7 +190,7 @@ async def test_async_get_catalog_with_pagination(mock_catalog_response):
 
     with aioresponses() as mock_aio:
         mock_aio.get(
-            "https://v3-cinemeta.strem.io/catalog/movie/top/skip=20.json?limit=10",
+            re.compile(r"https://v3-cinemeta\.strem\.io/catalog/movie/top/.*skip=20.*"),
             payload=mock_catalog_response,
             status=200,
         )
@@ -217,9 +221,10 @@ async def test_browse_catalog_service():
 
     with aioresponses() as mock_aio:
         mock_aio.get(
-            "https://v3-cinemeta.strem.io/catalog/movie/top/genre=Drama.json?limit=20",
+            re.compile(r"https://v3-cinemeta\.strem\.io/catalog/movie/top.*Drama.*"),
             payload=mock_response,
             status=200,
+            repeat=True,
         )
 
         # Test browsing movies

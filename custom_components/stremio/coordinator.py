@@ -63,7 +63,7 @@ class StremioDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             logic that requires hass or async operations is deferred to _async_setup().
         """
         self.client = client
-        self.entry = entry
+        self._entry_param = entry  # Store temporarily
         self._previous_watching: dict[str, Any] | None = None
         self._previous_library_count: int = 0
         self._previous_series_episodes: dict[str, tuple[int, int]] = {}  # imdb_id -> (season, episode)
@@ -90,6 +90,9 @@ class StremioDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             name=DOMAIN,
             update_interval=timedelta(seconds=self._configured_scan_interval),
         )
+        
+        # Set entry after parent init to avoid it being overwritten
+        self.entry = self._entry_param
 
     @property
     def config_entry(self):
