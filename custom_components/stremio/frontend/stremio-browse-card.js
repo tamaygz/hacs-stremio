@@ -48,15 +48,20 @@ class StremioBrowseCard extends LitElement {
     return css`
       :host {
         display: block;
+        height: 100%;
       }
 
       ha-card {
         overflow: hidden;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
       }
 
       .header {
         padding: 16px;
         border-bottom: 1px solid var(--divider-color);
+        flex-shrink: 0;
       }
 
       .header-title {
@@ -99,9 +104,10 @@ class StremioBrowseCard extends LitElement {
         grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
         gap: 12px;
         padding: 16px;
-        max-height: var(--card-max-height, none);
         overflow-y: auto;
         align-items: start;
+        flex: 1;
+        min-height: 0;
       }
 
       @media (max-width: 768px) {
@@ -294,6 +300,9 @@ class StremioBrowseCard extends LitElement {
       /* Inline detail view */
       .item-detail-view {
         padding: 16px;
+        flex: 1;
+        overflow-y: auto;
+        min-height: 0;
       }
 
       .detail-header {

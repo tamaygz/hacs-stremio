@@ -42,15 +42,20 @@ class StremioRecommendationsCard extends LitElement {
     return css`
       :host {
         display: block;
+        height: 100%;
       }
 
       ha-card {
         overflow: hidden;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
       }
 
       .header {
         padding: 16px;
         border-bottom: 1px solid var(--divider-color);
+        flex-shrink: 0;
       }
 
       .header-row {
@@ -121,8 +126,9 @@ class StremioRecommendationsCard extends LitElement {
         grid-template-columns: repeat(var(--grid-columns, 4), 1fr);
         gap: 12px;
         padding: 16px;
-        max-height: var(--card-max-height, none);
         overflow-y: auto;
+        flex: 1;
+        min-height: 0;
       }
 
       .items-grid.horizontal {

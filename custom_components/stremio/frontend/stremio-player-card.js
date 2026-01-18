@@ -39,15 +39,22 @@ class StremioPlayerCard extends LitElement {
     return css`
       :host {
         display: block;
+        height: 100%;
       }
 
       ha-card {
         overflow: hidden;
         position: relative;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
       }
 
       .card-content {
         padding: 16px;
+        flex: 1;
+        overflow-y: auto;
+        min-height: 0;
       }
 
       .player-container {

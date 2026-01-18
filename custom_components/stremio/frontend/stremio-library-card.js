@@ -44,15 +44,20 @@ class StremioLibraryCard extends LitElement {
     return css`
       :host {
         display: block;
+        height: 100%;
       }
 
       ha-card {
         overflow: hidden;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
       }
 
       .header {
         padding: 16px;
         border-bottom: 1px solid var(--divider-color);
+        flex-shrink: 0;
       }
 
       .header-title {
@@ -102,9 +107,9 @@ class StremioLibraryCard extends LitElement {
         grid-template-columns: repeat(var(--grid-columns, 4), 1fr);
         gap: 12px;
         padding: 16px;
-        max-height: var(--card-max-height, none);
         overflow-y: auto;
-        align-items: stretch;
+        flex: 1;
+        min-height: 0;
       }
 
       .library-grid.horizontal {
@@ -114,7 +119,6 @@ class StremioLibraryCard extends LitElement {
         overflow-y: hidden;
         scroll-snap-type: x mandatory;
         -webkit-overflow-scrolling: touch;
-        align-items: stretch;
       }
 
       .library-grid.horizontal .library-item {
@@ -130,8 +134,6 @@ class StremioLibraryCard extends LitElement {
         position: relative;
         display: flex;
         flex-direction: column;
-        align-self: stretch;
-        height: 100%;
       }
 
       .library-item:hover {
@@ -151,12 +153,15 @@ class StremioLibraryCard extends LitElement {
 
       .item-poster-container {
         width: 100%;
-        aspect-ratio: var(--poster-aspect-ratio, 2/3);
+        /* Use padding-bottom technique for consistent aspect ratio across all browsers */
+        /* --poster-height-ratio is height/width as percentage, e.g., 150 for 2:3 */
+        padding-bottom: calc(var(--poster-height-ratio, 150) * 1%);
         position: relative;
         overflow: hidden;
         border-radius: 6px;
         background: var(--secondary-background-color);
         flex-shrink: 0;
+        height: 0; /* Required for padding-bottom technique to work */
       }
 
       .item-poster {
@@ -885,7 +890,19 @@ class StremioLibraryCard extends LitElement {
       const columns = Number(this.config.columns || 4);
       const posterAspectRatio = this.config.poster_aspect_ratio || '2/3';
       const cardHeight = this.config.card_height > 0 ? `${this.config.card_height}px` : 'none';
-      const gridStyle = `--card-max-height: ${cardHeight}; --grid-columns: ${columns}; --poster-aspect-ratio: ${posterAspectRatio};`;
+      
+      // Calculate height ratio for padding-bottom technique
+      // For aspect ratio "w/h" (width/height), padding-bottom needs height/width * 100
+      // e.g., "2/3" -> height/width = 3/2 = 1.5 -> 150%
+      let posterHeightRatio = 150; // default 2:3 -> 150%
+      if (posterAspectRatio.includes('/')) {
+        const [w, h] = posterAspectRatio.split('/').map(Number);
+        if (w > 0 && h > 0) {
+          posterHeightRatio = (h / w) * 100;
+        }
+      }
+      
+      const gridStyle = `--card-max-height: ${cardHeight}; --grid-columns: ${columns}; --poster-height-ratio: ${posterHeightRatio};`;
 
       const filteredItems = this._getFilteredItems();
 
@@ -1183,7 +1200,6 @@ class StremioLibraryCard extends LitElement {
         @click=${() => this._handleSimilarItemClick(item)}
         @keydown=${(e) => e.key === 'Enter' && this._handleSimilarItemClick(item)}
         aria-label="${title}${year ? ` (${year})` : ''}"
-        style="--poster-aspect-ratio: ${this.config.poster_aspect_ratio || '2/3'}"
       >
         <div class="item-poster-container">
           ${item.poster ? html`
@@ -1219,7 +1235,6 @@ class StremioLibraryCard extends LitElement {
         @click=${() => this._handleItemClick(item)}
         @keydown=${(e) => e.key === 'Enter' && this._handleItemClick(item)}
         aria-label="${title}${progress > 0 ? `, ${progress.toFixed(0)}% watched` : ''}"
-        style="--poster-aspect-ratio: ${this.config.poster_aspect_ratio || '2/3'}"
       >
         <div class="item-poster-container">
           ${item.poster ? html`

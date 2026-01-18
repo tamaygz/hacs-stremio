@@ -47,11 +47,16 @@ class StremioMediaDetailsCard extends LitElement {
         --primary: var(--primary-color, #03a9f4);
         --divider: var(--divider-color, rgba(0, 0, 0, 0.12));
         --stremio-purple: #8458b3;
+        display: block;
+        height: 100%;
       }
 
       ha-card {
         overflow: hidden;
         position: relative;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
       }
 
       .backdrop {
@@ -81,6 +86,9 @@ class StremioMediaDetailsCard extends LitElement {
         position: relative;
         z-index: 1;
         padding: 16px;
+        flex: 1;
+        overflow-y: auto;
+        min-height: 0;
       }
 
       .header {

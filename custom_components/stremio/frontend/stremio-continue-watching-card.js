@@ -43,15 +43,20 @@ class StremioContinueWatchingCard extends LitElement {
     return css`
       :host {
         display: block;
+        height: 100%;
       }
 
       ha-card {
         overflow: hidden;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
       }
 
       .header {
         padding: 16px;
         border-bottom: 1px solid var(--divider-color);
+        flex-shrink: 0;
       }
 
       .header-title {
@@ -80,9 +85,10 @@ class StremioContinueWatchingCard extends LitElement {
         grid-template-columns: repeat(var(--grid-columns, 4), 1fr);
         gap: 12px;
         padding: 16px;
-        max-height: var(--card-max-height, none);
         overflow-y: auto;
         align-items: start;
+        flex: 1;
+        min-height: 0;
       }
 
       .items-grid.horizontal {
@@ -392,6 +398,10 @@ class StremioContinueWatchingCard extends LitElement {
     this._similarItems = null;
     this._similarSourceItem = null;
     this._loadingSimilar = false;
+    
+    // Bind methods that are used as event handlers
+    this._closeSimilarView = this._closeSimilarView.bind(this);
+    this._closeDetail = this._closeDetail.bind(this);
   }
 
   setConfig(config) {
@@ -611,7 +621,9 @@ class StremioContinueWatchingCard extends LitElement {
   }
 
   _closeDetail() {
+    console.log('[Continue Watching Card] _closeDetail called');
     this._selectedItem = null;
+    this.requestUpdate();
     
     // Fire event for external listeners
     this.dispatchEvent(
@@ -1102,8 +1114,10 @@ class StremioContinueWatchingCard extends LitElement {
    * Close the similar items view and return to the list.
    */
   _closeSimilarView() {
+    console.log('[Continue Watching Card] _closeSimilarView called');
     this._similarItems = null;
     this._similarSourceItem = null;
+    this.requestUpdate();
   }
 
   /**
