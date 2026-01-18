@@ -28,8 +28,11 @@ from .const import (
     EVENT_PLAYBACK_STARTED,
     SERVICE_ADD_TO_LIBRARY,
     SERVICE_BROWSE_CATALOG,
+    SERVICE_GET_RECOMMENDATIONS,
     SERVICE_GET_SERIES_METADATA,
+    SERVICE_GET_SIMILAR_CONTENT,
     SERVICE_GET_STREAMS,
+    SERVICE_GET_UPCOMING_EPISODES,
     SERVICE_HANDOVER_TO_APPLE_TV,
     SERVICE_REFRESH_LIBRARY,
     SERVICE_REMOVE_FROM_LIBRARY,
@@ -54,6 +57,7 @@ ATTR_METHOD = "method"
 ATTR_GENRE = "genre"
 ATTR_SKIP = "skip"
 ATTR_CATALOG_TYPE = "catalog_type"
+ATTR_DAYS_AHEAD = "days_ahead"
 
 # Service schemas
 SEARCH_LIBRARY_SCHEMA = vol.Schema(
@@ -117,6 +121,32 @@ BROWSE_CATALOG_SCHEMA = vol.Schema(
         ),
         vol.Optional(ATTR_LIMIT, default=50): vol.All(
             vol.Coerce(int), vol.Range(min=1, max=100)  # type: ignore[arg-type]
+        ),
+    }
+)
+
+GET_UPCOMING_EPISODES_SCHEMA = vol.Schema(
+    {
+        vol.Optional(ATTR_DAYS_AHEAD, default=7): vol.All(
+            vol.Coerce(int), vol.Range(min=1, max=30)  # type: ignore[arg-type]
+        ),
+    }
+)
+
+GET_RECOMMENDATIONS_SCHEMA = vol.Schema(
+    {
+        vol.Optional(ATTR_MEDIA_TYPE): vol.In(["movie", "series"]),
+        vol.Optional(ATTR_LIMIT, default=20): vol.All(
+            vol.Coerce(int), vol.Range(min=1, max=50)  # type: ignore[arg-type]
+        ),
+    }
+)
+
+GET_SIMILAR_CONTENT_SCHEMA = vol.Schema(
+    {
+        vol.Required(ATTR_MEDIA_ID): cv.string,
+        vol.Optional(ATTR_LIMIT, default=10): vol.All(
+            vol.Coerce(int), vol.Range(min=1, max=30)  # type: ignore[arg-type]
         ),
     }
 )
@@ -573,6 +603,86 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         except StremioConnectionError as err:
             raise HomeAssistantError(f"Failed to browse catalog: {err}") from err
 
+    async def handle_get_upcoming_episodes(call: ServiceCall) -> ServiceResponse:
+        """Handle get_upcoming_episodes service call.
+
+        Get air dates for upcoming episodes of series in the user's library.
+        Returns a list of upcoming episodes sorted by air date.
+        """
+        _, client, _ = _get_entry_data(hass)
+
+        days_ahead = call.data.get(ATTR_DAYS_AHEAD, 7)
+
+        _LOGGER.debug("Getting upcoming episodes for next %d days", days_ahead)
+
+        try:
+            upcoming = await client.async_get_upcoming_episodes(days_ahead=days_ahead)
+
+            return {
+                "episodes": upcoming,
+                "count": len(upcoming),
+                "days_ahead": days_ahead,
+            }
+
+        except StremioConnectionError as err:
+            raise HomeAssistantError(f"Failed to get upcoming episodes: {err}") from err
+
+    async def handle_get_recommendations(call: ServiceCall) -> ServiceResponse:
+        """Handle get_recommendations service call.
+
+        Get content recommendations based on the user's library.
+        Analyzes library genres and preferences to suggest new content.
+        """
+        _, client, _ = _get_entry_data(hass)
+
+        media_type = call.data.get(ATTR_MEDIA_TYPE)
+        limit = call.data.get(ATTR_LIMIT, 20)
+
+        _LOGGER.debug("Getting recommendations: type=%s, limit=%d", media_type, limit)
+
+        try:
+            recommendations = await client.async_get_recommendations(
+                media_type=media_type,
+                limit=limit,
+            )
+
+            return {
+                "recommendations": recommendations,
+                "count": len(recommendations),
+                "media_type": media_type,
+            }
+
+        except StremioConnectionError as err:
+            raise HomeAssistantError(f"Failed to get recommendations: {err}") from err
+
+    async def handle_get_similar_content(call: ServiceCall) -> ServiceResponse:
+        """Handle get_similar_content service call.
+
+        Get similar movies or shows based on a specific media item.
+        Uses genre and metadata matching to find related content.
+        """
+        _, client, _ = _get_entry_data(hass)
+
+        media_id = call.data[ATTR_MEDIA_ID]
+        limit = call.data.get(ATTR_LIMIT, 10)
+
+        _LOGGER.debug("Getting similar content for %s, limit=%d", media_id, limit)
+
+        try:
+            similar = await client.async_get_similar_content(
+                media_id=media_id,
+                limit=limit,
+            )
+
+            return {
+                "similar": similar,
+                "count": len(similar),
+                "source_media_id": media_id,
+            }
+
+        except StremioConnectionError as err:
+            raise HomeAssistantError(f"Failed to get similar content: {err}") from err
+
     # Register services
     hass.services.async_register(
         DOMAIN,
@@ -633,6 +743,30 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         supports_response=SupportsResponse.OPTIONAL,
     )
 
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_GET_UPCOMING_EPISODES,
+        handle_get_upcoming_episodes,
+        schema=GET_UPCOMING_EPISODES_SCHEMA,
+        supports_response=SupportsResponse.OPTIONAL,
+    )
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_GET_RECOMMENDATIONS,
+        handle_get_recommendations,
+        schema=GET_RECOMMENDATIONS_SCHEMA,
+        supports_response=SupportsResponse.OPTIONAL,
+    )
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_GET_SIMILAR_CONTENT,
+        handle_get_similar_content,
+        schema=GET_SIMILAR_CONTENT_SCHEMA,
+        supports_response=SupportsResponse.OPTIONAL,
+    )
+
 
 async def async_unload_services(hass: HomeAssistant) -> None:
     """Unload Stremio services.
@@ -648,3 +782,6 @@ async def async_unload_services(hass: HomeAssistant) -> None:
     hass.services.async_remove(DOMAIN, SERVICE_REFRESH_LIBRARY)
     hass.services.async_remove(DOMAIN, SERVICE_HANDOVER_TO_APPLE_TV)
     hass.services.async_remove(DOMAIN, SERVICE_BROWSE_CATALOG)
+    hass.services.async_remove(DOMAIN, SERVICE_GET_UPCOMING_EPISODES)
+    hass.services.async_remove(DOMAIN, SERVICE_GET_RECOMMENDATIONS)
+    hass.services.async_remove(DOMAIN, SERVICE_GET_SIMILAR_CONTENT)

@@ -17,6 +17,7 @@ import './stremio-episode-picker.js';
 import './stremio-library-card.js';
 import './stremio-media-details-card.js';
 import './stremio-player-card.js';
+import './stremio-recommendations-card.js';
 import './stremio-stream-dialog.js';
 
 // Get version from URL query param (set by backend from manifest.json)
@@ -89,6 +90,14 @@ window.customCards.push({
   type: 'stremio-continue-watching-card',
   name: 'Stremio Continue Watching Card',
   description: 'Display and resume content from your Continue Watching list with progress indicators',
+  preview: true,
+  documentationURL: 'https://github.com/tamaygz/hacs-stremio/blob/main/docs/ui.md',
+});
+
+window.customCards.push({
+  type: 'stremio-recommendations-card',
+  name: 'Stremio Recommendations Card',
+  description: 'Get personalized content recommendations based on your library preferences',
   preview: true,
   documentationURL: 'https://github.com/tamaygz/hacs-stremio/blob/main/docs/ui.md',
 });

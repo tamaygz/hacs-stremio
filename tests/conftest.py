@@ -171,6 +171,59 @@ MOCK_CURRENT_MEDIA = {
 # ============================================================================
 
 
+MOCK_UPCOMING_EPISODES = [
+    {
+        "series_id": "tt0903747",
+        "series_title": "Breaking Bad",
+        "episode_title": "Felina",
+        "season": 5,
+        "episode": 16,
+        "air_date": "2024-12-20",
+        "poster": "https://example.com/breakingbad.jpg",
+    },
+]
+
+MOCK_RECOMMENDATIONS = [
+    {
+        "id": "tt0137523",
+        "type": "movie",
+        "title": "Fight Club",
+        "year": 1999,
+        "poster": "https://example.com/fightclub.jpg",
+        "rating": "8.8",
+        "reason": "Because you watched The Shawshank Redemption",
+    },
+    {
+        "id": "tt1396484",
+        "type": "series",
+        "title": "It's Always Sunny in Philadelphia",
+        "year": 2005,
+        "poster": "https://example.com/sunny.jpg",
+        "rating": "8.8",
+        "reason": "Because you watched Breaking Bad",
+    },
+]
+
+MOCK_SIMILAR_CONTENT = [
+    {
+        "id": "tt0110912",
+        "type": "movie",
+        "title": "Pulp Fiction",
+        "year": 1994,
+        "poster": "https://example.com/pulpfiction.jpg",
+        "rating": "8.9",
+    },
+    {
+        "id": "tt0109830",
+        "type": "movie",
+        "title": "Forrest Gump",
+        "year": 1994,
+        "poster": "https://example.com/forrestgump.jpg",
+        "rating": "8.8",
+    },
+]
+
+
 @pytest.fixture
 def mock_stremio_client():
     """Create a mock Stremio API client."""
@@ -186,6 +239,11 @@ def mock_stremio_client():
     client.remove_from_library = AsyncMock(return_value=True)
     client.get_user_info = AsyncMock(return_value=MOCK_USER_DATA)
     client.is_authenticated = True
+
+    # New service methods
+    client.async_get_upcoming_episodes = AsyncMock(return_value=MOCK_UPCOMING_EPISODES)
+    client.async_get_recommendations = AsyncMock(return_value=MOCK_RECOMMENDATIONS)
+    client.async_get_similar_content = AsyncMock(return_value=MOCK_SIMILAR_CONTENT)
 
     return client
 

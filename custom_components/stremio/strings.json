@@ -52,5 +52,45 @@
         }
       }
     }
+  },
+  "services": {
+    "get_upcoming_episodes": {
+      "name": "Get Upcoming Episodes",
+      "description": "Get air dates for upcoming episodes of series in your library.",
+      "fields": {
+        "days_ahead": {
+          "name": "Days Ahead",
+          "description": "Number of days to look ahead for upcoming episodes (1-30)."
+        }
+      }
+    },
+    "get_recommendations": {
+      "name": "Get Recommendations",
+      "description": "Get personalized content recommendations based on your library preferences.",
+      "fields": {
+        "media_type": {
+          "name": "Media Type",
+          "description": "Filter recommendations by type (movie or series). Leave empty for both."
+        },
+        "limit": {
+          "name": "Limit",
+          "description": "Maximum number of recommendations to return."
+        }
+      }
+    },
+    "get_similar_content": {
+      "name": "Get Similar Content",
+      "description": "Get similar movies or shows based on a specific media item.",
+      "fields": {
+        "media_id": {
+          "name": "Media ID",
+          "description": "The IMDB ID of the media item to find similar content for."
+        },
+        "limit": {
+          "name": "Limit",
+          "description": "Maximum number of similar items to return."
+        }
+      }
+    }
   }
 }

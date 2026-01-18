@@ -1483,6 +1483,357 @@ class StremioClient:
             limit=limit,
         )
 
+    async def async_get_upcoming_episodes(
+        self, days_ahead: int = 7
+    ) -> list[dict[str, Any]]:
+        """Get upcoming episode air dates for series in the user's library.
+
+        Fetches metadata for all series in the library and checks for upcoming
+        episodes based on air dates.
+
+        Args:
+            days_ahead: Number of days to look ahead (default 7)
+
+        Returns:
+            List of upcoming episodes with series info and air dates
+
+        Raises:
+            StremioAuthError: Authentication failed
+            StremioConnectionError: Connection failed
+        """
+        import datetime
+
+        _LOGGER.debug("Fetching upcoming episodes for next %d days", days_ahead)
+
+        try:
+            # Get user's library
+            library = await self.async_get_library()
+
+            # Filter to series only
+            series_items = [item for item in library if item.get("type") == "series"]
+            _LOGGER.debug("Found %d series in library", len(series_items))
+
+            upcoming = []
+            today = datetime.datetime.now(datetime.timezone.utc)
+            cutoff_date = today + datetime.timedelta(days=days_ahead)
+
+            # Fetch metadata for each series (limit concurrent requests)
+            for series in series_items[:20]:  # Limit to avoid rate limiting
+                try:
+                    imdb_id = series.get("imdb_id") or series.get("id", "").split(":")[-1]
+                    if not imdb_id:
+                        continue
+
+                    metadata = await self.async_get_series_metadata(imdb_id)
+                    if not metadata:
+                        continue
+
+                    # Check each season/episode for upcoming air dates
+                    for season in metadata.get("seasons", []):
+                        for episode in season.get("episodes", []):
+                            released_str = episode.get("released")
+                            if not released_str:
+                                continue
+
+                            try:
+                                # Parse ISO format air date
+                                air_date = datetime.datetime.fromisoformat(
+                                    released_str.replace("Z", "+00:00")
+                                )
+
+                                # Check if it's upcoming (after today, before cutoff)
+                                if today <= air_date <= cutoff_date:
+                                    upcoming.append({
+                                        "series_id": imdb_id,
+                                        "series_title": series.get("title") or metadata.get("title"),
+                                        "poster": series.get("poster") or metadata.get("poster"),
+                                        "season": season.get("number"),
+                                        "episode": episode.get("number"),
+                                        "episode_title": episode.get("title"),
+                                        "air_date": released_str,
+                                        "air_date_formatted": air_date.strftime("%Y-%m-%d"),
+                                        "days_until": (air_date - today).days,
+                                    })
+                            except (ValueError, TypeError):
+                                continue
+
+                except Exception as err:
+                    _LOGGER.debug(
+                        "Error fetching metadata for series %s: %s",
+                        series.get("title"),
+                        err,
+                    )
+                    continue
+
+            # Sort by air date
+            upcoming.sort(key=lambda x: x.get("air_date", ""))
+
+            _LOGGER.info("Found %d upcoming episodes in next %d days", len(upcoming), days_ahead)
+            return upcoming
+
+        except StremioAuthError:
+            raise
+        except StremioConnectionError:
+            raise
+        except Exception as err:
+            _LOGGER.exception("Failed to get upcoming episodes: %s", err)
+            raise StremioConnectionError(f"Failed to get upcoming episodes: {err}") from err
+
+    async def async_get_recommendations(
+        self,
+        media_type: str | None = None,
+        limit: int = 20,
+    ) -> list[dict[str, Any]]:
+        """Get content recommendations based on user's library.
+
+        Analyzes the user's library to identify preferred genres and fetches
+        recommendations from catalogs matching those preferences.
+
+        Args:
+            media_type: Optional filter for "movie" or "series" (None for both)
+            limit: Maximum recommendations to return (default 20)
+
+        Returns:
+            List of recommended content items
+
+        Raises:
+            StremioAuthError: Authentication failed
+            StremioConnectionError: Connection failed
+        """
+        _LOGGER.debug("Fetching recommendations: type=%s, limit=%d", media_type, limit)
+
+        try:
+            # Get user's library to analyze preferences
+            library = await self.async_get_library()
+
+            if not library:
+                _LOGGER.debug("Library is empty, returning popular content")
+                # Return popular content if library is empty
+                if media_type == "movie":
+                    return await self.async_get_popular_movies(limit=limit)
+                elif media_type == "series":
+                    return await self.async_get_popular_series(limit=limit)
+                else:
+                    movies = await self.async_get_popular_movies(limit=limit // 2)
+                    series = await self.async_get_popular_series(limit=limit // 2)
+                    return movies + series
+
+            # Filter library by type if specified
+            filtered_library = library
+            if media_type:
+                filtered_library = [item for item in library if item.get("type") == media_type]
+
+            # Analyze genres from library
+            genre_counts: dict[str, int] = {}
+            library_ids = set()
+            for item in filtered_library:
+                library_ids.add(item.get("imdb_id") or item.get("id"))
+                for genre in item.get("genres", []):
+                    genre_counts[genre] = genre_counts.get(genre, 0) + 1
+
+            # Get top genres (sorted by count)
+            top_genres = sorted(genre_counts.items(), key=lambda x: x[1], reverse=True)[:3]
+            _LOGGER.debug("Top genres from library: %s", top_genres)
+
+            recommendations = []
+            seen_ids = set()
+
+            # Fetch recommendations based on top genres
+            for genre, _ in top_genres:
+                try:
+                    if media_type == "movie" or media_type is None:
+                        movies = await self.async_get_catalog(
+                            media_type="movie",
+                            catalog_id="top",
+                            genre=genre,
+                            limit=limit,
+                        )
+                        for movie in movies:
+                            item_id = movie.get("imdb_id") or movie.get("id")
+                            if item_id and item_id not in library_ids and item_id not in seen_ids:
+                                movie["recommendation_reason"] = f"Based on your interest in {genre}"
+                                recommendations.append(movie)
+                                seen_ids.add(item_id)
+
+                    if media_type == "series" or media_type is None:
+                        series = await self.async_get_catalog(
+                            media_type="series",
+                            catalog_id="top",
+                            genre=genre,
+                            limit=limit,
+                        )
+                        for show in series:
+                            item_id = show.get("imdb_id") or show.get("id")
+                            if item_id and item_id not in library_ids and item_id not in seen_ids:
+                                show["recommendation_reason"] = f"Based on your interest in {genre}"
+                                recommendations.append(show)
+                                seen_ids.add(item_id)
+
+                except Exception as err:
+                    _LOGGER.debug("Error fetching recommendations for genre %s: %s", genre, err)
+                    continue
+
+                if len(recommendations) >= limit:
+                    break
+
+            # If not enough recommendations, add some popular content
+            if len(recommendations) < limit:
+                try:
+                    popular = await self.async_get_catalog(
+                        media_type=media_type or "movie",
+                        catalog_id="top",
+                        limit=limit - len(recommendations),
+                    )
+                    for item in popular:
+                        item_id = item.get("imdb_id") or item.get("id")
+                        if item_id and item_id not in library_ids and item_id not in seen_ids:
+                            item["recommendation_reason"] = "Popular right now"
+                            recommendations.append(item)
+                            seen_ids.add(item_id)
+                            if len(recommendations) >= limit:
+                                break
+                except Exception as err:
+                    _LOGGER.debug("Error fetching popular content: %s", err)
+
+            _LOGGER.info("Generated %d recommendations", len(recommendations[:limit]))
+            return recommendations[:limit]
+
+        except StremioAuthError:
+            raise
+        except StremioConnectionError:
+            raise
+        except Exception as err:
+            _LOGGER.exception("Failed to get recommendations: %s", err)
+            raise StremioConnectionError(f"Failed to get recommendations: {err}") from err
+
+    async def async_get_similar_content(
+        self,
+        media_id: str,
+        limit: int = 10,
+    ) -> list[dict[str, Any]]:
+        """Get similar movies/shows based on a specific media item.
+
+        Uses Cinemeta's meta endpoint to fetch related content based on
+        genres, cast, and other metadata similarities.
+
+        Args:
+            media_id: IMDb ID of the media item (e.g., "tt1234567")
+            limit: Maximum similar items to return (default 10)
+
+        Returns:
+            List of similar content items
+
+        Raises:
+            StremioConnectionError: Connection failed
+        """
+        _LOGGER.debug("Fetching similar content for %s, limit=%d", media_id, limit)
+
+        try:
+            # First, get the source item's metadata
+            # Try series first, then movie
+            from .const import CINEMETA_BASE_URL
+
+            session = await self._get_session()
+            source_meta = None
+            source_type = None
+
+            for content_type in ["series", "movie"]:
+                meta_url = f"{CINEMETA_BASE_URL}/meta/{content_type}/{media_id}.json"
+                try:
+                    async with session.get(
+                        meta_url,
+                        timeout=aiohttp.ClientTimeout(total=10),
+                    ) as response:
+                        if response.status == 200:
+                            data = await response.json()
+                            source_meta = data.get("meta", {})
+                            if source_meta:
+                                source_type = content_type
+                                break
+                except Exception:
+                    continue
+
+            if not source_meta:
+                _LOGGER.debug("Could not find metadata for %s", media_id)
+                return []
+
+            # Extract genres and other metadata for finding similar content
+            source_genres = source_meta.get("genres", [])
+            source_director = source_meta.get("director")
+            source_cast = source_meta.get("cast", [])[:3]  # Top 3 cast members
+
+            _LOGGER.debug(
+                "Source: %s, genres=%s, director=%s",
+                source_meta.get("name"),
+                source_genres,
+                source_director,
+            )
+
+            similar = []
+            seen_ids = {media_id}  # Don't include the source item
+
+            # Search by primary genre
+            if source_genres:
+                primary_genre = source_genres[0]
+                try:
+                    genre_results = await self.async_get_catalog(
+                        media_type=source_type,
+                        catalog_id="top",
+                        genre=primary_genre,
+                        limit=limit * 2,  # Fetch more to filter
+                    )
+
+                    for item in genre_results:
+                        item_id = item.get("imdb_id") or item.get("id")
+                        if item_id and item_id not in seen_ids:
+                            # Score similarity based on shared genres
+                            item_genres = item.get("genres", [])
+                            shared_genres = set(source_genres) & set(item_genres)
+                            item["similarity_score"] = len(shared_genres)
+                            item["similarity_reason"] = f"Similar {primary_genre} content"
+                            similar.append(item)
+                            seen_ids.add(item_id)
+
+                except Exception as err:
+                    _LOGGER.debug("Error fetching genre-based similar: %s", err)
+
+            # If we have a secondary genre and need more results
+            if len(source_genres) > 1 and len(similar) < limit:
+                secondary_genre = source_genres[1]
+                try:
+                    genre_results = await self.async_get_catalog(
+                        media_type=source_type,
+                        catalog_id="top",
+                        genre=secondary_genre,
+                        limit=limit,
+                    )
+
+                    for item in genre_results:
+                        item_id = item.get("imdb_id") or item.get("id")
+                        if item_id and item_id not in seen_ids:
+                            item_genres = item.get("genres", [])
+                            shared_genres = set(source_genres) & set(item_genres)
+                            item["similarity_score"] = len(shared_genres)
+                            item["similarity_reason"] = f"You might also like this {secondary_genre}"
+                            similar.append(item)
+                            seen_ids.add(item_id)
+                            if len(similar) >= limit * 2:
+                                break
+
+                except Exception as err:
+                    _LOGGER.debug("Error fetching secondary genre similar: %s", err)
+
+            # Sort by similarity score and limit
+            similar.sort(key=lambda x: x.get("similarity_score", 0), reverse=True)
+            result = similar[:limit]
+
+            _LOGGER.info("Found %d similar items for %s", len(result), media_id)
+            return result
+
+        except Exception as err:
+            _LOGGER.exception("Failed to get similar content for %s: %s", media_id, err)
+            raise StremioConnectionError(f"Failed to get similar content: {err}") from err
+
 
 class StremioAuthError(HomeAssistantError):
     """Error to indicate authentication failure."""

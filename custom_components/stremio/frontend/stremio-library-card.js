@@ -406,6 +406,7 @@ class StremioLibraryCard extends LitElement {
       show_view_toggle: true,
       show_title: true, // Show title below poster
       show_media_type_badge: false, // Show movie/series badge
+      show_similar_button: true, // Show "Find Similar" button in detail view
       
       // Layout
       default_view: 'library',
@@ -438,6 +439,7 @@ class StremioLibraryCard extends LitElement {
       title: 'Stremio Library',
       show_view_toggle: true,
       show_title: true,
+      show_similar_button: true,
       default_view: 'library',
       columns: 4,
       max_items: 50,
@@ -1005,6 +1007,15 @@ class StremioLibraryCard extends LitElement {
             Get Streams
           </button>
         </div>
+
+        ${this.config.show_similar_button !== false ? html`
+          <div class="detail-actions">
+            <button class="detail-button tertiary" @click=${() => this._getSimilarContent(item)}>
+              <ha-icon icon="mdi:movie-search"></ha-icon>
+              Find Similar
+            </button>
+          </div>
+        ` : ''}
       </div>
     `;
   }
@@ -1025,6 +1036,78 @@ class StremioLibraryCard extends LitElement {
     } else {
       // Movie - fetch directly
       this._fetchStreams(item, null, null);
+    }
+  }
+
+  /**
+   * Get similar content for the item and display in a dialog.
+   */
+  _getSimilarContent(item) {
+    const mediaId = item.imdb_id || item.id;
+    if (!mediaId || !this._hass) {
+      console.error('[Library Card] Cannot get similar: missing ID or hass');
+      return;
+    }
+
+    this._showToast('Finding similar content...');
+
+    this._hass.callWS({
+      type: 'call_service',
+      domain: 'stremio',
+      service: 'get_similar_content',
+      service_data: {
+        media_id: mediaId,
+        limit: 10,
+      },
+      return_response: true,
+    })
+      .then((response) => {
+        console.log('[Library Card] Similar content response:', response);
+        
+        let similarItems = null;
+        if (response?.response?.similar) {
+          similarItems = response.response.similar;
+        } else if (response?.similar) {
+          similarItems = response.similar;
+        }
+        
+        if (similarItems && similarItems.length > 0) {
+          console.log('[Library Card] Found', similarItems.length, 'similar items');
+          this._showSimilarDialog(item, similarItems);
+        } else {
+          console.log('[Library Card] No similar content found');
+          this._showToast('No similar content found');
+        }
+      })
+      .catch((error) => {
+        console.error('[Library Card] Failed to get similar content:', error);
+        this._showToast(`Failed to get similar content: ${error.message}`, 'error');
+      });
+  }
+
+  /**
+   * Show a dialog with similar content items.
+   */
+  _showSimilarDialog(sourceItem, similarItems) {
+    // Fire an event for integration with other cards or create a simple modal
+    this.dispatchEvent(
+      new CustomEvent('stremio-similar-content', {
+        bubbles: true,
+        composed: true,
+        detail: {
+          sourceItem,
+          similarItems,
+        },
+      })
+    );
+
+    // Also use the global similar dialog if available
+    if (window.StremioSimilarDialog) {
+      window.StremioSimilarDialog.show(this._hass, sourceItem, similarItems);
+    } else {
+      // Fallback: Create a simple alert with titles (can be improved later)
+      const titles = similarItems.slice(0, 5).map(i => i.title || i.name).join(', ');
+      this._showToast(`Similar: ${titles}...`);
     }
   }
 
@@ -1262,6 +1345,14 @@ class StremioLibraryCardEditor extends LitElement {
                   <ha-switch
                     .checked=${this._config.show_media_type_badge === true}
                     .configValue=${'show_media_type_badge'}
+                    @change=${this._valueChanged}
+                  ></ha-switch>
+                </ha-formfield>
+
+                <ha-formfield label="Show Find Similar Button">
+                  <ha-switch
+                    .checked=${this._config.show_similar_button !== false}
+                    .configValue=${'show_similar_button'}
                     @change=${this._valueChanged}
                   ></ha-switch>
                 </ha-formfield>

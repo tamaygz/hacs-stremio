@@ -194,6 +194,125 @@ max_items: 50
 
 ---
 
+### 6. Stremio Continue Watching Card
+
+Display and resume content from your "Continue Watching" list with progress indicators.
+
+**Type:** `stremio-continue-watching-card`
+
+#### Basic Configuration
+
+```yaml
+type: custom:stremio-continue-watching-card
+```
+
+#### Full Configuration
+
+```yaml
+type: custom:stremio-continue-watching-card
+title: Continue Watching
+show_filters: true
+show_title: true
+show_progress_text: true
+show_media_type_badge: false
+show_similar_button: true
+max_items: 20
+columns: 4
+card_height: 0
+poster_aspect_ratio: '2/3'
+horizontal_scroll: false
+tap_action: details
+default_sort: recent
+```
+
+#### Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `title` | string | "Continue Watching" | Card title |
+| `show_filters` | boolean | true | Show type filter and sort options |
+| `show_title` | boolean | true | Show title below poster |
+| `show_progress_text` | boolean | true | Show progress percentage |
+| `show_media_type_badge` | boolean | false | Show Movie/TV badge on poster |
+| `show_similar_button` | boolean | true | Show "Find Similar" button in detail view |
+| `max_items` | number | 20 | Maximum items to display |
+| `columns` | number | 4 | Grid columns |
+| `card_height` | number | 0 | Fixed height in px (0 for auto) |
+| `poster_aspect_ratio` | string | "2/3" | Poster ratio ("2/3", "16/9", "1/1", "4/3") |
+| `horizontal_scroll` | boolean | false | Enable horizontal carousel mode |
+| `tap_action` | string | "details" | Action on tap ("details", "play", "streams") |
+| `default_sort` | string | "recent" | Default sort ("recent", "progress", "title") |
+
+#### Features
+
+- **Progress Tracking**: Visual progress bars for each item
+- **Quick Resume**: One-click resume in Stremio
+- **Episode Picker**: Select different episodes for TV series
+- **Find Similar**: Discover similar content (configurable)
+- **Responsive Layout**: Grid or horizontal carousel mode
+
+---
+
+### 7. Stremio Recommendations Card
+
+Get personalized content recommendations based on your library preferences.
+
+**Type:** `stremio-recommendations-card`
+
+#### Basic Configuration
+
+```yaml
+type: custom:stremio-recommendations-card
+```
+
+#### Full Configuration
+
+```yaml
+type: custom:stremio-recommendations-card
+title: Recommended For You
+show_filters: true
+show_title: true
+show_reason: true
+show_media_type_badge: false
+max_items: 20
+columns: 4
+card_height: 0
+poster_aspect_ratio: '2/3'
+horizontal_scroll: false
+tap_action: details
+default_filter: all
+refresh_interval: 3600
+```
+
+#### Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `title` | string | "Recommended For You" | Card title |
+| `show_filters` | boolean | true | Show All/Movies/Series filter buttons |
+| `show_title` | boolean | true | Show title below poster |
+| `show_reason` | boolean | true | Show recommendation reason overlay |
+| `show_media_type_badge` | boolean | false | Show Movie/TV badge on poster |
+| `max_items` | number | 20 | Maximum recommendations to display |
+| `columns` | number | 4 | Grid columns |
+| `card_height` | number | 0 | Fixed height in px (0 for auto) |
+| `poster_aspect_ratio` | string | "2/3" | Poster ratio ("2/3", "16/9", "1/1", "4/3") |
+| `horizontal_scroll` | boolean | false | Enable horizontal carousel mode |
+| `tap_action` | string | "details" | Action on tap ("details", "open_stremio", "streams") |
+| `default_filter` | string | "all" | Default filter ("all", "movie", "series") |
+| `refresh_interval` | number | 3600 | Seconds between auto-refreshes |
+
+#### Features
+
+- **Personalized**: Recommendations based on your library genres
+- **Reason Display**: Shows why each item was recommended
+- **Quick Actions**: Add to library, get streams, or open in Stremio
+- **Filter by Type**: Show only movies or TV series
+- **Manual Refresh**: Refresh button to get new recommendations
+- **Responsive Layout**: Grid or horizontal carousel mode
+
+---
+
 ## Dashboard Examples
 
 ### Minimal Dashboard
@@ -218,6 +337,12 @@ views:
             entity: media_player.stremio
           - type: custom:stremio-media-details-card
             entity: media_player.stremio
+      - type: custom:stremio-continue-watching-card
+        title: Continue Watching
+        horizontal_scroll: true
+        columns: 5
+      - type: custom:stremio-recommendations-card
+        title: Recommended For You
       - type: custom:stremio-browse-card
         title: Discover Content
         default_view: popular

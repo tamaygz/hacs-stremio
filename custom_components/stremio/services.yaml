@@ -251,3 +251,68 @@ browse_catalog:
           min: 1
           max: 100
           mode: slider
+
+get_upcoming_episodes:
+  name: Get Upcoming Episodes
+  description: Get air dates for upcoming episodes of series in your library.
+  fields:
+    days_ahead:
+      name: Days Ahead
+      description: Number of days to look ahead for upcoming episodes.
+      required: false
+      default: 7
+      example: 14
+      selector:
+        number:
+          min: 1
+          max: 30
+          mode: slider
+
+get_recommendations:
+  name: Get Recommendations
+  description: Get personalized content recommendations based on your library preferences.
+  fields:
+    media_type:
+      name: Media Type
+      description: Filter recommendations by type (movie or series). Leave empty for both.
+      required: false
+      example: "movie"
+      selector:
+        select:
+          options:
+            - "movie"
+            - "series"
+    limit:
+      name: Limit
+      description: Maximum number of recommendations to return.
+      required: false
+      default: 20
+      example: 10
+      selector:
+        number:
+          min: 1
+          max: 50
+          mode: slider
+
+get_similar_content:
+  name: Get Similar Content
+  description: Get similar movies or shows based on a specific media item.
+  fields:
+    media_id:
+      name: Media ID
+      description: The IMDB ID of the media item to find similar content for.
+      required: true
+      example: "tt0903747"
+      selector:
+        text:
+    limit:
+      name: Limit
+      description: Maximum number of similar items to return.
+      required: false
+      default: 10
+      example: 5
+      selector:
+        number:
+          min: 1
+          max: 30
+          mode: slider

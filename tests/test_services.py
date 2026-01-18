@@ -16,6 +16,9 @@ from custom_components.stremio.const import (
     SERVICE_REMOVE_FROM_LIBRARY,
     SERVICE_REFRESH_LIBRARY,
     SERVICE_HANDOVER_TO_APPLE_TV,
+    SERVICE_GET_UPCOMING_EPISODES,
+    SERVICE_GET_RECOMMENDATIONS,
+    SERVICE_GET_SIMILAR_CONTENT,
 )
 from custom_components.stremio.services import (
     async_setup_services,
@@ -32,6 +35,34 @@ def mock_service_hass(hass: HomeAssistant, mock_coordinator):
     mock_client.async_get_streams = AsyncMock(return_value=MOCK_STREAMS)
     mock_client.async_add_to_library = AsyncMock(return_value=True)
     mock_client.async_remove_from_library = AsyncMock(return_value=True)
+    mock_client.async_get_upcoming_episodes = AsyncMock(return_value=[
+        {
+            "series_id": "tt0903747",
+            "series_title": "Breaking Bad",
+            "season": 5,
+            "episode": 10,
+            "episode_title": "Buried",
+            "air_date": "2024-01-15T00:00:00Z",
+            "air_date_formatted": "2024-01-15",
+            "days_until": 3,
+        }
+    ])
+    mock_client.async_get_recommendations = AsyncMock(return_value=[
+        {
+            "id": "tt1234567",
+            "title": "Recommended Movie",
+            "type": "movie",
+            "recommendation_reason": "Based on your interest in Drama",
+        }
+    ])
+    mock_client.async_get_similar_content = AsyncMock(return_value=[
+        {
+            "id": "tt7654321",
+            "title": "Similar Show",
+            "type": "series",
+            "similarity_reason": "Similar Drama content",
+        }
+    ])
 
     hass.data[DOMAIN] = {
         "test_entry": {
@@ -389,6 +420,9 @@ class TestServiceRegistration:
         assert hass.services.has_service(DOMAIN, SERVICE_REMOVE_FROM_LIBRARY)
         assert hass.services.has_service(DOMAIN, SERVICE_REFRESH_LIBRARY)
         assert hass.services.has_service(DOMAIN, SERVICE_HANDOVER_TO_APPLE_TV)
+        assert hass.services.has_service(DOMAIN, SERVICE_GET_UPCOMING_EPISODES)
+        assert hass.services.has_service(DOMAIN, SERVICE_GET_RECOMMENDATIONS)
+        assert hass.services.has_service(DOMAIN, SERVICE_GET_SIMILAR_CONTENT)
 
     @pytest.mark.asyncio
     async def test_services_unregistered(self, hass: HomeAssistant):
@@ -405,3 +439,175 @@ class TestServiceRegistration:
         # Verify services were removed
         assert not hass.services.has_service(DOMAIN, SERVICE_SEARCH_LIBRARY)
         assert not hass.services.has_service(DOMAIN, SERVICE_GET_STREAMS)
+
+
+class TestGetUpcomingEpisodesService:
+    """Tests for the get_upcoming_episodes service."""
+
+    @pytest.mark.asyncio
+    async def test_get_upcoming_episodes(self, mock_service_hass, mock_coordinator):
+        """Test getting upcoming episodes."""
+        await async_setup_services(mock_service_hass)
+
+        calls = mock_service_hass.services.async_register.call_args_list
+        upcoming_call = next(c for c in calls if c[0][1] == SERVICE_GET_UPCOMING_EPISODES)
+        handler = upcoming_call[0][2]
+
+        service_call = MagicMock(spec=ServiceCall)
+        service_call.data = {"days_ahead": 7}
+
+        result = await handler(service_call)
+
+        assert "episodes" in result
+        assert "count" in result
+        assert "days_ahead" in result
+
+        # Verify client method was called
+        client = mock_service_hass.data[DOMAIN]["test_entry"]["client"]
+        client.async_get_upcoming_episodes.assert_called_once_with(days_ahead=7)
+
+    @pytest.mark.asyncio
+    async def test_get_upcoming_episodes_default_days(self, mock_service_hass, mock_coordinator):
+        """Test getting upcoming episodes with default days_ahead."""
+        await async_setup_services(mock_service_hass)
+
+        calls = mock_service_hass.services.async_register.call_args_list
+        upcoming_call = next(c for c in calls if c[0][1] == SERVICE_GET_UPCOMING_EPISODES)
+        handler = upcoming_call[0][2]
+
+        service_call = MagicMock(spec=ServiceCall)
+        service_call.data = {}
+
+        result = await handler(service_call)
+
+        assert "episodes" in result
+        # Verify default value of 7 was used
+        client = mock_service_hass.data[DOMAIN]["test_entry"]["client"]
+        client.async_get_upcoming_episodes.assert_called_once_with(days_ahead=7)
+
+
+class TestGetRecommendationsService:
+    """Tests for the get_recommendations service."""
+
+    @pytest.mark.asyncio
+    async def test_get_recommendations_all(self, mock_service_hass, mock_coordinator):
+        """Test getting all recommendations."""
+        await async_setup_services(mock_service_hass)
+
+        calls = mock_service_hass.services.async_register.call_args_list
+        rec_call = next(c for c in calls if c[0][1] == SERVICE_GET_RECOMMENDATIONS)
+        handler = rec_call[0][2]
+
+        service_call = MagicMock(spec=ServiceCall)
+        service_call.data = {"limit": 20}
+
+        result = await handler(service_call)
+
+        assert "recommendations" in result
+        assert "count" in result
+
+        # Verify client method was called
+        client = mock_service_hass.data[DOMAIN]["test_entry"]["client"]
+        client.async_get_recommendations.assert_called_once_with(
+            media_type=None,
+            limit=20,
+        )
+
+    @pytest.mark.asyncio
+    async def test_get_recommendations_movies_only(self, mock_service_hass, mock_coordinator):
+        """Test getting movie recommendations only."""
+        await async_setup_services(mock_service_hass)
+
+        calls = mock_service_hass.services.async_register.call_args_list
+        rec_call = next(c for c in calls if c[0][1] == SERVICE_GET_RECOMMENDATIONS)
+        handler = rec_call[0][2]
+
+        service_call = MagicMock(spec=ServiceCall)
+        service_call.data = {"media_type": "movie", "limit": 10}
+
+        result = await handler(service_call)
+
+        assert "recommendations" in result
+        assert "media_type" in result
+
+        # Verify client method was called with movie type
+        client = mock_service_hass.data[DOMAIN]["test_entry"]["client"]
+        client.async_get_recommendations.assert_called_once_with(
+            media_type="movie",
+            limit=10,
+        )
+
+    @pytest.mark.asyncio
+    async def test_get_recommendations_series_only(self, mock_service_hass, mock_coordinator):
+        """Test getting series recommendations only."""
+        await async_setup_services(mock_service_hass)
+
+        calls = mock_service_hass.services.async_register.call_args_list
+        rec_call = next(c for c in calls if c[0][1] == SERVICE_GET_RECOMMENDATIONS)
+        handler = rec_call[0][2]
+
+        service_call = MagicMock(spec=ServiceCall)
+        service_call.data = {"media_type": "series", "limit": 15}
+
+        result = await handler(service_call)
+
+        assert "recommendations" in result
+
+        # Verify client method was called with series type
+        client = mock_service_hass.data[DOMAIN]["test_entry"]["client"]
+        client.async_get_recommendations.assert_called_once_with(
+            media_type="series",
+            limit=15,
+        )
+
+
+class TestGetSimilarContentService:
+    """Tests for the get_similar_content service."""
+
+    @pytest.mark.asyncio
+    async def test_get_similar_content(self, mock_service_hass, mock_coordinator):
+        """Test getting similar content."""
+        await async_setup_services(mock_service_hass)
+
+        calls = mock_service_hass.services.async_register.call_args_list
+        similar_call = next(c for c in calls if c[0][1] == SERVICE_GET_SIMILAR_CONTENT)
+        handler = similar_call[0][2]
+
+        service_call = MagicMock(spec=ServiceCall)
+        service_call.data = {"media_id": "tt0903747", "limit": 10}
+
+        result = await handler(service_call)
+
+        assert "similar" in result
+        assert "count" in result
+        assert "source_media_id" in result
+
+        # Verify client method was called
+        client = mock_service_hass.data[DOMAIN]["test_entry"]["client"]
+        client.async_get_similar_content.assert_called_once_with(
+            media_id="tt0903747",
+            limit=10,
+        )
+
+    @pytest.mark.asyncio
+    async def test_get_similar_content_default_limit(self, mock_service_hass, mock_coordinator):
+        """Test getting similar content with default limit."""
+        await async_setup_services(mock_service_hass)
+
+        calls = mock_service_hass.services.async_register.call_args_list
+        similar_call = next(c for c in calls if c[0][1] == SERVICE_GET_SIMILAR_CONTENT)
+        handler = similar_call[0][2]
+
+        service_call = MagicMock(spec=ServiceCall)
+        service_call.data = {"media_id": "tt0468569"}
+
+        result = await handler(service_call)
+
+        assert "similar" in result
+
+        # Verify default limit of 10 was used
+        client = mock_service_hass.data[DOMAIN]["test_entry"]["client"]
+        client.async_get_similar_content.assert_called_once_with(
+            media_id="tt0468569",
+            limit=10,
+        )
