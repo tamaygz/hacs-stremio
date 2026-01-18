@@ -5,10 +5,7 @@
     "@tamaygz"
   ],
   "config_flow": true,
-  "dependencies": [
-    "http",
-    "media_source"
-  ],
+
   "documentation": "https://github.com/tamaygz/hacs-stremio",
   "integration_type": "service",
   "iot_class": "cloud_polling",
