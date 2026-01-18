@@ -1,6 +1,6 @@
 {
   "domain": "stremio",
-  "name": "HACS Stremio Integration",
+  "name": "Stremio Integration",
   "codeowners": [
     "@tamaygz"
   ],
