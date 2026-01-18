@@ -1,9 +1,9 @@
 /**
- * Stremio Library Card
+ * Stremio Continue Watching Card
  * 
- * Browse and search your Stremio library with filtering and sorting.
+ * Display and resume content from your Stremio "Continue Watching" list with progress indicators.
  * 
- * @customElement stremio-library-card
+ * @customElement stremio-continue-watching-card
  * @extends LitElement
  */
 
@@ -24,16 +24,15 @@ const loadCardHelpers = async () => {
 
 const { LitElement, html, css } = await loadCardHelpers();
 
-class StremioLibraryCard extends LitElement {
+class StremioContinueWatchingCard extends LitElement {
   static get properties() {
     return {
       hass: { type: Object },
       config: { type: Object },
-      _searchQuery: { type: String },
+      _continueWatchingItems: { type: Array },
+      _selectedItem: { type: Object },
       _filterType: { type: String },
       _sortBy: { type: String },
-      _libraryItems: { type: Array },
-      _selectedItem: { type: Object },
     };
   }
 
@@ -59,27 +58,6 @@ class StremioLibraryCard extends LitElement {
         color: var(--primary-text-color);
       }
 
-      .search-row {
-        display: flex;
-        gap: 8px;
-        margin-bottom: 8px;
-      }
-
-      .search-input {
-        flex: 1;
-        padding: 8px 12px;
-        border: 1px solid var(--divider-color);
-        border-radius: 4px;
-        background: var(--card-background-color);
-        color: var(--primary-text-color);
-        font-size: 0.95em;
-      }
-
-      .search-input:focus {
-        outline: none;
-        border-color: var(--primary-color);
-      }
-
       .filter-row {
         display: flex;
         gap: 8px;
@@ -94,33 +72,37 @@ class StremioLibraryCard extends LitElement {
         font-size: 0.85em;
       }
 
-      .library-grid {
+      .items-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
         gap: 12px;
         padding: 16px;
-        max-height: 400px;
+        max-height: 500px;
         overflow-y: auto;
       }
 
-      .library-item {
+      @media (max-width: 768px) {
+        .items-grid {
+          grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+          gap: 8px;
+          padding: 12px;
+        }
+      }
+
+      .item {
         cursor: pointer;
         transition: transform 0.2s ease;
+        position: relative;
       }
 
-      .library-item:hover {
+      .item:hover {
         transform: scale(1.05);
       }
 
-      .library-item:focus {
+      .item:focus {
         outline: 2px solid var(--primary-color);
         outline-offset: 2px;
         transform: scale(1.05);
-      }
-
-      .library-item:focus-visible {
-        outline: 2px solid var(--primary-color);
-        outline-offset: 2px;
       }
 
       .item-poster {
@@ -156,20 +138,29 @@ class StremioLibraryCard extends LitElement {
       }
 
       .item-progress {
-        height: 3px;
+        height: 4px;
         background: var(--secondary-background-color);
         border-radius: 2px;
         margin-top: 4px;
         overflow: hidden;
+        position: relative;
       }
 
       .item-progress-fill {
         height: 100%;
         background: var(--primary-color);
+        transition: width 0.3s ease;
+      }
+
+      .item-progress-text {
+        font-size: 0.7em;
+        color: var(--secondary-text-color);
+        margin-top: 2px;
+        text-align: center;
       }
 
       .empty-state {
-        padding: 32px;
+        padding: 40px;
         text-align: center;
         color: var(--secondary-text-color);
       }
@@ -208,6 +199,7 @@ class StremioLibraryCard extends LitElement {
         width: 90%;
         max-height: 80vh;
         overflow-y: auto;
+        position: relative;
       }
 
       .detail-header {
@@ -282,12 +274,10 @@ class StremioLibraryCard extends LitElement {
 
   constructor() {
     super();
-    this._searchQuery = '';
-    this._filterType = 'all';
-    this._sortBy = 'recent';
-    this._libraryItems = [];
+    this._continueWatchingItems = [];
     this._selectedItem = null;
-    this._viewMode = 'library'; // 'library' or 'catalog'
+    this._filterType = 'all';
+    this._sortBy = 'progress';
   }
 
   setConfig(config) {
@@ -295,29 +285,22 @@ class StremioLibraryCard extends LitElement {
       throw new Error('Invalid configuration');
     }
     this.config = {
-      title: 'Stremio Library',
-      show_search: true,
+      title: 'Continue Watching',
+      entity: 'sensor.stremio_continue_watching_count',
       show_filters: true,
-      show_view_toggle: true,
-      default_view: 'library',
+      max_items: 20,
       columns: 4,
-      max_items: 50,
       ...config,
     };
-    this._viewMode = this.config.default_view;
   }
 
   // Define card type for UI editor
-  static getConfigElement() {
-    return document.createElement('stremio-library-card-editor');
-  }
-
   static getStubConfig() {
     return {
-      type: 'custom:stremio-library-card',
-      title: 'Stremio Library',
-      show_view_toggle: true,
-      default_view: 'library',
+      type: 'custom:stremio-continue-watching-card',
+      title: 'Continue Watching',
+      entity: 'sensor.stremio_continue_watching_count',
+      show_filters: true,
     };
   }
 
@@ -325,20 +308,13 @@ class StremioLibraryCard extends LitElement {
     const oldHass = this._hass;
     this._hass = hass;
     
-    // Load initial data if this is the first time hass is set
-    if (!oldHass && hass) {
-      this._updateLibraryItems();
-      this.requestUpdate();
-      return;
-    }
-    
     // Only update if relevant entity state changed
     if (this.config?.entity) {
       const oldState = oldHass?.states?.[this.config.entity];
       const newState = hass?.states?.[this.config.entity];
       
       if (oldState !== newState) {
-        this._updateLibraryItems();
+        this._updateContinueWatchingItems();
         this.requestUpdate();
       }
     }
@@ -351,49 +327,32 @@ class StremioLibraryCard extends LitElement {
   // Optimize re-renders
   shouldUpdate(changedProps) {
     if (changedProps.has('config')) return true;
-    if (changedProps.has('_searchQuery')) return true;
+    if (changedProps.has('_continueWatchingItems')) return true;
+    if (changedProps.has('_selectedItem')) return true;
     if (changedProps.has('_filterType')) return true;
     if (changedProps.has('_sortBy')) return true;
-    if (changedProps.has('_libraryItems')) return true;
-    if (changedProps.has('_selectedItem')) return true;
     return false;
   }
 
-  _updateLibraryItems() {
+  _updateContinueWatchingItems() {
     if (!this._hass) {
-      this._libraryItems = [];
+      this._continueWatchingItems = [];
       return;
     }
 
-    // Get library data from sensor
-    const sensorEntity = this.config.entity || `sensor.stremio_library_count`;
-    const entity = this._hass.states[sensorEntity];
+    // Get continue watching data from sensor
+    const entity = this._hass.states[this.config.entity];
 
     if (!entity?.attributes?.items) {
-      // Try to get from continue watching sensor
-      const continueEntity = this._hass.states[`sensor.stremio_continue_watching_count`];
-      if (continueEntity?.attributes?.items) {
-        this._libraryItems = continueEntity.attributes.items || [];
-      } else {
-        this._libraryItems = [];
-      }
+      this._continueWatchingItems = [];
       return;
     }
 
-    this._libraryItems = entity.attributes.items || [];
+    this._continueWatchingItems = entity.attributes.items || [];
   }
 
   _getFilteredItems() {
-    let items = [...this._libraryItems];
-
-    // Apply search filter
-    if (this._searchQuery) {
-      const query = this._searchQuery.toLowerCase();
-      items = items.filter(item => 
-        item.title?.toLowerCase().includes(query) ||
-        item.name?.toLowerCase().includes(query)
-      );
-    }
+    let items = [...this._continueWatchingItems];
 
     // Apply type filter
     if (this._filterType !== 'all') {
@@ -403,22 +362,19 @@ class StremioLibraryCard extends LitElement {
     // Apply sorting
     switch (this._sortBy) {
       case 'title':
-        items.sort((a, b) => (a.title || a.name || '').localeCompare(b.title || b.name || ''));
+        items.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
         break;
       case 'progress':
+        // Sort by progress descending (most progress first)
         items.sort((a, b) => (b.progress_percent || 0) - (a.progress_percent || 0));
         break;
       case 'recent':
       default:
-        // Keep original order (usually most recent first)
+        // Keep original order (usually most recently watched)
         break;
     }
 
     return items.slice(0, this.config.max_items);
-  }
-
-  _handleSearch(e) {
-    this._searchQuery = e.target.value;
   }
 
   _handleFilterChange(e) {
@@ -440,9 +396,10 @@ class StremioLibraryCard extends LitElement {
         detail: { 
           item,
           mediaId: item.imdb_id || item.id,
-          title: item.title || item.name,
+          title: item.title,
           type: item.type,
           poster: item.poster,
+          progress: item.progress_percent,
         },
       })
     );
@@ -460,7 +417,7 @@ class StremioLibraryCard extends LitElement {
     );
   }
 
-  _openInStremio(item) {
+  _resumeInStremio(item) {
     const type = item.type === 'series' ? 'series' : 'movie';
     const id = item.imdb_id || item.id;
     if (id) {
@@ -477,7 +434,7 @@ class StremioLibraryCard extends LitElement {
         detail: { 
           item,
           mediaId: item.imdb_id || item.id,
-          title: item.title || item.name,
+          title: item.title,
           type: item.type,
           poster: item.poster,
           year: item.year,
@@ -504,7 +461,7 @@ class StremioLibraryCard extends LitElement {
         detail: { 
           item,
           mediaId: id,
-          title: item.title || item.name,
+          title: item.title,
           type: item.type,
           poster: item.poster,
         },
@@ -524,19 +481,6 @@ class StremioLibraryCard extends LitElement {
               <span class="count-badge" aria-label="${filteredItems.length} items">(${filteredItems.length})</span>
             </h2>
 
-            ${this.config.show_search ? html`
-              <div class="search-row">
-                <input
-                  type="search"
-                  class="search-input"
-                  placeholder="Search library..."
-                  .value=${this._searchQuery}
-                  @input=${this._handleSearch}
-                  aria-label="Search library"
-                />
-              </div>
-            ` : ''}
-
             ${this.config.show_filters ? html`
               <div class="filter-row" role="group" aria-label="Filter options">
                 <select 
@@ -546,7 +490,7 @@ class StremioLibraryCard extends LitElement {
                 >
                   <option value="all">All Types</option>
                   <option value="movie">Movies</option>
-                  <option value="series">Series</option>
+                  <option value="series">TV Series</option>
                 </select>
                 <select 
                   class="filter-select" 
@@ -554,21 +498,21 @@ class StremioLibraryCard extends LitElement {
                   aria-label="Sort by"
                 >
                   <option value="recent">Most Recent</option>
+                  <option value="progress">By Progress</option>
                   <option value="title">Title A-Z</option>
-                  <option value="progress">Progress</option>
                 </select>
               </div>
             ` : ''}
           </div>
 
           ${filteredItems.length > 0 ? html`
-            <div class="library-grid" role="list" aria-label="Library items">
+            <div class="items-grid" role="list" aria-label="Continue watching items">
               ${filteredItems.map(item => this._renderItem(item))}
             </div>
           ` : html`
             <div class="empty-state" role="status">
-              <ha-icon icon="mdi:movie-open-outline"></ha-icon>
-              <div>No items found</div>
+              <ha-icon icon="mdi:play-pause"></ha-icon>
+              <div>No items to continue watching</div>
             </div>
           `}
 
@@ -576,7 +520,7 @@ class StremioLibraryCard extends LitElement {
         </ha-card>
       `;
     } catch (error) {
-      console.error('Stremio Library Card render error:', error);
+      console.error('Stremio Continue Watching Card render error:', error);
       return html`
         <ha-card>
           <div class="card-content" style="padding: 16px; color: var(--error-color);">
@@ -589,23 +533,23 @@ class StremioLibraryCard extends LitElement {
   }
 
   _renderItem(item) {
-    const title = item.title || item.name || 'Unknown';
+    const title = item.title || 'Unknown';
     const progress = item.progress_percent || 0;
 
     return html`
       <div 
-        class="library-item" 
+        class="item" 
         role="listitem"
         tabindex="0"
         @click=${() => this._handleItemClick(item)}
         @keydown=${(e) => e.key === 'Enter' && this._handleItemClick(item)}
-        aria-label="${title}${progress > 0 ? `, ${progress.toFixed(0)}% watched` : ''}"
+        aria-label="${title}, ${progress.toFixed(0)}% watched"
       >
         ${item.poster ? html`
           <img class="item-poster" src="${item.poster}" alt="" loading="lazy" />
         ` : html`
           <div class="item-poster-placeholder">
-            <ha-icon icon="mdi:movie-outline"></ha-icon>
+            <ha-icon icon="mdi:${item.type === 'series' ? 'television' : 'movie'}"></ha-icon>
           </div>
         `}
         <div class="item-title" title="${title}">${title}</div>
@@ -613,6 +557,7 @@ class StremioLibraryCard extends LitElement {
           <div class="item-progress" role="progressbar" aria-valuenow="${progress}" aria-valuemin="0" aria-valuemax="100">
             <div class="item-progress-fill" style="width: ${progress}%"></div>
           </div>
+          <div class="item-progress-text">${progress.toFixed(0)}% watched</div>
         ` : ''}
       </div>
     `;
@@ -620,11 +565,12 @@ class StremioLibraryCard extends LitElement {
 
   _renderDetailOverlay() {
     const item = this._selectedItem;
-    const title = item.title || item.name || 'Unknown';
+    const title = item.title || 'Unknown';
 
     return html`
       <div class="item-detail-overlay" @click=${this._closeDetail}>
         <div class="item-detail" @click=${e => e.stopPropagation()}>
+          <button class="close-button" aria-label="Close" @click=${this._closeDetail}>✕</button>
           <div class="detail-header">
             ${item.poster ? html`
               <img class="detail-poster" src="${item.poster}" alt="${title}" />
@@ -638,9 +584,9 @@ class StremioLibraryCard extends LitElement {
           </div>
 
           <div class="detail-actions">
-            <button class="detail-button primary" @click=${() => this._openInStremio(item)}>
+            <button class="detail-button primary" @click=${() => this._resumeInStremio(item)}>
               <ha-icon icon="mdi:play"></ha-icon>
-              Open in Stremio
+              Resume in Stremio
             </button>
             <button class="detail-button secondary" @click=${() => this._getStreams(item)}>
               <ha-icon icon="mdi:format-list-bulleted"></ha-icon>
@@ -675,99 +621,12 @@ class StremioLibraryCard extends LitElement {
       min_columns: 3,
     };
   }
-
-  static getConfigElement() {
-    return document.createElement('stremio-library-card-editor');
-  }
-
-  static getStubConfig() {
-    return {
-      title: 'Stremio Library',
-      show_search: true,
-      show_filters: true,
-      max_items: 50,
-    };
-  }
 }
 
 // Guard against duplicate registration
-if (!customElements.get('stremio-library-card')) {
-  customElements.define('stremio-library-card', StremioLibraryCard);
+if (!customElements.get('stremio-continue-watching-card')) {
+  customElements.define('stremio-continue-watching-card', StremioContinueWatchingCard);
 }
 
-// Editor
-class StremioLibraryCardEditor extends LitElement {
-  static get properties() {
-    return {
-      hass: { type: Object },
-      _config: { type: Object },
-    };
-  }
-
-  setConfig(config) {
-    this._config = config;
-  }
-
-  render() {
-    return html`
-      <div class="card-config">
-        <ha-textfield
-          label="Title"
-          .value=${this._config?.title || 'Stremio Library'}
-          .configValue=${'title'}
-          @input=${this._valueChanged}
-        ></ha-textfield>
-
-        <ha-formfield label="Show Search">
-          <ha-switch
-            .checked=${this._config?.show_search !== false}
-            .configValue=${'show_search'}
-            @change=${this._valueChanged}
-          ></ha-switch>
-        </ha-formfield>
-
-        <ha-formfield label="Show Filters">
-          <ha-switch
-            .checked=${this._config?.show_filters !== false}
-            .configValue=${'show_filters'}
-            @change=${this._valueChanged}
-          ></ha-switch>
-        </ha-formfield>
-      </div>
-    `;
-  }
-
-  _valueChanged(ev) {
-    const target = ev.target;
-    const configValue = target.configValue;
-    const value = target.checked !== undefined ? target.checked : target.value;
-
-    if (configValue) {
-      this._config = { ...this._config, [configValue]: value };
-      // Dispatch config-changed with bubbles and composed for HA compatibility
-      this.dispatchEvent(
-        new CustomEvent('config-changed', {
-          bubbles: true,
-          composed: true,
-          detail: { config: this._config },
-        })
-      );
-    }
-  }
-
-  static get styles() {
-    return css`
-      .card-config {
-        display: flex;
-        flex-direction: column;
-        gap: 16px;
-        padding: 16px;
-      }
-    `;
-  }
-}
-
-// Guard against duplicate registration
-if (!customElements.get('stremio-library-card-editor')) {
-  customElements.define('stremio-library-card-editor', StremioLibraryCardEditor);
-}
+// Note: Card registration with window.customCards is handled in stremio-card-bundle.js
+// to prevent duplicate entries

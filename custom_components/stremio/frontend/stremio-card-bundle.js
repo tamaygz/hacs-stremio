@@ -14,6 +14,7 @@ import './stremio-media-details-card.js';
 import './stremio-player-card.js';
 import './stremio-stream-dialog.js';
 import './stremio-browse-card.js';
+import './stremio-continue-watching-card.js';
 
 // Card registration info - should match manifest.json version
 const CARD_VERSION = '0.2.7';
@@ -63,6 +64,14 @@ window.customCards.push({
   type: 'stremio-browse-card',
   name: 'Stremio Browse Card',
   description: 'Browse popular movies, TV shows, and new content from Stremio catalogs',
+  preview: true,
+  documentationURL: 'https://github.com/tamaygz/hacs-stremio/blob/main/docs/ui.md',
+});
+
+window.customCards.push({
+  type: 'stremio-continue-watching-card',
+  name: 'Stremio Continue Watching Card',
+  description: 'Display and resume content from your Continue Watching list with progress indicators',
   preview: true,
   documentationURL: 'https://github.com/tamaygz/hacs-stremio/blob/main/docs/ui.md',
 });

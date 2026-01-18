@@ -389,6 +389,7 @@ class StremioBrowseCard extends LitElement {
   _openMediaBrowser(item) {
     // Navigate to media browser for this item
     if (!item || !item.media_content_id) {
+      console.error('Stremio Browse Card: Invalid item or missing media_content_id');
       return;
     }
 
@@ -398,42 +399,77 @@ class StremioBrowseCard extends LitElement {
     }
 
     const hass = this._hass;
+    const contentId = item.media_content_id;
 
-    // Check if browser_mod.navigate service is available
+    // Try native HA navigation first (most compatible method)
+    try {
+      // Use Home Assistant's history API to navigate to media browser
+      const mediaSourceId = `media-source://stremio/${contentId}`;
+      
+      // Fire a more-info event that HA can handle
+      this.dispatchEvent(
+        new CustomEvent('hass-more-info', {
+          bubbles: true,
+          composed: true,
+          detail: {
+            entityId: null, // No specific entity
+          },
+        })
+      );
+
+      // Try to open the media browser programmatically using HA's built-in methods
+      if (window.history && window.location) {
+        const currentPath = window.location.pathname;
+        // Check if we can navigate within HA
+        if (currentPath.includes('/lovelace/') || currentPath.includes('/config/')) {
+          // Use native browser navigation to media-browser
+          const encodedPath = `/media-browser/${encodeURIComponent(mediaSourceId)}`;
+          window.history.pushState(null, '', encodedPath);
+          
+          // Dispatch a popstate event to notify HA of the navigation
+          window.dispatchEvent(new PopStateEvent('popstate'));
+          return;
+        }
+      }
+    } catch (error) {
+      console.warn('Stremio Browse Card: Native navigation failed:', error);
+    }
+
+    // Fallback 1: Try browser_mod if available
     const hasBrowserMod =
       hass.services &&
       hass.services.browser_mod &&
       hass.services.browser_mod.navigate;
 
-    if (!hasBrowserMod) {
-      // Provide user feedback if browser_mod is not available
-      console.warn('Stremio Browse Card: browser_mod.navigate service is not available.');
-      // Try to show a notification if persistent_notification service is available
-      if (hass.services && hass.services.persistent_notification && hass.services.persistent_notification.create) {
-        hass.callService('persistent_notification', 'create', {
-          title: 'Stremio Browse',
-          message: 'The browser_mod integration is required to navigate the media browser. Please install it or access the media browser manually.',
-        }).catch(err => console.error('Failed to create notification:', err));
-      }
+    if (hasBrowserMod) {
+      const encodedPath = `/media-browser/media-source%3A%2F%2Fstremio%2F${contentId}`;
+      
+      hass.callService('browser_mod', 'navigate', {
+        path: encodedPath,
+      }).catch((error) => {
+        console.error('Stremio Browse Card: browser_mod navigation failed:', error);
+        this._showNavigationFallback(item);
+      });
       return;
     }
 
-    const contentId = item.media_content_id;
-    // Don't double-encode - media_content_id is already the raw identifier
-    const encodedPath = `/media-browser/media-source%3A%2F%2Fstremio%2F${contentId}`;
+    // Fallback 2: Show enhanced detail dialog with more information
+    this._showNavigationFallback(item);
+  }
+
+  _showNavigationFallback(item) {
+    // Show notification with instructions
+    if (this._hass && this._hass.services?.persistent_notification?.create) {
+      const mediaSourceId = `media-source://stremio/${item.media_content_id}`;
+      this._hass.callService('persistent_notification', 'create', {
+        title: 'Stremio - View Details',
+        message: `To view full details for "${item.title}", open the Media Browser from the sidebar and navigate to Stremio section.\n\nMedia ID: ${mediaSourceId}`,
+        notification_id: `stremio_media_${item.media_content_id}`,
+      }).catch(err => console.error('Failed to create notification:', err));
+    }
     
-    hass.callService('browser_mod', 'navigate', {
-      path: encodedPath,
-    }).catch((error) => {
-      console.error('Stremio Browse Card: Failed to navigate to media browser:', error);
-      // Try to show notification about failure
-      if (hass.services && hass.services.persistent_notification && hass.services.persistent_notification.create) {
-        hass.callService('persistent_notification', 'create', {
-          title: 'Stremio Browse',
-          message: 'Failed to open the media browser. Please try accessing it manually from the sidebar.',
-        }).catch(err => console.error('Failed to create notification:', err));
-      }
-    });
+    // Also log to console for debugging
+    console.info('Stremio Browse Card: Media browser path:', `/media-browser/media-source://stremio/${item.media_content_id}`);
   }
 
   _addToLibrary(item) {
@@ -597,12 +633,10 @@ class StremioBrowseCard extends LitElement {
   }
 }
 
-customElements.define('stremio-browse-card', StremioBrowseCard);
+// Guard against duplicate registration
+if (!customElements.get('stremio-browse-card')) {
+  customElements.define('stremio-browse-card', StremioBrowseCard);
+}
 
-// Register with custom cards registry
-window.customCards = window.customCards || [];
-window.customCards.push({
-  type: 'stremio-browse-card',
-  name: 'Stremio Browse Card',
-  description: 'Browse popular movies, TV shows, and new content from Stremio catalogs',
-});
+// Note: Card registration with window.customCards is handled in stremio-card-bundle.js
+// to prevent duplicate entries
