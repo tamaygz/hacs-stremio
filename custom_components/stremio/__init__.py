@@ -103,7 +103,6 @@ async def _async_register_frontend(hass: HomeAssistant) -> None:
                         StaticPathConfig(  # type: ignore[name-defined]
                             url_path="/stremio_cards",
                             path=str(www_path),
-                            cache_headers=True,
                         )
                     ]
                 )
@@ -116,7 +115,6 @@ async def _async_register_frontend(hass: HomeAssistant) -> None:
                     hass.http.register_static_path(
                         "/stremio_cards",
                         str(www_path),
-                        cache_headers=True,
                     )
                     _LOGGER.info(
                         "Registered static path for Stremio frontend (sync method)"
@@ -135,7 +133,6 @@ async def _async_register_frontend(hass: HomeAssistant) -> None:
                 hass.http.register_static_path(
                     "/stremio_cards",
                     str(www_path),
-                    cache_headers=True,
                 )
                 _LOGGER.info(
                     "Registered static path for Stremio frontend (fallback method)"
@@ -152,7 +149,6 @@ async def _async_register_frontend(hass: HomeAssistant) -> None:
             hass.http.register_static_path(
                 "/stremio_cards",
                 str(www_path),
-                cache_headers=True,
             )
             _LOGGER.info("Registered static path for Stremio frontend (legacy method)")
         except Exception as err:
