@@ -282,6 +282,7 @@ class StremioEpisodePicker extends LitElement {
     this._selectedSeason = 1;
     this._loading = false;
     this._episodes = [];
+    this._seriesMetadata = null;
     this._handleKeyDown = this._handleKeyDown.bind(this);
   }
 
