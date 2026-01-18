@@ -64,6 +64,10 @@ class StremioBrowseCard extends LitElement {
         flex-shrink: 0;
       }
 
+      .header.detail-mode {
+        padding: 0;
+      }
+
       .header-title {
         font-size: 1.2em;
         font-weight: 500;
@@ -298,11 +302,11 @@ class StremioBrowseCard extends LitElement {
         border: none;
         color: var(--primary-color);
         cursor: pointer;
-        padding: 12px 16px;
+        padding: 8px 12px;
         display: flex;
         align-items: center;
-        gap: 8px;
-        font-size: 0.95em;
+        gap: 6px;
+        font-size: 0.85em;
         font-weight: 500;
         transition: background-color 0.2s;
       }
@@ -313,7 +317,7 @@ class StremioBrowseCard extends LitElement {
 
       /* Inline detail view */
       .item-detail-view {
-        padding: 16px;
+        padding: 12px;
         flex: 1;
         overflow-y: auto;
         min-height: 0;
@@ -321,23 +325,23 @@ class StremioBrowseCard extends LitElement {
 
       .detail-header {
         display: flex;
-        gap: 16px;
-        margin-bottom: 16px;
+        gap: 12px;
+        margin-bottom: 12px;
       }
 
       .detail-poster {
-        width: 120px;
-        height: 180px;
+        width: 80px;
+        height: 120px;
         object-fit: cover;
-        border-radius: 8px;
+        border-radius: 6px;
         flex-shrink: 0;
       }
 
       .detail-poster-placeholder {
-        width: 120px;
-        height: 180px;
+        width: 80px;
+        height: 120px;
         background: var(--secondary-background-color);
-        border-radius: 8px;
+        border-radius: 6px;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -345,8 +349,8 @@ class StremioBrowseCard extends LitElement {
       }
 
       .detail-poster-placeholder ha-icon {
-        width: 48px;
-        height: 48px;
+        width: 32px;
+        height: 32px;
         color: var(--disabled-text-color);
       }
 
@@ -355,48 +359,50 @@ class StremioBrowseCard extends LitElement {
       }
 
       .detail-info h3 {
-        margin: 0 0 8px 0;
+        margin: 0 0 4px 0;
         color: var(--primary-text-color);
-        font-size: 1.3em;
+        font-size: 1.1em;
       }
 
       .detail-type {
-        margin: 4px 0;
-        font-size: 0.95em;
+        margin: 2px 0;
+        font-size: 0.85em;
         color: var(--primary-color);
         font-weight: 500;
       }
 
       .detail-meta {
-        margin: 4px 0;
-        font-size: 0.9em;
+        margin: 2px 0;
+        font-size: 0.8em;
         color: var(--secondary-text-color);
       }
 
       .detail-episode {
         color: var(--primary-color);
         font-weight: 500;
-        font-size: 0.95em;
-        margin: 4px 0;
+        font-size: 0.85em;
+        margin: 2px 0;
       }
 
       .detail-actions {
         display: flex;
-        gap: 8px;
-        margin-top: 16px;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 10px;
       }
 
       .detail-button {
         flex: 1;
-        padding: 12px 16px;
+        min-width: 0;
+        padding: 8px 10px;
         border: none;
-        border-radius: 6px;
+        border-radius: 4px;
         cursor: pointer;
-        font-size: 0.9em;
+        font-size: 0.8em;
         display: flex;
         align-items: center;
         justify-content: center;
-        gap: 6px;
+        gap: 4px;
         transition: opacity 0.2s;
       }
 
@@ -1099,7 +1105,7 @@ class StremioBrowseCard extends LitElement {
     if (this._selectedItem) {
       return html`
         <ha-card>
-          <div class="header">
+          <div class="header detail-mode">
             <button class="back-button" @click=${this._closeDetail} aria-label="Back to browse">
               <ha-icon icon="mdi:arrow-left"></ha-icon>
               Back to Browse
