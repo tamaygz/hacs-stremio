@@ -8,7 +8,12 @@ from datetime import timedelta
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import STATE_OFF, STATE_STANDBY, STATE_UNAVAILABLE, STATE_UNKNOWN
+from homeassistant.const import (
+    STATE_OFF,
+    STATE_STANDBY,
+    STATE_UNAVAILABLE,
+    STATE_UNKNOWN,
+)
 from homeassistant.core import Event, EventStateChangedData, HomeAssistant, callback
 from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
@@ -49,6 +54,10 @@ class StremioDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             hass: Home Assistant instance
             client: Stremio API client
             entry: Config entry
+
+        Note:
+            Following Home Assistant best practices (2024.8+), complex initialization
+            logic that requires hass or async operations is deferred to _async_setup().
         """
         self.client = client
         self.entry = entry
@@ -68,15 +77,32 @@ class StremioDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             CONF_POLLING_GATE_ENTITIES, DEFAULT_POLLING_GATE_ENTITIES
         )
 
-        # Determine initial update interval based on gate entity states
-        initial_interval = self._calculate_update_interval()
-
+        # Start with the configured interval; _async_setup will adjust if needed
+        # based on gate entity states (requires hass to be available)
         super().__init__(
             hass,
             _LOGGER,
             name=DOMAIN,
-            update_interval=initial_interval,
+            update_interval=timedelta(seconds=self._configured_scan_interval),
+            config_entry=entry,
         )
+
+    async def _async_setup(self) -> None:
+        """Set up the coordinator.
+
+        This method is called during async_config_entry_first_refresh() and provides
+        proper error handling. Use this for initialization that requires hass or
+        async operations.
+        """
+        # Calculate initial interval based on gate entity states
+        # (now self.hass is available)
+        initial_interval = self._calculate_update_interval()
+        if initial_interval != self.update_interval:
+            self.update_interval = initial_interval
+            _LOGGER.debug(
+                "Adjusted initial update interval to %s based on gate entity states",
+                initial_interval,
+            )
 
         # Set up state change listeners for gate entities
         self._setup_gate_entity_listeners()
@@ -267,10 +293,7 @@ class StremioDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             except StremioConnectionError as err:
                 last_error = err
                 if attempt < MAX_RETRIES - 1:
-                    delay = min(
-                        BASE_RETRY_DELAY * (2 ** attempt),
-                        MAX_RETRY_DELAY
-                    )
+                    delay = min(BASE_RETRY_DELAY * (2**attempt), MAX_RETRY_DELAY)
                     _LOGGER.debug(
                         "Retry %d/%d for %s after %.1fs: %s",
                         attempt + 1,

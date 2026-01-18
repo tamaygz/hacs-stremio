@@ -218,7 +218,12 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                         ),
                     ): selector.EntitySelector(
                         selector.EntitySelectorConfig(
-                            domain=["media_player", "binary_sensor", "switch", "input_boolean"],
+                            domain=[
+                                "media_player",
+                                "binary_sensor",
+                                "switch",
+                                "input_boolean",
+                            ],
                             multiple=True,
                         ),
                     ),
