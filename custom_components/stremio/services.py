@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 
 import voluptuous as vol
-
 from homeassistant.core import (
     HomeAssistant,
     ServiceCall,
@@ -141,7 +140,12 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                 return {"results": [], "count": 0}
 
             # Get library from coordinator
-            library = coordinator.data.get("library", [])
+            if coordinator.data is None:
+                _LOGGER.warning("Coordinator data is None, refreshing...")
+                await coordinator.async_request_refresh()
+
+            library = (coordinator.data or {}).get("library", [])
+            _LOGGER.debug("Library has %d items", len(library))
 
             # Filter based on search type
             results = []
