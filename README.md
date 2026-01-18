@@ -124,7 +124,7 @@ title: My Library
 ```
 
 <a href="docs/screenshots/card_my_library.png">
-  <img src="docs/screenshots/card_my_library.png" alt="My Library Card" width="600" />
+  <img src="docs/screenshots/card_my_library.png" alt="My Library Card" width="450" />
 </a>
 
 ### Continue Watching Card
@@ -136,7 +136,7 @@ type: custom:stremio-continue-watching-card
 ```
 
 <a href="docs/screenshots/card_continue_watching.png">
-  <img src="docs/screenshots/card_continue_watching.png" alt="Continue Watching Card" width="600" />
+  <img src="docs/screenshots/card_continue_watching.png" alt="Continue Watching Card" width="450" />
 </a>
 
 ### Browse Catalog Card
@@ -148,7 +148,7 @@ type: custom:stremio-browse-catalog-card
 ```
 
 <a href="docs/screenshots/card_browse_catalog.png">
-  <img src="docs/screenshots/card_browse_catalog.png" alt="Browse Catalog Card" width="600" />
+  <img src="docs/screenshots/card_browse_catalog.png" alt="Browse Catalog Card" width="450" />
 </a>
 
 ### Recommended Media Card
@@ -160,7 +160,7 @@ type: custom:stremio-recommended-media-card
 ```
 
 <a href="docs/screenshots/card_recommended_media.png">
-  <img src="docs/screenshots/card_recommended_media.png" alt="Recommended Media Card" width="600" />
+  <img src="docs/screenshots/card_recommended_media.png" alt="Recommended Media Card" width="450" />
 </a>
 
 📖 [UI Cards Guide](docs/ui.md)
