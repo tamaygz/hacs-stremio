@@ -595,13 +595,13 @@ class StremioClient:
     def _sort_addons_by_preference(
         self,
         addons: list[dict[str, Any]],
-        addon_order: list[str],
+        addon_order: list[str] | str,
     ) -> list[dict[str, Any]]:
         """Sort addons according to user preference.
 
         Args:
             addons: List of addon dictionaries with 'name' and 'id' keys
-            addon_order: User's preferred order (list of addon names/IDs)
+            addon_order: User's preferred order (list of addon names/IDs or multiline string)
 
         Returns:
             Sorted list of addons with preferred ones first
@@ -610,17 +610,20 @@ class StremioClient:
             return addons
 
         # Parse addon_order if it's a string (multiline text from config)
+        order_list: list[str]
         if isinstance(addon_order, str):
-            addon_order = [
+            order_list = [
                 line.strip()
                 for line in addon_order.split("\n")
                 if line.strip()
             ]
+        else:
+            order_list = addon_order
 
         # Create a mapping of addon name/id to index in preference list
         # Lower index = higher priority
         preference_map: dict[str, int] = {}
-        for idx, pref in enumerate(addon_order):
+        for idx, pref in enumerate(order_list):
             pref_lower = pref.lower()
             preference_map[pref_lower] = idx
 
@@ -636,7 +639,7 @@ class StremioClient:
                 return (preference_map[addon_id], name)
 
             # Not in preference list - put at the end
-            return (len(addon_order), name)
+            return (len(order_list), name)
 
         return sorted(addons, key=get_sort_key)
 

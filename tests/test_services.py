@@ -154,6 +154,102 @@ class TestGetStreamsService:
         with pytest.raises(ServiceValidationError):
             await handler(service_call)
 
+    @pytest.mark.asyncio
+    async def test_get_streams_with_addon_order(
+        self, hass: HomeAssistant, mock_coordinator
+    ):
+        """Test get_streams service passes addon order to client."""
+        from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+        # Create config entry with addon order preference
+        entry = MockConfigEntry(
+            domain=DOMAIN,
+            data={"email": "test@example.com", "password": "test"},
+            options={
+                "addon_stream_order": "Torrentio\\nCinemetaStreams",
+                "stream_quality_preference": "any",
+            },
+            entry_id="test_entry_with_prefs",
+        )
+        entry.add_to_hass(hass)
+
+        mock_client = AsyncMock()
+        mock_client.async_get_streams = AsyncMock(return_value=MOCK_STREAMS)
+
+        hass.data[DOMAIN] = {
+            entry.entry_id: {
+                "coordinator": mock_coordinator,
+                "client": mock_client,
+            }
+        }
+
+        await async_setup_services(hass)
+
+        calls = hass.services.async_register.call_args_list
+        streams_call = next(c for c in calls if c[0][1] == SERVICE_GET_STREAMS)
+        handler = streams_call[0][2]
+
+        service_call = MagicMock(spec=ServiceCall)
+        service_call.data = {
+            "media_id": "tt0111161",
+            "media_type": "movie",
+        }
+
+        await handler(service_call)
+
+        # Verify client was called with preferences
+        mock_client.async_get_streams.assert_called_once()
+        call_kwargs = mock_client.async_get_streams.call_args
+        assert "addon_order" in call_kwargs.kwargs or len(call_kwargs.args) > 4
+
+    @pytest.mark.asyncio
+    async def test_get_streams_with_quality_preference(
+        self, hass: HomeAssistant, mock_coordinator
+    ):
+        """Test get_streams service passes quality preference to client."""
+        from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+        # Create config entry with quality preference
+        entry = MockConfigEntry(
+            domain=DOMAIN,
+            data={"email": "test@example.com", "password": "test"},
+            options={
+                "addon_stream_order": "",
+                "stream_quality_preference": "1080p",
+            },
+            entry_id="test_entry_quality",
+        )
+        entry.add_to_hass(hass)
+
+        mock_client = AsyncMock()
+        mock_client.async_get_streams = AsyncMock(return_value=MOCK_STREAMS)
+
+        hass.data[DOMAIN] = {
+            entry.entry_id: {
+                "coordinator": mock_coordinator,
+                "client": mock_client,
+            }
+        }
+
+        await async_setup_services(hass)
+
+        calls = hass.services.async_register.call_args_list
+        streams_call = next(c for c in calls if c[0][1] == SERVICE_GET_STREAMS)
+        handler = streams_call[0][2]
+
+        service_call = MagicMock(spec=ServiceCall)
+        service_call.data = {
+            "media_id": "tt0111161",
+            "media_type": "movie",
+        }
+
+        await handler(service_call)
+
+        # Verify client was called with quality preference
+        mock_client.async_get_streams.assert_called_once()
+        call_kwargs = mock_client.async_get_streams.call_args
+        assert "quality_preference" in call_kwargs.kwargs or len(call_kwargs.args) > 5
+
 
 class TestAddToLibraryService:
     """Tests for the add_to_library service."""

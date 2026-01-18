@@ -27,6 +27,7 @@ A comprehensive Home Assistant Custom Component (HACS) integration that connects
 | 🔍 **Media Source**        | Browse library from HA media browser            |
 | 🎯 **Services**            | Search, manage library, get stream URLs         |
 | 🎭 **Catalog Browsing**    | Browse popular movies, TV shows, and by genre   |
+| ⚙️ **Stream Preferences**  | Configure addon order & quality preferences     |
 
 ---
 
