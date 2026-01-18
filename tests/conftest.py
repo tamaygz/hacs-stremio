@@ -8,6 +8,7 @@ See docs/testing.md for details.
 
 from __future__ import annotations
 
+import sys
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -15,6 +16,27 @@ from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
 from homeassistant.core import HomeAssistant
 
 from custom_components.stremio.const import DOMAIN
+
+
+def pytest_configure(config):
+    """Enable socket for Windows before any test fixtures load.
+    
+    This is necessary because Windows' ProactorEventLoop requires socket access
+    for internal event loop operations (socketpair for self-pipe).
+    """
+    if sys.platform == "win32":
+        # On Windows, we need to enable socket before pytest-socket blocks it
+        import socket as socket_module
+        # Store original socket class
+        config._original_socket = socket_module.socket
+        
+        # Try to re-enable socket if pytest-socket has already blocked it
+        try:
+            import pytest_socket
+            pytest_socket.enable_socket()
+        except (ImportError, AttributeError):
+            pass
+
 
 # Import fixtures from pytest-homeassistant-custom-component
 # These provide properly mocked HomeAssistant instances that work with pytest-socket
