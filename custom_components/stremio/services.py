@@ -620,6 +620,7 @@ async def async_unload_services(hass: HomeAssistant) -> None:
     """
     hass.services.async_remove(DOMAIN, SERVICE_SEARCH_LIBRARY)
     hass.services.async_remove(DOMAIN, SERVICE_GET_STREAMS)
+    hass.services.async_remove(DOMAIN, SERVICE_GET_SERIES_METADATA)
     hass.services.async_remove(DOMAIN, SERVICE_ADD_TO_LIBRARY)
     hass.services.async_remove(DOMAIN, SERVICE_REMOVE_FROM_LIBRARY)
     hass.services.async_remove(DOMAIN, SERVICE_REFRESH_LIBRARY)
