@@ -572,6 +572,7 @@ class StremioRecommendationsCard extends LitElement {
 
   _closeDetail() {
     this._selectedItem = null;
+    this.requestUpdate();
     
     this.dispatchEvent(
       new CustomEvent('stremio-detail-closed', {

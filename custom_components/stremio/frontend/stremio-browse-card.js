@@ -645,6 +645,7 @@ class StremioBrowseCard extends LitElement {
 
   _closeDetail() {
     this._selectedItem = null;
+    this.requestUpdate();
     
     // Fire event for external listeners
     this.dispatchEvent(
@@ -941,6 +942,7 @@ class StremioBrowseCard extends LitElement {
   _closeSimilarView() {
     this._similarItems = null;
     this._similarSourceItem = null;
+    this.requestUpdate();
   }
 
   /**

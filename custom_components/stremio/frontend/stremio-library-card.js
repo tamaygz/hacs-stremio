@@ -673,6 +673,7 @@ class StremioLibraryCard extends LitElement {
 
   _closeDetail() {
     this._selectedItem = null;
+    this.requestUpdate();
     
     // Fire event for external listeners
     this.dispatchEvent(
