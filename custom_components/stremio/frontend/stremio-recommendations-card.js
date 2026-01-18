@@ -681,7 +681,8 @@ class StremioRecommendationsCard extends LitElement {
           poster: item.poster,
           imdb_id: item.imdb_id || item.id,
         },
-        streams
+        streams,
+        this.config.apple_tv_entity
       );
     } else {
       let dialog = document.querySelector('stremio-stream-dialog');
@@ -692,6 +693,7 @@ class StremioRecommendationsCard extends LitElement {
       dialog.hass = this._hass;
       dialog.mediaItem = item;
       dialog.streams = streams;
+      dialog.appleTvEntity = this.config.apple_tv_entity;
       dialog.open = true;
     }
   }
