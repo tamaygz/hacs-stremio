@@ -40,6 +40,7 @@ CONF_APPLE_TV_ENTITY_ID: Final = "apple_tv_entity_id"
 CONF_APPLE_TV_CREDENTIALS: Final = "apple_tv_credentials"
 CONF_APPLE_TV_IDENTIFIER: Final = "apple_tv_identifier"
 CONF_POLLING_GATE_ENTITIES: Final = "polling_gate_entities"
+CONF_SHOW_COPY_URL: Final = "show_copy_url"
 
 # Options defaults
 DEFAULT_PLAYER_SCAN_INTERVAL: Final = 30  # seconds
@@ -49,6 +50,7 @@ DEFAULT_HANDOVER_METHOD: Final = "auto"
 DEFAULT_APPLE_TV_DEVICE: Final = ""
 DEFAULT_APPLE_TV_ENTITY_ID: Final = ""
 DEFAULT_POLLING_GATE_ENTITIES: Final[list[str]] = []
+DEFAULT_SHOW_COPY_URL: Final = True  # Show "Copy URL" in media browser streams
 
 # Polling gate intervals (seconds)
 POLLING_GATE_ACTIVE_INTERVAL: Final = None  # Use configured interval

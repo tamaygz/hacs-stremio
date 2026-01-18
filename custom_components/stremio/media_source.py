@@ -19,7 +19,7 @@ from homeassistant.components.media_source import (
 )
 from homeassistant.core import HomeAssistant
 
-from .const import DOMAIN
+from .const import CONF_SHOW_COPY_URL, DEFAULT_SHOW_COPY_URL, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -879,8 +879,8 @@ class StremioMediaSource(MediaSource):
                 )
             )
 
-            # Add a URL copy entry if URL is available
-            if stream_url:
+            # Add a URL copy entry if URL is available and option is enabled
+            if stream_url and self._should_show_copy_url():
                 # Truncate URL for display if too long
                 display_url = stream_url
                 if len(display_url) > 80:
@@ -1330,6 +1330,22 @@ class StremioMediaSource(MediaSource):
             if isinstance(entry_data, dict) and "coordinator" in entry_data:
                 return entry_data["coordinator"]
         return None
+
+    def _get_config_entry(self):
+        """Get the first Stremio config entry."""
+        entries = self.hass.data.get(DOMAIN, {})
+        for entry_id, entry_data in entries.items():
+            if isinstance(entry_data, dict):
+                # Return the config entry from hass.config_entries
+                return self.hass.config_entries.async_get_entry(entry_id)
+        return None
+
+    def _should_show_copy_url(self) -> bool:
+        """Check if Copy URL option should be shown in media browser."""
+        entry = self._get_config_entry()
+        if entry:
+            return entry.options.get(CONF_SHOW_COPY_URL, DEFAULT_SHOW_COPY_URL)
+        return DEFAULT_SHOW_COPY_URL
 
     def _get_mime_type(self, url: str, stream_data: dict[str, Any]) -> str:
         """Determine MIME type for a stream URL.
