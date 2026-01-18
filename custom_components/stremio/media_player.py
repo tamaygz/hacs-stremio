@@ -90,6 +90,7 @@ class StremioMediaPlayer(
         # Track previous state to avoid unnecessary updates
         self._previous_state: MediaPlayerState | None = None
         self._previous_media_title: str | None = None
+        self._previous_media_id: str | None = None
 
     @callback
     def _handle_coordinator_update(self) -> None:
@@ -101,21 +102,41 @@ class StremioMediaPlayer(
         """
         current_state = self.state
         current_title = self.media_title
+        current_media_id = self._get_current_media_id()
 
-        # Only update if state or media actually changed
-        if (
-            current_state != self._previous_state
-            or current_title != self._previous_media_title
-        ):
+        # Check if anything actually changed
+        state_changed = current_state != self._previous_state
+        title_changed = current_title != self._previous_media_title
+        media_id_changed = current_media_id != self._previous_media_id
+
+        if state_changed or title_changed or media_id_changed:
+            _LOGGER.debug(
+                "Media player state update: state=%s (changed=%s), title=%s (changed=%s), "
+                "media_id=%s (changed=%s)",
+                current_state,
+                state_changed,
+                current_title,
+                title_changed,
+                current_media_id,
+                media_id_changed,
+            )
             self._previous_state = current_state
             self._previous_media_title = current_title
+            self._previous_media_id = current_media_id
             self.async_write_ha_state()
         else:
             _LOGGER.debug(
-                "Skipping state update - no change (state=%s, title=%s)",
+                "Skipping state update - no change (state=%s, title=%s, media_id=%s)",
                 current_state,
                 current_title,
+                current_media_id,
             )
+
+    def _get_current_media_id(self) -> str | None:
+        """Get the current media IMDB ID from coordinator data."""
+        if self.coordinator.data and self.coordinator.data.get("current_watching"):
+            return self.coordinator.data["current_watching"].get("imdb_id")
+        return None
 
     @property
     def state(self) -> MediaPlayerState:
