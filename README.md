@@ -7,6 +7,8 @@
 
 A comprehensive Home Assistant Custom Component (HACS) integration that connects to the Stremio API to track your library, viewing activity, and media consumption.
 
+> **🍎 Built for Apple TV** — This integration was created primarily to bring easy Stremio playback to Apple TV using the VLC app. Stream your favorite content directly to your Apple TV with seamless AirPlay handover!
+
 <p align="center">
   <img src="https://www.stremio.com/website/stremio-logo-small.png" alt="Stremio Logo" width="150">
 </p>

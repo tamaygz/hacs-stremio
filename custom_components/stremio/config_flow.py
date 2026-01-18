@@ -25,6 +25,7 @@ from .const import (
     CONF_LIBRARY_SCAN_INTERVAL,
     CONF_PLAYER_SCAN_INTERVAL,
     CONF_POLLING_GATE_ENTITIES,
+    CONF_SHOW_COPY_URL,
     DEFAULT_APPLE_TV_DEVICE,
     DEFAULT_APPLE_TV_ENTITY_ID,
     DEFAULT_ENABLE_APPLE_TV_HANDOVER,
@@ -32,6 +33,7 @@ from .const import (
     DEFAULT_LIBRARY_SCAN_INTERVAL,
     DEFAULT_PLAYER_SCAN_INTERVAL,
     DEFAULT_POLLING_GATE_ENTITIES,
+    DEFAULT_SHOW_COPY_URL,
     DOMAIN,
     HANDOVER_METHOD_AIRPLAY,
     HANDOVER_METHODS,
@@ -251,6 +253,12 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                             )
                         },
                     ): str,
+                    vol.Optional(
+                        CONF_SHOW_COPY_URL,
+                        default=self._config_entry.options.get(
+                            CONF_SHOW_COPY_URL, DEFAULT_SHOW_COPY_URL
+                        ),
+                    ): bool,
                 }
             ),
             errors=errors,
