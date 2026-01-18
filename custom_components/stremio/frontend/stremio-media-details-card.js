@@ -5,7 +5,8 @@
  * description, cast, year, genres, and provides access to streams.
  * 
  * @customElement stremio-media-details-card
- * @version 0.2.4
+ * @version 0.3.1
+ * @cacheBust 20260118
  */
 
 // Safe LitElement access - wait for HA frontend to be ready

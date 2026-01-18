@@ -3,6 +3,11 @@
 This module handles automatic registration of custom Lovelace cards
 with Home Assistant's frontend system, eliminating the need for
 manual resource configuration.
+
+Cache busting is achieved by:
+1. Adding version query parameter to resource URLs (?v=X.Y.Z)
+2. Using INTEGRATION_VERSION from manifest.json as the source of truth
+3. Automatically updating Lovelace resources when version changes
 """
 
 from __future__ import annotations
@@ -23,7 +28,7 @@ except ImportError:
     HAS_STATIC_PATH_CONFIG = False
     StaticPathConfig = None  # type: ignore[assignment, misc]
 
-from ..const import JSMODULES, URL_BASE
+from ..const import INTEGRATION_VERSION, JSMODULES, URL_BASE
 
 if TYPE_CHECKING:
     from homeassistant.components.lovelace import LovelaceData
@@ -102,14 +107,24 @@ class JSModuleRegistration:
             await self._async_wait_for_lovelace_resources()
         else:
             _LOGGER.info(
-                "Lovelace mode is '%s'. Add resources manually if needed: %s/*.js",
+                "Lovelace mode is '%s'. Add resources manually if needed: %s/*.js?v=%s",
                 mode or "unknown",
                 URL_BASE,
+                INTEGRATION_VERSION,
             )
 
     async def _async_register_path(self) -> None:
-        """Register the static HTTP path for serving JS files."""
+        """Register the static HTTP path for serving JS files.
+        
+        Note: Cache busting is achieved through version query params on resource URLs.
+        The static path serves files without caching by default in HA dev mode.
+        """
         frontend_path = Path(__file__).parent
+        _LOGGER.info(
+            "Registering Stremio frontend v%s from %s",
+            INTEGRATION_VERSION,
+            frontend_path,
+        )
 
         # Try modern method first (HA 2024.6+)
         if HAS_STATIC_PATH_CONFIG and StaticPathConfig is not None:

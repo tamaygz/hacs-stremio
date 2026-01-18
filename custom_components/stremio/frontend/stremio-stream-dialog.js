@@ -6,6 +6,8 @@
  * 
  * @customElement stremio-stream-dialog
  * @extends LitElement
+ * @version 0.3.1
+ * @cacheBust 20260118
  */
 
 // Safe LitElement access - wait for HA frontend to be ready

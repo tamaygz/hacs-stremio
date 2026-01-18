@@ -5,10 +5,12 @@
  * Cards are auto-registered when the integration loads.
  * 
  * @author @tamaygz
- * @version 0.3.0
+ * @version 0.3.1
+ * @cacheBust 20260118
  */
 
 // Import card components (relative paths - all in frontend/ folder)
+// Cache busting is handled via version query param on the bundle URL
 import './stremio-browse-card.js';
 import './stremio-continue-watching-card.js';
 import './stremio-library-card.js';
@@ -17,7 +19,7 @@ import './stremio-player-card.js';
 import './stremio-stream-dialog.js';
 
 // Card registration info - should match manifest.json version
-const CARD_VERSION = '0.3.0';
+const CARD_VERSION = '0.3.1';
 
 console.info(
   `%c STREMIO CARDS %c ${CARD_VERSION} `,
