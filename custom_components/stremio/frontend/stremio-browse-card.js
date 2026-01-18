@@ -389,7 +389,9 @@ class StremioBrowseCard extends LitElement {
   _openMediaBrowser(item) {
     // Navigate to media browser for this item
     if (!item || !item.media_content_id) {
-      console.error('Stremio Browse Card: Invalid item or missing media_content_id');
+      console.error('Stremio Browse Card: Invalid item or missing media_content_id', { 
+        item: item ? { title: item.title, type: item.media_content_type } : null 
+      });
       return;
     }
 

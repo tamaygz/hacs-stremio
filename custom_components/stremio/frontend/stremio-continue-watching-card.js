@@ -420,8 +420,17 @@ class StremioContinueWatchingCard extends LitElement {
   _resumeInStremio(item) {
     const type = item.type === 'series' ? 'series' : 'movie';
     const id = item.imdb_id || item.id;
-    if (id) {
-      window.open(`stremio://detail/${type}/${id}`, '_blank');
+    
+    // Validate ID format to prevent protocol injection
+    // IMDb IDs should match pattern: tt followed by 7-8 digits
+    if (id && typeof id === 'string') {
+      // Basic sanitization: only allow alphanumeric and safe characters
+      const sanitizedId = id.replace(/[^a-zA-Z0-9_-]/g, '');
+      if (sanitizedId && sanitizedId.length > 0) {
+        window.open(`stremio://detail/${type}/${sanitizedId}`, '_blank');
+      } else {
+        console.warn('Stremio Continue Watching Card: Invalid media ID format', id);
+      }
     }
   }
 
