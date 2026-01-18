@@ -99,6 +99,26 @@ SENSOR_TYPES: tuple[StremioSensorEntityDescription, ...] = (
         native_unit_of_measurement="items",
         state_class=SensorStateClass.MEASUREMENT,
         value_fn=lambda data: data.get("library_count", 0),
+        attributes_fn=lambda data: {
+            "items": [
+                {
+                    "title": item.get("title"),
+                    "type": item.get("type"),
+                    "poster": item.get("poster"),
+                    "imdb_id": item.get("imdb_id"),
+                    "id": item.get("id"),
+                    "year": item.get("year"),
+                    "progress_percent": (
+                        round(
+                            (item.get("progress", 0) / item.get("duration", 1)) * 100, 1
+                        )
+                        if item.get("duration", 0) > 0
+                        else 0
+                    ),
+                }
+                for item in data.get("library", [])
+            ]
+        },
     ),
     StremioSensorEntityDescription(
         key="current_watching",
@@ -178,6 +198,10 @@ SENSOR_TYPES: tuple[StremioSensorEntityDescription, ...] = (
                 {
                     "title": item.get("title"),
                     "type": item.get("type"),
+                    "poster": item.get("poster"),
+                    "imdb_id": item.get("imdb_id"),
+                    "id": item.get("id"),
+                    "year": item.get("year"),
                     "progress_percent": (
                         round(
                             (item.get("progress", 0) / item.get("duration", 1)) * 100, 1
@@ -186,7 +210,7 @@ SENSOR_TYPES: tuple[StremioSensorEntityDescription, ...] = (
                         else 0
                     ),
                 }
-                for item in data.get("continue_watching", [])[:5]
+                for item in data.get("continue_watching", [])
             ]
         },
     ),
