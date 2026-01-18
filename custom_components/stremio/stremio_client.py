@@ -550,7 +550,7 @@ class StremioClient:
             resources = manifest.get("resources", [])
             provides_stream = False
             types_match = False
-            prefix_match = True  # Default to true if no prefix defined
+            prefix_match = True  # Default to true if no prefix defined or media_id is empty
 
             for resource in resources:
                 if isinstance(resource, str):
@@ -559,22 +559,26 @@ class StremioClient:
                         # Use manifest-level types
                         types = manifest.get("types", [])
                         types_match = media_type in types or not types
-                        # Check id prefix
+                        # Check id prefix - skip check if media_id is empty
                         prefixes = manifest.get("idPrefixes", [])
-                        if prefixes:
+                        if prefixes and media_id:
                             prefix_match = any(media_id.startswith(p) for p in prefixes)
+                        else:
+                            prefix_match = True
                 elif isinstance(resource, dict):
                     if resource.get("name") == "stream":
                         provides_stream = True
                         # Use resource-specific types or fallback to manifest
                         types = resource.get("types", manifest.get("types", []))
                         types_match = media_type in types or not types
-                        # Check id prefix
+                        # Check id prefix - skip check if media_id is empty
                         prefixes = resource.get(
                             "idPrefixes", manifest.get("idPrefixes", [])
                         )
-                        if prefixes:
+                        if prefixes and media_id:
                             prefix_match = any(media_id.startswith(p) for p in prefixes)
+                        else:
+                            prefix_match = True
 
             if provides_stream and types_match and prefix_match:
                 stream_addons.append(
@@ -620,26 +624,62 @@ class StremioClient:
         else:
             order_list = addon_order
 
+        if not order_list:
+            return addons
+
+        _LOGGER.debug("Addon preference order: %s", order_list)
+        _LOGGER.debug("Available addons: %s", [a.get("name") for a in addons])
+
         # Create a mapping of addon name/id to index in preference list
         # Lower index = higher priority
+        # Store both exact lowercase match and normalized (alphanumeric only) for fuzzy match
         preference_map: dict[str, int] = {}
+        preference_map_normalized: dict[str, int] = {}
         for idx, pref in enumerate(order_list):
             pref_lower = pref.lower()
             preference_map[pref_lower] = idx
+            # Create normalized version (remove special chars for fuzzy matching)
+            pref_normalized = "".join(c.lower() for c in pref if c.isalnum())
+            if pref_normalized:
+                preference_map_normalized[pref_normalized] = idx
 
         def get_sort_key(addon: dict[str, Any]) -> tuple[int, str]:
             """Get sort key for addon (priority, name)."""
-            name = addon.get("name", "").lower()
-            addon_id = addon.get("id", "").lower()
+            name = addon.get("name", "")
+            addon_id = addon.get("id", "")
+            name_lower = name.lower()
+            addon_id_lower = addon_id.lower()
 
-            # Check if addon matches any preference (by name or ID)
-            if name in preference_map:
-                return (preference_map[name], name)
-            if addon_id in preference_map:
-                return (preference_map[addon_id], name)
+            # First try exact match (case-insensitive)
+            if name_lower in preference_map:
+                _LOGGER.debug("Addon '%s' matched by exact name at position %d", name, preference_map[name_lower])
+                return (preference_map[name_lower], name_lower)
+            if addon_id_lower in preference_map:
+                _LOGGER.debug("Addon '%s' matched by exact ID at position %d", name, preference_map[addon_id_lower])
+                return (preference_map[addon_id_lower], name_lower)
+
+            # Try normalized match (ignore special characters)
+            name_normalized = "".join(c.lower() for c in name if c.isalnum())
+            addon_id_normalized = "".join(c.lower() for c in addon_id if c.isalnum())
+            if name_normalized in preference_map_normalized:
+                _LOGGER.debug("Addon '%s' matched by normalized name at position %d", name, preference_map_normalized[name_normalized])
+                return (preference_map_normalized[name_normalized], name_lower)
+            if addon_id_normalized in preference_map_normalized:
+                _LOGGER.debug("Addon '%s' matched by normalized ID at position %d", name, preference_map_normalized[addon_id_normalized])
+                return (preference_map_normalized[addon_id_normalized], name_lower)
+
+            # Try partial/contains match for preferences
+            for pref_lower, idx in preference_map.items():
+                if pref_lower in name_lower or name_lower in pref_lower:
+                    _LOGGER.debug("Addon '%s' matched by partial name '%s' at position %d", name, pref_lower, idx)
+                    return (idx, name_lower)
+                if pref_lower in addon_id_lower or addon_id_lower in pref_lower:
+                    _LOGGER.debug("Addon '%s' matched by partial ID '%s' at position %d", name, pref_lower, idx)
+                    return (idx, name_lower)
 
             # Not in preference list - put at the end
-            return (len(order_list), name)
+            _LOGGER.debug("Addon '%s' not matched, placing at end", name)
+            return (len(order_list), name_lower)
 
         return sorted(addons, key=get_sort_key)
 

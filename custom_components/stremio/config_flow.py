@@ -188,6 +188,12 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             # Store the options for later
             self._pending_options = user_input
 
+            # Handle empty text fields that may be omitted from user_input
+            # TextSelector with multiline=True doesn't include empty values in user_input
+            # We need to explicitly set them to empty string if they were cleared
+            if CONF_ADDON_STREAM_ORDER not in user_input:
+                self._pending_options[CONF_ADDON_STREAM_ORDER] = ""
+
             # Check if we need to configure Apple TV
             enable_handover = user_input.get(
                 CONF_ENABLE_APPLE_TV_HANDOVER, DEFAULT_ENABLE_APPLE_TV_HANDOVER
