@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 from dataclasses import dataclass
-import logging
 from typing import Any
 
 from homeassistant.components.sensor import (
@@ -25,7 +25,7 @@ from .entity_helpers import get_device_info
 _LOGGER = logging.getLogger(__name__)
 
 
-@dataclass(frozen=False)
+@dataclass(frozen=True, kw_only=True)
 class StremioSensorEntityDescription(SensorEntityDescription):
     """Describes Stremio sensor entity."""
 

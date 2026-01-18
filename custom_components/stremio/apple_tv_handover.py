@@ -216,6 +216,74 @@ class HandoverManager:
 
         return devices[0]
 
+    async def _check_airplay_feature(self, atv: Any) -> bool:
+        """Check if AirPlay (PlayUrl) feature is available.
+
+        This helper method handles multiple pyatv API versions and implementations.
+        It attempts to check the feature state in the following order:
+        1. Try modern API with FeatureState and FeatureName enums
+        2. Try alternative attribute names
+        3. Fall back to assuming available if API check fails
+
+        Args:
+            atv: PyATV device instance
+
+        Returns:
+            True if AirPlay is available, False otherwise
+        """
+        if not hasattr(atv, "features"):
+            _LOGGER.debug(
+                "Device does not have 'features' attribute, assuming AirPlay available"
+            )
+            return True
+
+        # Try modern pyatv API (FeatureState and FeatureName enums)
+        try:
+            if hasattr(pyatv, "FeatureState") and hasattr(pyatv, "FeatureName"):
+                feature_available = atv.features.in_state(
+                    pyatv.FeatureState.Available,  # type: ignore[attr-defined]
+                    pyatv.FeatureName.PlayUrl,  # type: ignore[attr-defined]
+                )
+                _LOGGER.debug(
+                    "Checked AirPlay feature using modern API: %s", feature_available
+                )
+                return feature_available
+        except (AttributeError, TypeError) as err:
+            _LOGGER.debug(
+                "Modern pyatv API check failed (%s), trying alternatives", err
+            )
+
+        # Try alternative: check if features has a PlayUrl attribute directly
+        try:
+            if hasattr(atv.features, "play_url"):
+                play_url_feature = atv.features.play_url
+                if hasattr(play_url_feature, "available"):
+                    _LOGGER.debug("Checked AirPlay via play_url.available attribute")
+                    return play_url_feature.available
+        except (AttributeError, TypeError) as err:
+            _LOGGER.debug(
+                "Alternative pyatv API check failed (%s), trying feature list", err
+            )
+
+        # Try checking feature list
+        try:
+            if hasattr(atv.features, "get_feature"):
+                # Some versions might have this method
+                feature = atv.features.get_feature("play_url")  # type: ignore[union-attr]
+                if feature is not None:
+                    _LOGGER.debug("Found PlayUrl feature via get_feature method")
+                    return True
+        except (AttributeError, TypeError) as err:
+            _LOGGER.debug(
+                "Feature list check failed (%s), assuming AirPlay available", err
+            )
+
+        # Last resort: log and assume available
+        _LOGGER.warning(
+            "Could not determine AirPlay feature availability for pyatv, assuming available"
+        )
+        return True
+
     async def handover_via_airplay(
         self,
         device_name: str,
@@ -253,11 +321,11 @@ class HandoverManager:
             atv = await pyatv.connect(device_config, self.hass.loop)
 
             try:
-                # Check if AirPlay is available
-                if not atv.features.in_state(
-                    pyatv.interface.FeatureState.Available,
-                    pyatv.interface.FeatureName.PlayUrl,
-                ):
+                # Check if AirPlay (PlayUrl) is available on the device
+                # This implementation handles multiple pyatv API versions
+                feature_available = await self._check_airplay_feature(atv)
+
+                if not feature_available:
                     raise HandoverError(
                         "AirPlay streaming not available on this device"
                     )

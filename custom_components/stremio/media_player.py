@@ -6,6 +6,7 @@ import logging
 from typing import Any
 
 from homeassistant.components.media_player import (
+    BrowseMedia,
     MediaPlayerEntity,
     MediaPlayerEntityFeature,
     MediaPlayerState,
@@ -19,6 +20,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import DOMAIN
 from .coordinator import StremioDataUpdateCoordinator
 from .entity_helpers import get_device_info
+from .media_source import StremioMediaSource
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -129,6 +131,53 @@ class StremioMediaPlayer(
                 "progress_percent": current.get("progress_percent"),
             }
         return {}
+
+    async def async_browse_media(
+        self, media_content_type: str | None = None, media_content_id: str | None = None
+    ) -> BrowseMedia:
+        """Implement the websocket media browsing helper.
+
+        This method enables the media browser UI in Home Assistant.
+        It delegates to the StremioMediaSource implementation.
+
+        Args:
+            media_content_type: Content type to browse
+            media_content_id: Content ID to browse (can be None for root,
+                            a simple identifier like "library", or a full
+                            media-source:// URI)
+
+        Returns:
+            BrowseMedia object with browsable content
+        """
+        _LOGGER.debug(
+            "Browse media requested - type=%s, id=%s",
+            media_content_type,
+            media_content_id,
+        )
+
+        # Import MediaSourceItem
+        from homeassistant.components.media_source import MediaSourceItem
+
+        # Determine the identifier from media_content_id
+        # It could be:
+        # 1. None (root browsing)
+        # 2. A simple identifier like "library" or "continue_watching"
+        # 3. A full media-source URI like "media-source://stremio/library"
+        if media_content_id and media_content_id.startswith("media-source://"):
+            # Parse the URI to extract the identifier
+            item = MediaSourceItem.from_uri(self.hass, media_content_id, self.entity_id)
+        else:
+            # Create MediaSourceItem directly with the identifier
+            item = MediaSourceItem(
+                hass=self.hass,
+                domain=DOMAIN,
+                identifier=media_content_id or "",
+                target_media_player=self.entity_id,
+            )
+
+        # Get the media source and browse
+        media_source = StremioMediaSource(self.hass)
+        return await media_source.async_browse_media(item)
 
     async def async_play_media(
         self, media_type: str, media_id: str, **kwargs: Any

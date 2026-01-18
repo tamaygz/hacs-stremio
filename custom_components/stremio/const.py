@@ -112,6 +112,7 @@ BINARY_SENSOR_TYPES: Final = {
 EVENT_PLAYBACK_STARTED: Final = "stremio_playback_started"
 EVENT_PLAYBACK_STOPPED: Final = "stremio_playback_stopped"
 EVENT_NEW_CONTENT: Final = "stremio_new_content"
+EVENT_STREAM_URL: Final = "stremio_stream_url"
 
 # Service Names
 SERVICE_GET_STREAMS: Final = "get_streams"
