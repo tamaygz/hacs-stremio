@@ -40,7 +40,9 @@ async def test_async_setup_entry_success(hass: HomeAssistant, mock_config_entry)
     ), patch(
         "custom_components.stremio.async_get_clientsession",
         return_value=mock_session,
-    ):
+    ), patch.object(
+        hass.config_entries, "async_forward_entry_setups", new_callable=AsyncMock
+    ) as mock_forward:
         from custom_components.stremio import async_setup_entry
 
         result = await async_setup_entry(hass, mock_config_entry)
@@ -48,6 +50,9 @@ async def test_async_setup_entry_success(hass: HomeAssistant, mock_config_entry)
         assert result is True
         assert DOMAIN in hass.data
         assert mock_config_entry.entry_id in hass.data[DOMAIN]
+        
+        # Verify platforms were forwarded
+        mock_forward.assert_called_once()
 
 
 @pytest.mark.asyncio

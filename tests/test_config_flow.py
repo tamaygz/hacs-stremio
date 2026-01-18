@@ -181,7 +181,13 @@ async def test_options_flow_update(hass: HomeAssistant, mock_config_entry):
         "stream_quality_preference": "1080p",
     }
 
-    result = await options_flow.async_step_init(new_options)
+    # Mock Apple TV discovery to prevent socket errors
+    with patch(
+        "custom_components.stremio.config_flow.pyatv.scan",
+        new_callable=AsyncMock,
+        return_value=[],
+    ):
+        result = await options_flow.async_step_init(new_options)
 
     assert result["type"] == FlowResultType.CREATE_ENTRY  # type: ignore[index]
     assert result["data"]["addon_stream_order"] == [

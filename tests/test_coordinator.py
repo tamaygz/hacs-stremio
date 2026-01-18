@@ -104,6 +104,7 @@ async def test_coordinator_fetch_data_auth_failure(
         side_effect=StremioAuthError("Invalid credentials")
     )
 
+    # Make sure the entry has the async_start_reauth method
     mock_config_entry.async_start_reauth = MagicMock()
 
     coordinator = StremioDataUpdateCoordinator(
