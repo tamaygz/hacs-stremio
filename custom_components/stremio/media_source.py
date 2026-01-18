@@ -19,7 +19,7 @@ from homeassistant.components.media_source import (
 )
 from homeassistant.core import HomeAssistant
 
-from .const import DOMAIN, EVENT_STREAM_URL
+from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -524,8 +524,8 @@ class StremioMediaSource(MediaSource):
 
         # If episode specified, show episode detail with streams
         if episode is not None:
-            episode_list = season_data.get("episodes", [])
-            ep_data = next(
+            episode_list: list[dict[str, Any]] = season_data.get("episodes", [])
+            ep_data: dict[str, Any] = next(
                 (e for e in episode_list if e.get("number") == episode),
                 {},
             )
@@ -563,7 +563,7 @@ class StremioMediaSource(MediaSource):
 
         # Show episodes for specific season
         episodes = []
-        episode_list = season_data.get("episodes", [])
+        episode_list: list[dict[str, Any]] = season_data.get("episodes", [])
 
         for ep_data in episode_list:
             ep_num = ep_data.get("number", 0)
