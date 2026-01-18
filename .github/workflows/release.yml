@@ -4,8 +4,8 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Version to release (e.g., 0.1.1)"
-        required: true
+        description: "Version to release (e.g., 0.1.1). Leave empty to auto-bump patch version."
+        required: false
         type: string
 
 permissions:
@@ -24,9 +24,33 @@ jobs:
         with:
           python-version: "3.13"
 
+      - name: Determine version
+        id: version
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            # Use the provided version
+            VERSION="${{ inputs.version }}"
+            echo "Using provided version: $VERSION"
+          else
+            # Auto-bump patch version from manifest.json
+            CURRENT_VERSION=$(grep -oP '"version":\s*"\K[^"]+' custom_components/stremio/manifest.json)
+            echo "Current version in manifest: $CURRENT_VERSION"
+            
+            # Split version into major.minor.patch
+            IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
+            
+            # Bump patch version
+            PATCH=$((PATCH + 1))
+            VERSION="${MAJOR}.${MINOR}.${PATCH}"
+            echo "Auto-bumped version: $VERSION"
+          fi
+          
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Final version to release: $VERSION"
+
       - name: Update version in manifest
         run: |
-          VERSION="${{ inputs.version }}"
+          VERSION="${{ steps.version.outputs.version }}"
           echo "Setting version to: $VERSION"
           sed -i "s|\"version\": \".*\"|\"version\": \"$VERSION\"|" custom_components/stremio/manifest.json
           cat custom_components/stremio/manifest.json
@@ -39,8 +63,8 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: v${{ inputs.version }}
-          name: Release v${{ inputs.version }}
+          tag_name: v${{ steps.version.outputs.version }}
+          name: Release v${{ steps.version.outputs.version }}
           files: stremio.zip
           generate_release_notes: true
         env:
@@ -48,5 +72,5 @@ jobs:
 
       - name: Summary
         run: |
-          echo "✅ Release v${{ inputs.version }} created successfully"
+          echo "✅ Release v${{ steps.version.outputs.version }} created successfully"
           echo "HACS will automatically detect the new release"
