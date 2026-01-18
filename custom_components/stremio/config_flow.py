@@ -384,7 +384,8 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                     vol.Optional(
                         CONF_STREAM_QUALITY_PREFERENCE,
                         default=self._config_entry.options.get(
-                            CONF_STREAM_QUALITY_PREFERENCE, DEFAULT_STREAM_QUALITY_PREFERENCE
+                            CONF_STREAM_QUALITY_PREFERENCE,
+                            DEFAULT_STREAM_QUALITY_PREFERENCE,
                         ),
                     ): vol.In(STREAM_QUALITY_OPTIONS),
                 }

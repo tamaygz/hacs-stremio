@@ -1,7 +1,8 @@
 """Tests for Stremio catalog functionality."""
 
 import pytest
-from unittest.mock import AsyncMock, patch
+import re
+from aioresponses import aioresponses
 
 from custom_components.stremio.stremio_client import (
     StremioClient,
@@ -43,13 +44,12 @@ async def test_async_get_catalog_movies(mock_catalog_response):
     """Test fetching movie catalog."""
     client = StremioClient("test@example.com", "fake_auth_key")
 
-    with patch.object(client, "_get_session") as mock_session:
-        mock_response = AsyncMock()
-        mock_response.status = 200
-        mock_response.json = AsyncMock(return_value=mock_catalog_response)
-
-        mock_session.return_value.__aenter__.return_value.get.return_value.__aenter__.return_value = (
-            mock_response
+    with aioresponses() as mock_aio:
+        # Mock the API call
+        mock_aio.get(
+            "https://v3-cinemeta.strem.io/catalog/movie/top.json",
+            payload=mock_catalog_response,
+            status=200,
         )
 
         result = await client.async_get_catalog(media_type="movie", catalog_id="top")
@@ -65,13 +65,12 @@ async def test_async_get_catalog_with_genre(mock_catalog_response):
     """Test fetching catalog with genre filter."""
     client = StremioClient("test@example.com", "fake_auth_key")
 
-    with patch.object(client, "_get_session") as mock_session:
-        mock_response = AsyncMock()
-        mock_response.status = 200
-        mock_response.json = AsyncMock(return_value=mock_catalog_response)
-
-        mock_session.return_value.__aenter__.return_value.get.return_value.__aenter__.return_value = (
-            mock_response
+    with aioresponses() as mock_aio:
+        # Mock the API call with genre parameter (URL pattern matching)
+        mock_aio.get(
+            re.compile(r"https://v3-cinemeta\.strem\.io/catalog/movie/top/.*Drama.*"),
+            payload=mock_catalog_response,
+            status=200,
         )
 
         result = await client.async_get_catalog(
@@ -79,8 +78,6 @@ async def test_async_get_catalog_with_genre(mock_catalog_response):
         )
 
         assert len(result) == 2
-        # Verify the API was called with genre parameter
-        mock_session.return_value.__aenter__.return_value.get.assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -88,13 +85,13 @@ async def test_async_get_popular_movies(mock_catalog_response):
     """Test convenience method for popular movies."""
     client = StremioClient("test@example.com", "fake_auth_key")
 
-    with patch.object(client, "_get_session") as mock_session:
-        mock_response = AsyncMock()
-        mock_response.status = 200
-        mock_response.json = AsyncMock(return_value=mock_catalog_response)
-
-        mock_session.return_value.__aenter__.return_value.get.return_value.__aenter__.return_value = (
-            mock_response
+    with aioresponses() as mock_aio:
+        # Match the exact URL pattern that will be called
+        mock_aio.get(
+            re.compile(r"https://v3-cinemeta\.strem\.io/catalog/movie/top\.json.*"),
+            payload=mock_catalog_response,
+            status=200,
+            repeat=True,
         )
 
         result = await client.async_get_popular_movies(limit=50)
@@ -121,13 +118,12 @@ async def test_async_get_popular_series():
         ]
     }
 
-    with patch.object(client, "_get_session") as mock_session:
-        mock_response = AsyncMock()
-        mock_response.status = 200
-        mock_response.json = AsyncMock(return_value=series_response)
-
-        mock_session.return_value.__aenter__.return_value.get.return_value.__aenter__.return_value = (
-            mock_response
+    with aioresponses() as mock_aio:
+        mock_aio.get(
+            re.compile(r"https://v3-cinemeta\.strem\.io/catalog/series/top\.json.*"),
+            payload=series_response,
+            status=200,
+            repeat=True,
         )
 
         result = await client.async_get_popular_series(limit=50)
@@ -142,13 +138,11 @@ async def test_async_get_catalog_empty_response():
     """Test handling empty catalog response."""
     client = StremioClient("test@example.com", "fake_auth_key")
 
-    with patch.object(client, "_get_session") as mock_session:
-        mock_response = AsyncMock()
-        mock_response.status = 200
-        mock_response.json = AsyncMock(return_value={"metas": []})
-
-        mock_session.return_value.__aenter__.return_value.get.return_value.__aenter__.return_value = (
-            mock_response
+    with aioresponses() as mock_aio:
+        mock_aio.get(
+            "https://v3-cinemeta.strem.io/catalog/movie/top.json",
+            payload={"metas": []},
+            status=200,
         )
 
         result = await client.async_get_catalog(media_type="movie")
@@ -161,12 +155,10 @@ async def test_async_get_catalog_http_error():
     """Test catalog fetch with HTTP error status."""
     client = StremioClient("test@example.com", "fake_auth_key")
 
-    with patch.object(client, "_get_session") as mock_session:
-        mock_response = AsyncMock()
-        mock_response.status = 500
-
-        mock_session.return_value.__aenter__.return_value.get.return_value.__aenter__.return_value = (
-            mock_response
+    with aioresponses() as mock_aio:
+        mock_aio.get(
+            "https://v3-cinemeta.strem.io/catalog/movie/top.json",
+            status=500,
         )
 
         result = await client.async_get_catalog(media_type="movie")
@@ -180,9 +172,10 @@ async def test_async_get_catalog_network_error():
     """Test catalog fetch with network exception."""
     client = StremioClient("test@example.com", "fake_auth_key")
 
-    with patch.object(client, "_get_session") as mock_session:
-        mock_session.return_value.__aenter__.return_value.get.side_effect = Exception(
-            "Network error"
+    with aioresponses() as mock_aio:
+        mock_aio.get(
+            "https://v3-cinemeta.strem.io/catalog/movie/top.json",
+            exception=Exception("Network error"),
         )
 
         # Network errors raise StremioConnectionError
@@ -195,13 +188,11 @@ async def test_async_get_catalog_with_pagination(mock_catalog_response):
     """Test catalog with pagination parameters."""
     client = StremioClient("test@example.com", "fake_auth_key")
 
-    with patch.object(client, "_get_session") as mock_session:
-        mock_response = AsyncMock()
-        mock_response.status = 200
-        mock_response.json = AsyncMock(return_value=mock_catalog_response)
-
-        mock_session.return_value.__aenter__.return_value.get.return_value.__aenter__.return_value = (
-            mock_response
+    with aioresponses() as mock_aio:
+        mock_aio.get(
+            re.compile(r"https://v3-cinemeta\.strem\.io/catalog/movie/top/.*skip=20.*"),
+            payload=mock_catalog_response,
+            status=200,
         )
 
         result = await client.async_get_catalog(media_type="movie", skip=20, limit=10)
@@ -228,13 +219,12 @@ async def test_browse_catalog_service():
         ]
     }
 
-    with patch.object(client, "_get_session") as mock_session:
-        mock_resp = AsyncMock()
-        mock_resp.status = 200
-        mock_resp.json = AsyncMock(return_value=mock_response)
-
-        mock_session.return_value.__aenter__.return_value.get.return_value.__aenter__.return_value = (
-            mock_resp
+    with aioresponses() as mock_aio:
+        mock_aio.get(
+            re.compile(r"https://v3-cinemeta\.strem\.io/catalog/movie/top.*Drama.*"),
+            payload=mock_response,
+            status=200,
+            repeat=True,
         )
 
         # Test browsing movies
