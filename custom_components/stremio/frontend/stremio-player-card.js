@@ -468,12 +468,18 @@ class StremioPlayerCard extends LitElement {
 
   // Grid sizing for sections view (HA 2024.8+)
   getGridOptions() {
-    return {
+    const defaults = {
       rows: 3,
       columns: 6,
       min_rows: 2,
       min_columns: 3,
     };
+
+    if (this.config?.layout && typeof this.config.layout === 'object') {
+      return { ...defaults, ...this.config.layout };
+    }
+
+    return defaults;
   }
 
   static getConfigElement() {

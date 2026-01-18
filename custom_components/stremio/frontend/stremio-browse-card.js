@@ -93,6 +93,9 @@ class StremioBrowseCard extends LitElement {
         grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
         gap: 12px;
         padding: 16px;
+        max-height: var(--card-max-height, none);
+        overflow-y: auto;
+        align-items: start;
       }
 
       @media (max-width: 768px) {
@@ -450,6 +453,54 @@ class StremioBrowseCard extends LitElement {
   }
 
   render() {
+    const columns = Number(this.config.columns || 5);
+    const posterAspectRatio = this.config.poster_aspect_ratio || '2/3';
+    const cardHeight = this.config.card_height > 0 ? `${this.config.card_height}px` : 'none';
+    const gridStyle = `--card-max-height: ${cardHeight}; --grid-columns: ${columns}; --poster-aspect-ratio: ${posterAspectRatio};`;
+
+    // If showing similar items, show that view
+    if (this._similarItems && this._similarItems.length > 0) {
+      const sourceTitle = this._similarSourceItem?.title || this._similarSourceItem?.name || 'Unknown';
+      return html`
+        <ha-card>
+          <div class="header">
+            <button class="back-button" @click=${this._closeSimilarView} aria-label="Back to browse">
+              <ha-icon icon="mdi:arrow-left"></ha-icon>
+              Back to Browse
+            </button>
+            <h2 class="header-title" style="margin-top: 12px;">
+              Similar to "${sourceTitle}"
+              <span class="count-badge">(${this._similarItems.length})</span>
+            </h2>
+          </div>
+          <div 
+            class="catalog-grid ${this.config.horizontal_scroll ? 'horizontal' : ''}" 
+            role="list" 
+            aria-label="Similar items"
+            style="${gridStyle}"
+          >
+            ${this._similarItems.map(item => this._renderSimilarItem(item))}
+          </div>
+        </ha-card>
+      `;
+    }
+
+    // If an item is selected, show detail view instead of grid
+    if (this._selectedItem) {
+      return html`
+        <ha-card>
+          <div class="header">
+            <button class="back-button" @click=${this._closeDetail} aria-label="Back to browse">
+              <ha-icon icon="mdi:arrow-left"></ha-icon>
+              Back to Browse
+            </button>
+          </div>
+          ${this._renderDetailView()}
+        </ha-card>
+      `;
+    }
+
+    // Normal grid view
     return html`
       <ha-card>
         <div class="header">
@@ -524,66 +575,510 @@ class StremioBrowseCard extends LitElement {
             No ${this._viewMode} ${this._mediaType === 'movie' ? 'movies' : 'TV shows'} found
           </div>
         ` : html`
-          <div class="catalog-grid" style="grid-template-columns: repeat(auto-fill, minmax(${100 + (this.config.columns - 4) * 20}px, 1fr))">
-            ${this._catalogItems.map(item => html`
-              <div 
-                class="catalog-item" 
-                role="button"
-                tabindex="0"
-                aria-label="${item.title}"
-                @click=${() => this._handleItemClick(item)}
-                @keydown=${(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    this._handleItemClick(item);
-                  }
-                }}
-              >
-                ${item.thumbnail ? html`
-                  <img 
-                    class="catalog-poster" 
-                    src="${item.thumbnail}" 
-                    alt="${item.title}"
-                    loading="lazy"
-                  />
-                ` : html`
-                  <div class="catalog-poster"></div>
-                `}
-                <div class="catalog-title">${item.title}</div>
-              </div>
-            `)}
+          <div 
+            class="catalog-grid" 
+            role="list"
+            aria-label="Catalog items"
+            style="${gridStyle} grid-template-columns: repeat(auto-fill, minmax(${100 + (columns - 4) * 20}px, 1fr));"
+          >
+            ${this._catalogItems.map(item => this._renderCatalogItem(item))}
           </div>
         `}
+      </ha-card>
+    `;
+  }
 
-        ${this._selectedItem ? html`
-          <div class="modal-overlay" @click=${this._closeDetail}>
-            <div class="item-detail" @click=${(e) => e.stopPropagation()}>
-              <button class="close-button" aria-label="Close" @click=${this._closeDetail}>✕</button>
-              <div class="detail-header">
-                ${this._selectedItem.thumbnail ? html`
-                  <img class="detail-poster" src="${this._selectedItem.thumbnail}" alt="${this._selectedItem.title}" />
-                ` : ''}
-                <div class="detail-info">
-                  <h3>${this._selectedItem.title}</h3>
-                  <p>Type: ${this._selectedItem.media_content_type || 'Unknown'}</p>
+  _renderCatalogItem(item) {
+    const mediaType = this._getItemMediaType(item);
+    
+    return html`
+      <div 
+        class="catalog-item" 
+        role="listitem"
+        tabindex="0"
+        aria-label="${item.title}"
+        style="--poster-aspect-ratio: ${this.config.poster_aspect_ratio || '2/3'}"
+        @click=${() => this._handleItemClick(item)}
+        @keydown=${(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            this._handleItemClick(item);
+          }
+        }}
+      >
+        <div class="catalog-poster-container">
+          ${item.thumbnail ? html`
+            <img 
+              class="catalog-poster" 
+              src="${item.thumbnail}" 
+              alt=""
+              loading="lazy"
+            />
+          ` : html`
+            <div class="catalog-poster-placeholder">
+              <ha-icon icon="mdi:movie-outline"></ha-icon>
+            </div>
+          `}
+        </div>
+        ${this.config.show_media_type_badge ? html`
+          <span class="media-type-badge ${mediaType}">${mediaType === 'series' ? 'TV' : 'Movie'}</span>
+        ` : ''}
+        ${this.config.show_title !== false ? html`
+          <div class="catalog-title">${item.title}</div>
+        ` : ''}
+      </div>
+    `;
+  }
+
+  _renderDetailView() {
+    const item = this._selectedItem;
+    const title = item.title || 'Unknown';
+    const mediaType = this._getItemMediaType(item);
+    const hasSelectedEpisode = mediaType === 'series' && item.selectedSeason && item.selectedEpisode;
+    const episodeLabel = hasSelectedEpisode 
+      ? `S${String(item.selectedSeason).padStart(2, '0')}E${String(item.selectedEpisode).padStart(2, '0')}`
+      : null;
+
+    return html`
+      <div class="item-detail-view">
+        <div class="detail-header">
+          ${item.thumbnail ? html`
+            <img class="detail-poster" src="${item.thumbnail}" alt="${title}" />
+          ` : html`
+            <div class="detail-poster-placeholder">
+              <ha-icon icon="mdi:movie-outline"></ha-icon>
+            </div>
+          `}
+          <div class="detail-info">
+            <h3>${title}</h3>
+            <p class="detail-type">${mediaType === 'series' ? 'TV Series' : 'Movie'}</p>
+            ${episodeLabel ? html`<p class="detail-episode">Episode: ${episodeLabel}</p>` : ''}
+            ${item.year ? html`<p class="detail-meta">Year: ${item.year}</p>` : ''}
+          </div>
+        </div>
+
+        <div class="detail-actions">
+          ${mediaType === 'series' ? html`
+            <button class="detail-button tertiary" @click=${() => this._showEpisodePicker(item, 'detail')}>
+              <ha-icon icon="mdi:playlist-play"></ha-icon>
+              ${hasSelectedEpisode ? 'Change Episode' : 'Select Episode'}
+            </button>
+          ` : ''}
+          ${this.config.show_similar_button !== false ? html`
+            <button class="detail-button tertiary" @click=${() => this._getSimilarContent(item)} ?disabled=${this._loadingSimilar}>
+              <ha-icon icon="mdi:movie-search"></ha-icon>
+              ${this._loadingSimilar ? 'Loading...' : 'Find Similar'}
+            </button>
+          ` : ''}
+          <button class="detail-button tertiary" @click=${() => this._addToLibrary(item)}>
+            <ha-icon icon="mdi:plus"></ha-icon>
+            Add to Library
+          </button>
+        </div>
+
+        <div class="detail-actions">
+          <button class="detail-button primary" @click=${() => this._openInStremio(item)}>
+            <ha-icon icon="mdi:play"></ha-icon>
+            Open in Stremio
+          </button>
+          <button class="detail-button secondary" @click=${() => this._getStreamsForDetailItem(item)}>
+            <ha-icon icon="mdi:format-list-bulleted"></ha-icon>
+            Get Streams
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
+  // For UI card editor support
+  getCardSize() {
+    return 3;
+  }
+
+  getGridOptions() {
+    const defaults = {
+      rows: 6,
+      columns: 6,
+      min_rows: 4,
+      min_columns: 3,
+    };
+
+    if (this.config?.layout && typeof this.config.layout === 'object') {
+      return { ...defaults, ...this.config.layout };
+    }
+
+    return defaults;
+  }
+}
+
+// Guard against duplicate registration
+if (!customElements.get('stremio-browse-card')) {
+  customElements.define('stremio-browse-card', StremioBrowseCard);
+}
+
+// Editor for Browse Card
+class StremioBrowseCardEditor extends LitElement {
+  static get properties() {
+    return {
+      hass: { type: Object },
+      _config: { type: Object },
+      _stremioEntities: { type: Array },
+      _appleTvEntities: { type: Array },
+      _expandedSections: { type: Object },
+    };
+  }
+
+  constructor() {
+    super();
+    this._stremioEntities = [];
+    this._appleTvEntities = [];
+    this._expandedSections = {
+      account: true,
+      display: false,
+      layout: false,
+      behavior: false,
+      device: false,
+    };
+  }
+
+  setConfig(config) {
+    this._config = config;
+  }
+
+  updated(changedProps) {
+    if (changedProps.has('hass') && this.hass) {
+      this._updateEntities();
+    }
+  }
+
+  _updateEntities() {
+    // Find Stremio media player entities (represent each account)
+    this._stremioEntities = Object.keys(this.hass.states)
+      .filter(entityId => 
+        entityId.startsWith('media_player.') && 
+        entityId.toLowerCase().includes('stremio')
+      )
+      .map(entityId => ({
+        entity_id: entityId,
+        friendly_name: this.hass.states[entityId].attributes.friendly_name || entityId,
+      }));
+
+    // Find Apple TV media_player entities
+    this._appleTvEntities = Object.keys(this.hass.states)
+      .filter(entityId => {
+        if (!entityId.startsWith('media_player.')) return false;
+        const state = this.hass.states[entityId];
+        const friendlyName = (state.attributes.friendly_name || '').toLowerCase();
+        const entityLower = entityId.toLowerCase();
+        // Match Apple TV by entity ID or friendly name
+        return entityLower.includes('apple_tv') ||
+               entityLower.includes('appletv') ||
+               friendlyName.includes('apple tv') ||
+               friendlyName.includes('appletv');
+      })
+      .map(entityId => ({
+        entity_id: entityId,
+        friendly_name: this.hass.states[entityId].attributes.friendly_name || entityId,
+      }));
+  }
+
+  _selectEntity(entityId) {
+    this._config = { ...this._config, entity: entityId };
+    this.dispatchEvent(new CustomEvent('config-changed', {
+      bubbles: true,
+      composed: true,
+      detail: { config: this._config },
+    }));
+  }
+
+  _selectAppleTv(entityId) {
+    this._config = { ...this._config, apple_tv_entity: entityId || undefined };
+    this.dispatchEvent(new CustomEvent('config-changed', {
+      bubbles: true,
+      composed: true,
+      detail: { config: this._config },
+    }));
+  }
+
+  _toggleSection(section) {
+    this._expandedSections = {
+      ...this._expandedSections,
+      [section]: !this._expandedSections[section],
+    };
+  }
+
+  render() {
+    if (!this.hass || !this._config) {
+      return html``;
+    }
+
+    return html`
+      <div class="card-config">
+        <!-- Stremio Account Section -->
+        <div class="config-section">
+          <div class="section-header" @click=${() => this._toggleSection('account')}>
+            <ha-icon icon="mdi:account"></ha-icon>
+            <span>Stremio Account</span>
+            <ha-icon class="expand-icon ${this._expandedSections.account ? 'expanded' : ''}" icon="mdi:chevron-down"></ha-icon>
+          </div>
+          ${this._expandedSections.account ? html`
+            <div class="section-content">
+              ${this._stremioEntities?.length > 0 ? html`
+                <div class="entity-buttons">
+                  ${this._stremioEntities.map(entity => html`
+                    <button 
+                      class="entity-btn ${this._config.entity === entity.entity_id ? 'selected' : ''}"
+                      @click=${() => this._selectEntity(entity.entity_id)}
+                    >
+                      <ha-icon icon="mdi:account-circle"></ha-icon>
+                      <span>${entity.friendly_name}</span>
+                    </button>
+                  `)}
                 </div>
+              ` : html`
+                <div class="no-entities">
+                  <ha-icon icon="mdi:alert-circle-outline"></ha-icon>
+                  <span>No Stremio accounts found.</span>
+                </div>
+              `}
+              
+              <ha-entity-picker
+                .hass=${this.hass}
+                .value=${this._config.entity || ''}
+                .configValue=${'entity'}
+                .includeDomains=${['media_player']}
+                label="Or select manually"
+                allow-custom-entity
+                @value-changed=${this._valueChanged}
+              ></ha-entity-picker>
+              <p class="helper-text">Select a Stremio account to browse catalogs from that user's library.</p>
+            </div>
+          ` : ''}
+        </div>
+
+        <!-- Display Section -->
+        <div class="config-section">
+          <div class="section-header" @click=${() => this._toggleSection('display')}>
+            <ha-icon icon="mdi:palette"></ha-icon>
+            <span>Display Options</span>
+            <ha-icon class="expand-icon ${this._expandedSections.display ? 'expanded' : ''}" icon="mdi:chevron-down"></ha-icon>
+          </div>
+          ${this._expandedSections.display ? html`
+            <div class="section-content">
+              <ha-textfield
+                label="Card Title"
+                .value=${this._config.title || 'Browse Stremio'}
+                .configValue=${'title'}
+                @input=${this._valueChanged}
+              ></ha-textfield>
+
+              <div class="toggle-group">
+                <ha-formfield label="Show View Controls (Popular/New)">
+                  <ha-switch
+                    .checked=${this._config.show_view_controls !== false}
+                    .configValue=${'show_view_controls'}
+                    @change=${this._valueChanged}
+                  ></ha-switch>
+                </ha-formfield>
+
+                <ha-formfield label="Show Type Controls (Movie/Series)">
+                  <ha-switch
+                    .checked=${this._config.show_type_controls !== false}
+                    .configValue=${'show_type_controls'}
+                    @change=${this._valueChanged}
+                  ></ha-switch>
+                </ha-formfield>
+
+                <ha-formfield label="Show Genre Filter">
+                  <ha-switch
+                    .checked=${this._config.show_genre_filter !== false}
+                    .configValue=${'show_genre_filter'}
+                    @change=${this._valueChanged}
+                  ></ha-switch>
+                </ha-formfield>
+
+                <ha-formfield label="Show Title Below Poster">
+                  <ha-switch
+                    .checked=${this._config.show_title !== false}
+                    .configValue=${'show_title'}
+                    @change=${this._valueChanged}
+                  ></ha-switch>
+                </ha-formfield>
+
+                <ha-formfield label="Show Media Type Badge">
+                  <ha-switch
+                    .checked=${this._config.show_media_type_badge === true}
+                    .configValue=${'show_media_type_badge'}
+                    @change=${this._valueChanged}
+                  ></ha-switch>
+                </ha-formfield>
+
+                <ha-formfield label="Show Find Similar Button">
+                  <ha-switch
+                    .checked=${this._config.show_similar_button !== false}
+                    .configValue=${'show_similar_button'}
+                    @change=${this._valueChanged}
+                  ></ha-switch>
+                </ha-formfield>
               </div>
-              <div class="detail-actions">
-                <button 
-                  class="detail-button primary" 
-                  aria-label="View details for ${this._selectedItem.title}"
-                  @click=${() => this._openMediaBrowser(this._selectedItem)}
-                >
-                  View Details
-                </button>
-                <button 
-                  class="detail-button secondary" 
-                  aria-label="Add ${this._selectedItem.title} to library"
-                  @click=${() => this._addToLibrary(this._selectedItem)}
-                >
-                  + Library
-                </button>
+            </div>
+          ` : ''}
+        </div>
+
+        <!-- Layout Section -->
+        <div class="config-section">
+          <div class="section-header" @click=${() => this._toggleSection('layout')}>
+            <ha-icon icon="mdi:view-grid"></ha-icon>
+            <span>Layout</span>
+            <ha-icon class="expand-icon ${this._expandedSections.layout ? 'expanded' : ''}" icon="mdi:chevron-down"></ha-icon>
+          </div>
+          ${this._expandedSections.layout ? html`
+            <div class="section-content">
+              <div class="input-row">
+                <ha-textfield
+                  label="Columns"
+                  .value=${this._config.columns || 4}
+                  .configValue=${'columns'}
+                  type="number"
+                  min="2"
+                  max="8"
+                  @input=${this._valueChanged}
+                ></ha-textfield>
+
+                <ha-textfield
+                  label="Max Items"
+                  .value=${this._config.max_items || 50}
+                  .configValue=${'max_items'}
+                  type="number"
+                  min="1"
+                  max="100"
+                  @input=${this._valueChanged}
+                ></ha-textfield>
               </div>
+
+              <div class="input-row">
+                <ha-textfield
+                  label="Card Height (px, 0 for auto)"
+                  .value=${this._config.card_height || 0}
+                  .configValue=${'card_height'}
+                  type="number"
+                  min="0"
+                  max="1000"
+                  @input=${this._valueChanged}
+                ></ha-textfield>
+              </div>
+
+              <ha-select
+                label="Poster Aspect Ratio"
+                .value=${this._config.poster_aspect_ratio || '2/3'}
+                .configValue=${'poster_aspect_ratio'}
+                @selected=${this._selectChanged}
+                @closed=${(e) => e.stopPropagation()}
+              >
+                <mwc-list-item value="2/3">2:3 (Movie Poster)</mwc-list-item>
+                <mwc-list-item value="16/9">16:9 (Widescreen)</mwc-list-item>
+                <mwc-list-item value="1/1">1:1 (Square)</mwc-list-item>
+                <mwc-list-item value="4/3">4:3 (Classic)</mwc-list-item>
+              </ha-select>
+
+              <ha-formfield label="Horizontal Scroll Mode">
+                <ha-switch
+                  .checked=${this._config.horizontal_scroll === true}
+                  .configValue=${'horizontal_scroll'}
+                  @change=${this._valueChanged}
+                ></ha-switch>
+              </ha-formfield>
+            </div>
+          ` : ''}
+        </div>
+
+        <!-- Behavior Section -->
+        <div class="config-section">
+          <div class="section-header" @click=${() => this._toggleSection('behavior')}>
+            <ha-icon icon="mdi:gesture-tap"></ha-icon>
+            <span>Behavior</span>
+            <ha-icon class="expand-icon ${this._expandedSections.behavior ? 'expanded' : ''}" icon="mdi:chevron-down"></ha-icon>
+          </div>
+          ${this._expandedSections.behavior ? html`
+            <div class="section-content">
+              <ha-select
+                label="Default View"
+                .value=${this._config.default_view || 'popular'}
+                .configValue=${'default_view'}
+                @selected=${this._selectChanged}
+                @closed=${(e) => e.stopPropagation()}
+              >
+                <mwc-list-item value="popular">Popular</mwc-list-item>
+                <mwc-list-item value="new">New</mwc-list-item>
+              </ha-select>
+
+              <ha-select
+                label="Default Media Type"
+                .value=${this._config.default_type || 'movie'}
+                .configValue=${'default_type'}
+                @selected=${this._selectChanged}
+                @closed=${(e) => e.stopPropagation()}
+              >
+                <mwc-list-item value="movie">Movies</mwc-list-item>
+                <mwc-list-item value="series">TV Series</mwc-list-item>
+              </ha-select>
+
+              <ha-select
+                label="Tap Action"
+                .value=${this._config.tap_action || 'details'}
+                .configValue=${'tap_action'}
+                @selected=${this._selectChanged}
+                @closed=${(e) => e.stopPropagation()}
+              >
+                <mwc-list-item value="details">Show Details</mwc-list-item>
+                <mwc-list-item value="play">Play Directly</mwc-list-item>
+                <mwc-list-item value="streams">Get Streams</mwc-list-item>
+              </ha-select>
+            </div>
+          ` : ''}
+        </div>
+
+        <!-- Device Section -->
+        <div class="config-section">
+          <div class="section-header" @click=${() => this._toggleSection('device')}>
+            <ha-icon icon="mdi:devices"></ha-icon>
+            <span>Device Integration</span>
+            <ha-icon class="expand-icon ${this._expandedSections.device ? 'expanded' : ''}" icon="mdi:chevron-down"></ha-icon>
+          </div>
+          ${this._expandedSections.device ? html`
+            <div class="section-content">
+              <p class="helper-text">Select an Apple TV to enable handover functionality.</p>
+              
+              ${this._appleTvEntities?.length > 0 ? html`
+                <div class="entity-buttons">
+                  ${this._appleTvEntities.map(entity => html`
+                    <button 
+                      class="entity-btn ${this._config.apple_tv_entity === entity.entity_id ? 'selected' : ''}"
+                      @click=${() => this._selectAppleTv(entity.entity_id)}
+                    >
+                      <ha-icon icon="mdi:apple"></ha-icon>
+                      <span>${entity.friendly_name}</span>
+                    </button>
+                  `)}
+                  <button 
+                    class="entity-btn ${!this._config.apple_tv_entity ? 'selected' : ''}"
+                    @click=${() => this._selectAppleTv('')}
+                  >
+                    <ha-icon icon="mdi:close"></ha-icon>
+                    <span>None</span>
+                  </button>
+                </div>
+              ` : ''}
+
+              <ha-entity-picker
+                .hass=${this.hass}
+                .value=${this._config.apple_tv_entity || ''}
+                .configValue=${'apple_tv_entity'}
+                .includeDomains=${['media_player']}
+                label="Apple TV Entity"
+                allow-custom-entity
+                @value-changed=${this._valueChanged}
+              ></ha-entity-picker>
             </div>
           </div>
         ` : ''}

@@ -99,7 +99,7 @@ class StremioLibraryCard extends LitElement {
         grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
         gap: 12px;
         padding: 16px;
-        max-height: 400px;
+        max-height: var(--card-max-height, none);
         overflow-y: auto;
       }
 
@@ -507,8 +507,56 @@ class StremioLibraryCard extends LitElement {
 
   render() {
     try {
+      const columns = Number(this.config.columns || 4);
+      const posterAspectRatio = this.config.poster_aspect_ratio || '2/3';
+      const cardHeight = this.config.card_height > 0 ? `${this.config.card_height}px` : 'none';
+      const gridStyle = `--card-max-height: ${cardHeight}; --grid-columns: ${columns}; --poster-aspect-ratio: ${posterAspectRatio};`;
+
       const filteredItems = this._getFilteredItems();
 
+      // If showing similar items, show that view
+      if (this._similarItems && this._similarItems.length > 0) {
+        const sourceTitle = this._similarSourceItem?.title || this._similarSourceItem?.name || 'Unknown';
+        return html`
+          <ha-card>
+            <div class="header">
+              <button class="back-button" @click=${this._closeSimilarView} aria-label="Back to library">
+                <ha-icon icon="mdi:arrow-left"></ha-icon>
+                Back to Library
+              </button>
+              <h2 class="header-title" style="margin-top: 12px;">
+                Similar to "${sourceTitle}"
+                <span class="count-badge" aria-label="${this._similarItems.length} items">(${this._similarItems.length})</span>
+              </h2>
+            </div>
+            <div 
+              class="library-grid ${this.config.horizontal_scroll ? 'horizontal' : ''}" 
+              role="list" 
+              aria-label="Similar items"
+              style="${gridStyle}"
+            >
+              ${this._similarItems.map(item => this._renderSimilarItem(item))}
+            </div>
+          </ha-card>
+        `;
+      }
+
+      // If an item is selected, show detail view instead of grid
+      if (this._selectedItem) {
+        return html`
+          <ha-card>
+            <div class="header">
+              <button class="back-button" @click=${this._closeDetail} aria-label="Back to library">
+                <ha-icon icon="mdi:arrow-left"></ha-icon>
+                Back to Library
+              </button>
+            </div>
+            ${this._renderDetailView()}
+          </ha-card>
+        `;
+      }
+
+      // Normal grid view
       return html`
         <ha-card>
           <div class="header">
@@ -555,7 +603,12 @@ class StremioLibraryCard extends LitElement {
           </div>
 
           ${filteredItems.length > 0 ? html`
-            <div class="library-grid" role="list" aria-label="Library items">
+            <div 
+              class="library-grid ${this.config.horizontal_scroll ? 'horizontal' : ''}" 
+              role="list" 
+              aria-label="Library items"
+              style="${gridStyle}"
+            >
               ${filteredItems.map(item => this._renderItem(item))}
             </div>
           ` : html`
@@ -661,12 +714,18 @@ class StremioLibraryCard extends LitElement {
 
   // Grid sizing for sections view (HA 2024.8+)
   getGridOptions() {
-    return {
+    const defaults = {
       rows: 6,
       columns: 6,
       min_rows: 4,
       min_columns: 3,
     };
+
+    if (this.config?.layout && typeof this.config.layout === 'object') {
+      return { ...defaults, ...this.config.layout };
+    }
+
+    return defaults;
   }
 
   static getConfigElement() {
