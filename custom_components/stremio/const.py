@@ -45,6 +45,7 @@ CONF_SHOW_COPY_URL: Final = "show_copy_url"
 # Options defaults
 DEFAULT_PLAYER_SCAN_INTERVAL: Final = 30  # seconds
 DEFAULT_LIBRARY_SCAN_INTERVAL: Final = 300  # seconds (5 minutes)
+DEFAULT_CONTINUE_WATCHING_LIMIT: Final = 100  # Max items in continue watching list
 DEFAULT_ENABLE_APPLE_TV_HANDOVER: Final = False
 DEFAULT_HANDOVER_METHOD: Final = "auto"
 DEFAULT_APPLE_TV_DEVICE: Final = ""

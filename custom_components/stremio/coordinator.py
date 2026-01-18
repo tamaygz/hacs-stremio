@@ -21,6 +21,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from .const import (
     CONF_PLAYER_SCAN_INTERVAL,
     CONF_POLLING_GATE_ENTITIES,
+    DEFAULT_CONTINUE_WATCHING_LIMIT,
     DEFAULT_PLAYER_SCAN_INTERVAL,
     DEFAULT_POLLING_GATE_ENTITIES,
     DOMAIN,
@@ -507,7 +508,7 @@ class StremioDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
             # Fetch continue watching with retry
             continue_watching = await self._async_fetch_with_retry(
-                lambda: self.client.async_get_continue_watching(limit=10),
+                lambda: self.client.async_get_continue_watching(limit=DEFAULT_CONTINUE_WATCHING_LIMIT),
                 "continue watching",
             )
             _LOGGER.info(

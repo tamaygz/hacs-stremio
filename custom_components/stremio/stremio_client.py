@@ -324,7 +324,7 @@ class StremioClient:
             raise StremioConnectionError(f"Failed to get library: {err}") from err
 
     async def async_get_continue_watching(
-        self, limit: int = 10
+        self, limit: int = 100
     ) -> list[dict[str, Any]]:
         """Get continue watching list.
 
@@ -332,7 +332,7 @@ class StremioClient:
         Items are sorted by most recently watched.
 
         Args:
-            limit: Maximum items to return
+            limit: Maximum items to return (default 100 to match Stremio Web)
 
         Returns:
             List of continue watching items
