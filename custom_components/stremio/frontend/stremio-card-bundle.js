@@ -15,7 +15,7 @@ import './stremio-player-card.js';
 import './stremio-stream-dialog.js';
 
 // Card registration info - should match manifest.json version
-const CARD_VERSION = '0.2.4';
+const CARD_VERSION = '0.2.7';
 
 console.info(
   `%c STREMIO CARDS %c ${CARD_VERSION} `,

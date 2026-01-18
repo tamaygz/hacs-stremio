@@ -322,14 +322,6 @@ class StremioStreamDialog extends LitElement {
     }, 2000);
   }
 
-  // Lifecycle: cleanup timers when element is removed
-  disconnectedCallback() {
-    super.disconnectedCallback();
-    if (this._copiedTimeout) {
-      clearTimeout(this._copiedTimeout);
-    }
-  }
-
   _fireUrlEvent(url) {
     // Fire event for HA to create notification or input_text
     const event = new CustomEvent('hass-notification', {
