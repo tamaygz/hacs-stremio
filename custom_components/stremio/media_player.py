@@ -13,7 +13,7 @@ from homeassistant.components.media_player import (
     MediaType,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -70,6 +70,35 @@ class StremioMediaPlayer(
         self._attr_name = "Stremio"
         self._attr_has_entity_name = True
         self._attr_device_info = get_device_info(entry)
+        # Track previous state to avoid unnecessary updates
+        self._previous_state: MediaPlayerState | None = None
+        self._previous_media_title: str | None = None
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Handle updated data from the coordinator.
+
+        Only trigger a state update if the actual state has changed.
+        This prevents the media browser from resetting during navigation
+        when the coordinator polls but nothing has changed.
+        """
+        current_state = self.state
+        current_title = self.media_title
+
+        # Only update if state or media actually changed
+        if (
+            current_state != self._previous_state
+            or current_title != self._previous_media_title
+        ):
+            self._previous_state = current_state
+            self._previous_media_title = current_title
+            self.async_write_ha_state()
+        else:
+            _LOGGER.debug(
+                "Skipping state update - no change (state=%s, title=%s)",
+                current_state,
+                current_title,
+            )
 
     @property
     def state(self) -> MediaPlayerState:

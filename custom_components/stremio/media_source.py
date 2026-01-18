@@ -69,6 +69,18 @@ class StremioMediaSource(MediaSource):
         if not identifier:
             raise Unresolvable("No media identifier provided")
 
+        # Handle copyurl: identifiers - these fire an event, not play media
+        if identifier.startswith("copyurl:"):
+            stream_url = identifier[8:]  # Remove "copyurl:" prefix
+            _LOGGER.info("Stream URL copied: %s", stream_url)
+            self.hass.bus.async_fire(
+                "stremio_stream_url",
+                {"url": stream_url, "action": "copy"},
+            )
+            # Return the URL as playable so it can be handled
+            mime_type = self._get_mime_type(stream_url, {})
+            return PlayMedia(url=stream_url, mime_type=mime_type)
+
         # Get coordinator from hass.data
         entries = self.hass.data.get(DOMAIN, {})
         if not entries:
@@ -83,6 +95,16 @@ class StremioMediaSource(MediaSource):
 
         if coordinator is None:
             raise Unresolvable("Stremio coordinator not available")
+
+        # Extract stream index if present (format: type/id#stream_index or type/id/season/episode#stream_index)
+        stream_index: int | None = None
+        if "#" in identifier:
+            identifier, stream_index_str = identifier.rsplit("#", 1)
+            try:
+                stream_index = int(stream_index_str)
+            except ValueError:
+                _LOGGER.warning("Invalid stream index: %s", stream_index_str)
+                stream_index = 0
 
         # Parse identifier format: type/id or type/id/season/episode
         parts = identifier.split("/")
@@ -107,15 +129,21 @@ class StremioMediaSource(MediaSource):
             if not streams:
                 raise Unresolvable(f"No streams found for {identifier}")
 
-            # Get the best stream (first one or highest quality)
-            best_stream = streams[0]
-            stream_url = best_stream.get("url") or best_stream.get("externalUrl")
+            # Get the requested stream by index, or first one if not specified
+            if stream_index is not None and 0 <= stream_index < len(streams):
+                selected_stream = streams[stream_index]
+            else:
+                selected_stream = streams[0]
+
+            stream_url = selected_stream.get("url") or selected_stream.get(
+                "externalUrl"
+            )
 
             if not stream_url:
                 raise Unresolvable("No playable stream URL available")
 
             # Determine MIME type
-            mime_type = self._get_mime_type(stream_url, best_stream)
+            mime_type = self._get_mime_type(stream_url, selected_stream)
 
             return PlayMedia(url=stream_url, mime_type=mime_type)
 
