@@ -13,11 +13,15 @@ from homeassistant.data_entry_flow import FlowResult
 from homeassistant.exceptions import HomeAssistantError
 
 from .const import (
+    CONF_APPLE_TV_DEVICE,
+    CONF_APPLE_TV_ENTITY_ID,
     CONF_AUTH_KEY,
     CONF_ENABLE_APPLE_TV_HANDOVER,
     CONF_HANDOVER_METHOD,
     CONF_LIBRARY_SCAN_INTERVAL,
     CONF_PLAYER_SCAN_INTERVAL,
+    DEFAULT_APPLE_TV_DEVICE,
+    DEFAULT_APPLE_TV_ENTITY_ID,
     DEFAULT_ENABLE_APPLE_TV_HANDOVER,
     DEFAULT_HANDOVER_METHOD,
     DEFAULT_LIBRARY_SCAN_INTERVAL,
@@ -174,6 +178,28 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                             CONF_HANDOVER_METHOD, DEFAULT_HANDOVER_METHOD
                         ),
                     ): vol.In(HANDOVER_METHODS),
+                    vol.Optional(
+                        CONF_APPLE_TV_DEVICE,
+                        default=self.config_entry.options.get(
+                            CONF_APPLE_TV_DEVICE, DEFAULT_APPLE_TV_DEVICE
+                        ),
+                        description={
+                            "suggested_value": self.config_entry.options.get(
+                                CONF_APPLE_TV_DEVICE, ""
+                            )
+                        },
+                    ): str,
+                    vol.Optional(
+                        CONF_APPLE_TV_ENTITY_ID,
+                        default=self.config_entry.options.get(
+                            CONF_APPLE_TV_ENTITY_ID, DEFAULT_APPLE_TV_ENTITY_ID
+                        ),
+                        description={
+                            "suggested_value": self.config_entry.options.get(
+                                CONF_APPLE_TV_ENTITY_ID, ""
+                            )
+                        },
+                    ): str,
                 }
             ),
         )

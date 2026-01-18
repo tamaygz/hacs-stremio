@@ -15,7 +15,14 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .apple_tv_handover import HandoverError, HandoverManager
-from .const import CONF_ENABLE_APPLE_TV_HANDOVER, DOMAIN
+from .const import (
+    CONF_APPLE_TV_DEVICE,
+    CONF_APPLE_TV_ENTITY_ID,
+    CONF_ENABLE_APPLE_TV_HANDOVER,
+    CONF_HANDOVER_METHOD,
+    DEFAULT_HANDOVER_METHOD,
+    DOMAIN,
+)
 from .coordinator import StremioDataUpdateCoordinator
 from .entity_helpers import get_device_info
 

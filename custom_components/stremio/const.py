@@ -43,12 +43,16 @@ CONF_PLAYER_SCAN_INTERVAL: Final = "player_scan_interval"
 CONF_LIBRARY_SCAN_INTERVAL: Final = "library_scan_interval"
 CONF_ENABLE_APPLE_TV_HANDOVER: Final = "enable_apple_tv_handover"
 CONF_HANDOVER_METHOD: Final = "handover_method"
+CONF_APPLE_TV_DEVICE: Final = "apple_tv_device"
+CONF_APPLE_TV_ENTITY_ID: Final = "apple_tv_entity_id"
 
 # Options defaults
 DEFAULT_PLAYER_SCAN_INTERVAL: Final = 30  # seconds
 DEFAULT_LIBRARY_SCAN_INTERVAL: Final = 300  # seconds (5 minutes)
 DEFAULT_ENABLE_APPLE_TV_HANDOVER: Final = False
 DEFAULT_HANDOVER_METHOD: Final = "auto"
+DEFAULT_APPLE_TV_DEVICE: Final = ""
+DEFAULT_APPLE_TV_ENTITY_ID: Final = ""
 
 # Handover methods
 HANDOVER_METHOD_AUTO: Final = "auto"
