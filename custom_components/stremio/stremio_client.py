@@ -1188,7 +1188,7 @@ class StremioClient:
 
         Uses Cinemeta's catalog endpoint to browse popular movies and series.
         Endpoint format: /catalog/{type}/{catalog_id}/{extra}.json
-        
+
         Example URLs:
         - https://v3-cinemeta.strem.io/catalog/movie/top/popular.json
         - https://v3-cinemeta.strem.io/catalog/series/top/popular.json?genre=Drama
@@ -1225,7 +1225,9 @@ class StremioClient:
         # Build catalog URL
         from .const import CINEMETA_BASE_URL
 
-        catalog_url = f"{CINEMETA_BASE_URL}/catalog/{media_type}/{catalog_id}/popular.json"
+        catalog_url = (
+            f"{CINEMETA_BASE_URL}/catalog/{media_type}/{catalog_id}/popular.json"
+        )
 
         # Add query parameters
         params = {}
@@ -1302,9 +1304,7 @@ class StremioClient:
             _LOGGER.error(
                 "Error fetching catalog %s/%s: %s", media_type, catalog_id, err
             )
-            raise StremioConnectionError(
-                f"Failed to fetch catalog: {err}"
-            ) from err
+            raise StremioConnectionError(f"Failed to fetch catalog: {err}") from err
 
     async def async_get_popular_movies(
         self, genre: str | None = None, skip: int = 0, limit: int = 50

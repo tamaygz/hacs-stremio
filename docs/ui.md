@@ -138,6 +138,53 @@ This card is typically not added directly but is used by other cards when you cl
 
 ---
 
+### 5. Stremio Browse Card
+
+Browse popular and new movies/TV shows from Stremio catalogs.
+
+**Type:** `stremio-browse-card`
+
+#### Basic Configuration
+
+```yaml
+type: custom:stremio-browse-card
+```
+
+#### Full Configuration
+
+```yaml
+type: custom:stremio-browse-card
+title: Browse Stremio
+default_view: popular
+default_type: movie
+show_view_controls: true
+show_type_controls: true
+columns: 4
+max_items: 50
+```
+
+#### Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `title` | string | "Browse Stremio" | Card title |
+| `default_view` | string | "popular" | Default view ("popular" or "new") |
+| `default_type` | string | "movie" | Default media type ("movie" or "series") |
+| `show_view_controls` | boolean | true | Show Popular/New toggle buttons |
+| `show_type_controls` | boolean | true | Show Movies/TV Shows toggle buttons |
+| `columns` | number | 4 | Grid columns (desktop) |
+| `max_items` | number | 50 | Maximum items to display |
+
+#### Features
+
+- **View Modes**: Toggle between Popular and New content
+- **Media Types**: Switch between Movies and TV Shows
+- **Click Actions**: Click any item for details and streaming options
+- **Responsive**: Adapts to mobile and desktop screens
+- **Direct Integration**: Uses Stremio's catalog API via media browser
+
+---
+
 ## Dashboard Examples
 
 ### Minimal Dashboard
@@ -162,8 +209,33 @@ views:
             entity: media_player.stremio
           - type: custom:stremio-media-details-card
             entity: media_player.stremio
+      - type: custom:stremio-browse-card
+        title: Discover Content
+        default_view: popular
       - type: custom:stremio-library-card
         title: My Library
+```
+
+### Discovery-Focused Dashboard
+
+```yaml
+views:
+  - title: Discover
+    cards:
+      - type: custom:stremio-browse-card
+        title: 🔥 Popular Movies
+        default_view: popular
+        default_type: movie
+        show_type_controls: false
+      - type: custom:stremio-browse-card
+        title: 🔥 Popular TV Shows
+        default_view: popular
+        default_type: series
+        show_type_controls: false
+      - type: custom:stremio-browse-card
+        title: 🆕 New Releases
+        default_view: new
+        columns: 6
 ```
 
 ### Mobile-Optimized Dashboard
