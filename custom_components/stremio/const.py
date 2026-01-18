@@ -1,11 +1,30 @@
 """Constants for the Stremio integration."""
 
+import json
 from datetime import timedelta
+from pathlib import Path
 from typing import Final
 
 from homeassistant.const import Platform
 
+# Read version from manifest.json
+MANIFEST_PATH = Path(__file__).parent / "manifest.json"
+with open(MANIFEST_PATH, encoding="utf-8") as f:
+    INTEGRATION_VERSION: Final[str] = json.load(f).get("version", "0.0.0")
+
 DOMAIN: Final = "stremio"
+
+# Frontend constants
+URL_BASE: Final[str] = "/stremio"
+
+# JavaScript modules to register with Lovelace
+JSMODULES: Final[list[dict[str, str]]] = [
+    {
+        "name": "Stremio Cards Bundle",
+        "filename": "stremio-card-bundle.js",
+        "version": INTEGRATION_VERSION,
+    },
+]
 
 # Update intervals
 DEFAULT_SCAN_INTERVAL: Final = timedelta(seconds=30)
