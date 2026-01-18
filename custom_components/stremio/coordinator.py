@@ -85,8 +85,10 @@ class StremioDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             _LOGGER,
             name=DOMAIN,
             update_interval=timedelta(seconds=self._configured_scan_interval),
-            config_entry=entry,
         )
+        
+        # Store entry reference for later use
+        self.config_entry = entry
 
     async def _async_setup(self) -> None:
         """Set up the coordinator.
