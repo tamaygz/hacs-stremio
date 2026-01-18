@@ -1223,25 +1223,35 @@ class StremioClient:
         )
 
         # Build catalog URL
+        # Cinemeta API uses path-based format for extra parameters:
+        # /catalog/{type}/{id}.json - basic catalog
+        # /catalog/{type}/{id}/genre={genre}.json - genre filtered
+        # /catalog/{type}/{id}/skip={skip}.json - pagination
+        # /catalog/{type}/{id}/genre={genre}&skip={skip}.json - combined
         from .const import CINEMETA_BASE_URL
 
-        catalog_url = (
-            f"{CINEMETA_BASE_URL}/catalog/{media_type}/{catalog_id}/popular.json"
-        )
-
-        # Add query parameters
-        params = {}
+        # Build extra path components for genre and skip
+        extra_parts = []
         if genre:
-            params["genre"] = genre
+            extra_parts.append(f"genre={genre}")
         if skip > 0:
-            params["skip"] = str(skip)
+            extra_parts.append(f"skip={skip}")
+
+        if extra_parts:
+            extra_path = "&".join(extra_parts)
+            catalog_url = (
+                f"{CINEMETA_BASE_URL}/catalog/{media_type}/{catalog_id}/{extra_path}.json"
+            )
+        else:
+            catalog_url = (
+                f"{CINEMETA_BASE_URL}/catalog/{media_type}/{catalog_id}.json"
+            )
 
         try:
             session = await self._get_session()
 
             async with session.get(
                 catalog_url,
-                params=params if params else None,
                 timeout=aiohttp.ClientTimeout(total=15),
             ) as response:
                 if response.status != 200:
