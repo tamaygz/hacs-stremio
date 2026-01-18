@@ -1508,13 +1508,6 @@ class StremioContinueWatchingCardEditor extends LitElement {
   }
 }
 
-      ha-textfield {
-        width: 100%;
-      }
-    `;
-  }
-}
-
 // Guard against duplicate registration
 if (!customElements.get('stremio-continue-watching-card')) {
   customElements.define('stremio-continue-watching-card', StremioContinueWatchingCard);
