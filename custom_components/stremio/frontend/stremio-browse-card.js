@@ -265,14 +265,29 @@ class StremioBrowseCard extends LitElement {
       throw new Error('Invalid configuration');
     }
     this.config = {
+      // Display options
       title: 'Browse Stremio',
-      default_view: 'popular',
-      default_type: 'movie',
       show_view_controls: true,
       show_type_controls: true,
       show_genre_filter: true,
+      show_title: true, // Show titles below posters
+      show_rating: true, // Show rating badge
+      
+      // Layout options
       columns: 4,
       max_items: 50,
+      card_height: 0, // 0 for auto
+      poster_aspect_ratio: '2/3', // 2/3, 16/9, 1/1, 4/3
+      horizontal_scroll: false, // Horizontal carousel mode
+      
+      // Behavior options
+      default_view: 'popular',
+      default_type: 'movie',
+      tap_action: 'details', // details, play, streams
+      
+      // Device integration
+      apple_tv_entity: undefined, // For Apple TV handover
+      
       ...config,
     };
     this._viewMode = this.config.default_view;
@@ -290,6 +305,17 @@ class StremioBrowseCard extends LitElement {
       title: 'Browse Stremio',
       default_view: 'popular',
       default_type: 'movie',
+      show_view_controls: true,
+      show_type_controls: true,
+      show_genre_filter: true,
+      show_title: true,
+      show_rating: true,
+      columns: 4,
+      max_items: 50,
+      card_height: 0,
+      poster_aspect_ratio: '2/3',
+      horizontal_scroll: false,
+      tap_action: 'details',
     };
   }
 
@@ -648,11 +674,29 @@ class StremioBrowseCardEditor extends LitElement {
     return {
       hass: { type: Object },
       _config: { type: Object },
+      _expandedSections: { type: Object },
+    };
+  }
+
+  constructor() {
+    super();
+    this._expandedSections = {
+      display: true,
+      layout: false,
+      behavior: false,
+      device: false,
     };
   }
 
   setConfig(config) {
     this._config = config;
+  }
+
+  _toggleSection(section) {
+    this._expandedSections = {
+      ...this._expandedSections,
+      [section]: !this._expandedSections[section],
+    };
   }
 
   render() {
@@ -662,86 +706,215 @@ class StremioBrowseCardEditor extends LitElement {
 
     return html`
       <div class="card-config">
-        <ha-textfield
-          label="Title"
-          .value=${this._config.title || 'Browse Stremio'}
-          .configValue=${'title'}
-          @input=${this._valueChanged}
-        ></ha-textfield>
+        <!-- Display Section -->
+        <div class="config-section">
+          <div class="section-header" @click=${() => this._toggleSection('display')}>
+            <ha-icon icon="mdi:palette"></ha-icon>
+            <span>Display Options</span>
+            <ha-icon class="expand-icon ${this._expandedSections.display ? 'expanded' : ''}" icon="mdi:chevron-down"></ha-icon>
+          </div>
+          ${this._expandedSections.display ? html`
+            <div class="section-content">
+              <ha-textfield
+                label="Card Title"
+                .value=${this._config.title || 'Browse Stremio'}
+                .configValue=${'title'}
+                @input=${this._valueChanged}
+              ></ha-textfield>
 
-        <label>Default View</label>
-        <ha-select
-          .value=${this._config.default_view || 'popular'}
-          .configValue=${'default_view'}
-          @selected=${this._valueChanged}
-          @closed=${(e) => e.stopPropagation()}
-        >
-          <mwc-list-item value="popular">Popular</mwc-list-item>
-          <mwc-list-item value="new">New</mwc-list-item>
-        </ha-select>
+              <div class="toggle-group">
+                <ha-formfield label="Show View Controls (Popular/New)">
+                  <ha-switch
+                    .checked=${this._config.show_view_controls !== false}
+                    .configValue=${'show_view_controls'}
+                    @change=${this._valueChanged}
+                  ></ha-switch>
+                </ha-formfield>
 
-        <label>Default Media Type</label>
-        <ha-select
-          .value=${this._config.default_type || 'movie'}
-          .configValue=${'default_type'}
-          @selected=${this._valueChanged}
-          @closed=${(e) => e.stopPropagation()}
-        >
-          <mwc-list-item value="movie">Movies</mwc-list-item>
-          <mwc-list-item value="series">TV Series</mwc-list-item>
-        </ha-select>
+                <ha-formfield label="Show Type Controls (Movie/Series)">
+                  <ha-switch
+                    .checked=${this._config.show_type_controls !== false}
+                    .configValue=${'show_type_controls'}
+                    @change=${this._valueChanged}
+                  ></ha-switch>
+                </ha-formfield>
 
-        <ha-formfield label="Show View Controls">
-          <ha-switch
-            .checked=${this._config.show_view_controls !== false}
-            .configValue=${'show_view_controls'}
-            @change=${this._valueChanged}
-          ></ha-switch>
-        </ha-formfield>
+                <ha-formfield label="Show Genre Filter">
+                  <ha-switch
+                    .checked=${this._config.show_genre_filter !== false}
+                    .configValue=${'show_genre_filter'}
+                    @change=${this._valueChanged}
+                  ></ha-switch>
+                </ha-formfield>
 
-        <ha-formfield label="Show Type Controls">
-          <ha-switch
-            .checked=${this._config.show_type_controls !== false}
-            .configValue=${'show_type_controls'}
-            @change=${this._valueChanged}
-          ></ha-switch>
-        </ha-formfield>
+                <ha-formfield label="Show Title Below Poster">
+                  <ha-switch
+                    .checked=${this._config.show_title !== false}
+                    .configValue=${'show_title'}
+                    @change=${this._valueChanged}
+                  ></ha-switch>
+                </ha-formfield>
 
-        <ha-formfield label="Show Genre Filter">
-          <ha-switch
-            .checked=${this._config.show_genre_filter !== false}
-            .configValue=${'show_genre_filter'}
-            @change=${this._valueChanged}
-          ></ha-switch>
-        </ha-formfield>
+                <ha-formfield label="Show Rating Badge">
+                  <ha-switch
+                    .checked=${this._config.show_rating !== false}
+                    .configValue=${'show_rating'}
+                    @change=${this._valueChanged}
+                  ></ha-switch>
+                </ha-formfield>
+              </div>
+            </div>
+          ` : ''}
+        </div>
 
-        <ha-textfield
-          label="Max Items"
-          .value=${this._config.max_items || 50}
-          .configValue=${'max_items'}
-          type="number"
-          min="1"
-          max="100"
-          @input=${this._valueChanged}
-        ></ha-textfield>
+        <!-- Layout Section -->
+        <div class="config-section">
+          <div class="section-header" @click=${() => this._toggleSection('layout')}>
+            <ha-icon icon="mdi:view-grid"></ha-icon>
+            <span>Layout</span>
+            <ha-icon class="expand-icon ${this._expandedSections.layout ? 'expanded' : ''}" icon="mdi:chevron-down"></ha-icon>
+          </div>
+          ${this._expandedSections.layout ? html`
+            <div class="section-content">
+              <div class="input-row">
+                <ha-textfield
+                  label="Columns"
+                  .value=${this._config.columns || 4}
+                  .configValue=${'columns'}
+                  type="number"
+                  min="2"
+                  max="8"
+                  @input=${this._valueChanged}
+                ></ha-textfield>
 
-        <ha-textfield
-          label="Columns"
-          .value=${this._config.columns || 4}
-          .configValue=${'columns'}
-          type="number"
-          min="2"
-          max="8"
-          @input=${this._valueChanged}
-        ></ha-textfield>
+                <ha-textfield
+                  label="Max Items"
+                  .value=${this._config.max_items || 50}
+                  .configValue=${'max_items'}
+                  type="number"
+                  min="1"
+                  max="100"
+                  @input=${this._valueChanged}
+                ></ha-textfield>
+              </div>
+
+              <div class="input-row">
+                <ha-textfield
+                  label="Card Height (px, 0 for auto)"
+                  .value=${this._config.card_height || 0}
+                  .configValue=${'card_height'}
+                  type="number"
+                  min="0"
+                  max="1000"
+                  @input=${this._valueChanged}
+                ></ha-textfield>
+              </div>
+
+              <ha-select
+                label="Poster Aspect Ratio"
+                .value=${this._config.poster_aspect_ratio || '2/3'}
+                .configValue=${'poster_aspect_ratio'}
+                @selected=${this._selectChanged}
+                @closed=${(e) => e.stopPropagation()}
+              >
+                <mwc-list-item value="2/3">2:3 (Movie Poster)</mwc-list-item>
+                <mwc-list-item value="16/9">16:9 (Widescreen)</mwc-list-item>
+                <mwc-list-item value="1/1">1:1 (Square)</mwc-list-item>
+                <mwc-list-item value="4/3">4:3 (Classic)</mwc-list-item>
+              </ha-select>
+
+              <ha-formfield label="Horizontal Scroll Mode">
+                <ha-switch
+                  .checked=${this._config.horizontal_scroll === true}
+                  .configValue=${'horizontal_scroll'}
+                  @change=${this._valueChanged}
+                ></ha-switch>
+              </ha-formfield>
+            </div>
+          ` : ''}
+        </div>
+
+        <!-- Behavior Section -->
+        <div class="config-section">
+          <div class="section-header" @click=${() => this._toggleSection('behavior')}>
+            <ha-icon icon="mdi:gesture-tap"></ha-icon>
+            <span>Behavior</span>
+            <ha-icon class="expand-icon ${this._expandedSections.behavior ? 'expanded' : ''}" icon="mdi:chevron-down"></ha-icon>
+          </div>
+          ${this._expandedSections.behavior ? html`
+            <div class="section-content">
+              <ha-select
+                label="Default View"
+                .value=${this._config.default_view || 'popular'}
+                .configValue=${'default_view'}
+                @selected=${this._selectChanged}
+                @closed=${(e) => e.stopPropagation()}
+              >
+                <mwc-list-item value="popular">Popular</mwc-list-item>
+                <mwc-list-item value="new">New</mwc-list-item>
+              </ha-select>
+
+              <ha-select
+                label="Default Media Type"
+                .value=${this._config.default_type || 'movie'}
+                .configValue=${'default_type'}
+                @selected=${this._selectChanged}
+                @closed=${(e) => e.stopPropagation()}
+              >
+                <mwc-list-item value="movie">Movies</mwc-list-item>
+                <mwc-list-item value="series">TV Series</mwc-list-item>
+              </ha-select>
+
+              <ha-select
+                label="Tap Action"
+                .value=${this._config.tap_action || 'details'}
+                .configValue=${'tap_action'}
+                @selected=${this._selectChanged}
+                @closed=${(e) => e.stopPropagation()}
+              >
+                <mwc-list-item value="details">Show Details</mwc-list-item>
+                <mwc-list-item value="play">Play Directly</mwc-list-item>
+                <mwc-list-item value="streams">Get Streams</mwc-list-item>
+              </ha-select>
+            </div>
+          ` : ''}
+        </div>
+
+        <!-- Device Section -->
+        <div class="config-section">
+          <div class="section-header" @click=${() => this._toggleSection('device')}>
+            <ha-icon icon="mdi:devices"></ha-icon>
+            <span>Device Integration</span>
+            <ha-icon class="expand-icon ${this._expandedSections.device ? 'expanded' : ''}" icon="mdi:chevron-down"></ha-icon>
+          </div>
+          ${this._expandedSections.device ? html`
+            <div class="section-content">
+              <p class="helper-text">Select an Apple TV to enable handover functionality.</p>
+              <ha-entity-picker
+                .hass=${this.hass}
+                .value=${this._config.apple_tv_entity || ''}
+                .configValue=${'apple_tv_entity'}
+                .includeDomains=${['media_player']}
+                label="Apple TV Entity"
+                allow-custom-entity
+                @value-changed=${this._valueChanged}
+              ></ha-entity-picker>
+            </div>
+          ` : ''}
+        </div>
       </div>
     `;
   }
 
-  _valueChanged(ev) {
-    if (!this._config || !this.hass) {
-      return;
+  _selectChanged(ev) {
+    const target = ev.target;
+    if (target.configValue) {
+      this._updateConfig(target.configValue, ev.detail.value || target.value);
     }
+  }
+
+  _valueChanged(ev) {
+    if (!this._config || !this.hass) return;
 
     const target = ev.target;
     let value;
@@ -751,21 +924,21 @@ class StremioBrowseCardEditor extends LitElement {
         value = target.checked;
       } else if (target.value !== undefined) {
         value = target.value;
-        // Convert to number for numeric fields
         if (target.type === 'number') {
           value = Number(value);
         }
       }
-
-      this._config = { ...this._config, [target.configValue]: value };
-      
-      const event = new CustomEvent('config-changed', {
-        detail: { config: this._config },
-        bubbles: true,
-        composed: true,
-      });
-      this.dispatchEvent(event);
+      this._updateConfig(target.configValue, value);
     }
+  }
+
+  _updateConfig(key, value) {
+    this._config = { ...this._config, [key]: value };
+    this.dispatchEvent(new CustomEvent('config-changed', {
+      detail: { config: this._config },
+      bubbles: true,
+      composed: true,
+    }));
   }
 
   static get styles() {
@@ -773,21 +946,73 @@ class StremioBrowseCardEditor extends LitElement {
       .card-config {
         display: flex;
         flex-direction: column;
-        gap: 16px;
+        gap: 8px;
+        padding: 8px;
+      }
+
+      .config-section {
+        border: 1px solid var(--divider-color);
+        border-radius: 8px;
+        overflow: hidden;
+      }
+
+      .section-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 12px 16px;
+        background: var(--secondary-background-color);
+        cursor: pointer;
+        user-select: none;
+      }
+
+      .section-header:hover {
+        background: var(--primary-background-color);
+      }
+
+      .section-header span {
+        flex: 1;
+        font-weight: 500;
+      }
+
+      .expand-icon {
+        transition: transform 0.2s;
+      }
+
+      .expand-icon.expanded {
+        transform: rotate(180deg);
+      }
+
+      .section-content {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
         padding: 16px;
       }
 
-      ha-textfield {
-        width: 100%;
+      .toggle-group {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
       }
 
-      label {
-        font-size: 14px;
-        font-weight: 500;
-        color: var(--primary-text-color);
-        margin-top: 8px;
+      .input-row {
+        display: flex;
+        gap: 12px;
       }
 
+      .input-row > * {
+        flex: 1;
+      }
+
+      .helper-text {
+        color: var(--secondary-text-color);
+        font-size: 0.9em;
+        margin: 0;
+      }
+
+      ha-entity-picker,
+      ha-textfield,
       ha-select {
         width: 100%;
       }

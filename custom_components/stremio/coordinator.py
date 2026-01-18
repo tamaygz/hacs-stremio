@@ -91,7 +91,7 @@ class StremioDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     def config_entry(self):
         """Return the config entry associated with this coordinator."""
         return self.entry
-    
+
     @config_entry.setter
     def config_entry(self, value):
         """Set the config entry (for Home Assistant compatibility)."""
@@ -492,7 +492,10 @@ class StremioDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             user = await self._async_fetch_with_retry(
                 self.client.async_get_user, "user profile"
             )
-            _LOGGER.info("Coordinator: Fetched user profile: %s", user.get("email") if user else "None")
+            _LOGGER.info(
+                "Coordinator: Fetched user profile: %s",
+                user.get("email") if user else "None",
+            )
 
             # Fetch library items with retry
             library = await self._async_fetch_with_retry(
@@ -507,9 +510,15 @@ class StremioDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 lambda: self.client.async_get_continue_watching(limit=10),
                 "continue watching",
             )
-            _LOGGER.info("Coordinator: Fetched continue watching count: %d", len(continue_watching))
+            _LOGGER.info(
+                "Coordinator: Fetched continue watching count: %d",
+                len(continue_watching),
+            )
             if continue_watching:
-                _LOGGER.debug("Coordinator: First continue watching item: %s", continue_watching[0])
+                _LOGGER.debug(
+                    "Coordinator: First continue watching item: %s",
+                    continue_watching[0],
+                )
 
             # Prepare data structure
             data = {

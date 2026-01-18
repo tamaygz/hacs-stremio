@@ -1,4 +1,5 @@
 """Tests for Stremio media source catalog browsing."""
+
 import pytest
 from unittest.mock import AsyncMock, MagicMock
 
@@ -38,7 +39,7 @@ def media_source(mock_hass):
 async def test_build_catalogs_browse(media_source):
     """Test building catalogs browse menu."""
     result = media_source._build_catalogs_browse()
-    
+
     assert result.identifier == CATALOGS_IDENTIFIER
     assert result.title == "Browse Catalogs"
     assert result.can_expand is True
@@ -49,7 +50,7 @@ async def test_build_catalogs_browse(media_source):
 async def test_build_movie_genres_browse(media_source):
     """Test building movie genres list."""
     result = media_source._build_movie_genres_browse()
-    
+
     assert result.identifier == MOVIE_GENRES_IDENTIFIER
     assert result.title == "Movie Genres"
     assert result.media_content_type == MediaType.MOVIE
@@ -60,7 +61,7 @@ async def test_build_movie_genres_browse(media_source):
 async def test_build_series_genres_browse(media_source):
     """Test building series genres list."""
     result = media_source._build_series_genres_browse()
-    
+
     assert result.identifier == SERIES_GENRES_IDENTIFIER
     assert result.title == "TV Show Genres"
     assert result.media_content_type == MediaType.TVSHOW
@@ -68,11 +69,13 @@ async def test_build_series_genres_browse(media_source):
 
 
 @pytest.mark.asyncio
-async def test_build_genre_content_browse_movies(media_source, mock_hass, mock_coordinator):
+async def test_build_genre_content_browse_movies(
+    media_source, mock_hass, mock_coordinator
+):
     """Test building genre-filtered movie content."""
     # Setup mock coordinator
     mock_hass.data = {"stremio": {"test_entry": {"coordinator": mock_coordinator}}}
-    
+
     mock_catalog_items = [
         {
             "id": "tt0111161",
@@ -82,23 +85,31 @@ async def test_build_genre_content_browse_movies(media_source, mock_hass, mock_c
             "year": "1994",
         }
     ]
-    
-    mock_coordinator.client.async_get_popular_movies = AsyncMock(return_value=mock_catalog_items)
-    
-    result = await media_source._build_genre_content_browse("movie_genres/Drama", "movie")
-    
+
+    mock_coordinator.client.async_get_popular_movies = AsyncMock(
+        return_value=mock_catalog_items
+    )
+
+    result = await media_source._build_genre_content_browse(
+        "movie_genres/Drama", "movie"
+    )
+
     assert "Drama" in result.title
     assert result.media_content_type == MediaType.MOVIE
     assert len(result.children) == 1
-    mock_coordinator.client.async_get_popular_movies.assert_called_once_with(genre="Drama", limit=50)
+    mock_coordinator.client.async_get_popular_movies.assert_called_once_with(
+        genre="Drama", limit=50
+    )
 
 
 @pytest.mark.asyncio
-async def test_build_genre_content_browse_series(media_source, mock_hass, mock_coordinator):
+async def test_build_genre_content_browse_series(
+    media_source, mock_hass, mock_coordinator
+):
     """Test building genre-filtered series content."""
     # Setup mock coordinator
     mock_hass.data = {"stremio": {"test_entry": {"coordinator": mock_coordinator}}}
-    
+
     mock_catalog_items = [
         {
             "id": "tt0903747",
@@ -108,15 +119,21 @@ async def test_build_genre_content_browse_series(media_source, mock_hass, mock_c
             "year": "2008",
         }
     ]
-    
-    mock_coordinator.client.async_get_popular_series = AsyncMock(return_value=mock_catalog_items)
-    
-    result = await media_source._build_genre_content_browse("series_genres/Crime", "series")
-    
+
+    mock_coordinator.client.async_get_popular_series = AsyncMock(
+        return_value=mock_catalog_items
+    )
+
+    result = await media_source._build_genre_content_browse(
+        "series_genres/Crime", "series"
+    )
+
     assert "Crime" in result.title
     assert result.media_content_type == MediaType.TVSHOW
     assert len(result.children) == 1
-    mock_coordinator.client.async_get_popular_series.assert_called_once_with(genre="Crime", limit=50)
+    mock_coordinator.client.async_get_popular_series.assert_called_once_with(
+        genre="Crime", limit=50
+    )
 
 
 @pytest.mark.asyncio
@@ -124,7 +141,7 @@ async def test_build_popular_movies_browse(media_source, mock_hass, mock_coordin
     """Test building popular movies browse."""
     # Setup mock coordinator
     mock_hass.data = {"stremio": {"test_entry": {"coordinator": mock_coordinator}}}
-    
+
     mock_catalog_items = [
         {
             "id": "tt0111161",
@@ -133,11 +150,13 @@ async def test_build_popular_movies_browse(media_source, mock_hass, mock_coordin
             "poster": "https://example.com/poster.jpg",
         }
     ]
-    
-    mock_coordinator.client.async_get_popular_movies = AsyncMock(return_value=mock_catalog_items)
-    
+
+    mock_coordinator.client.async_get_popular_movies = AsyncMock(
+        return_value=mock_catalog_items
+    )
+
     result = await media_source._build_popular_movies_browse()
-    
+
     assert result.identifier == POPULAR_MOVIES_IDENTIFIER
     assert result.title == "Popular Movies"
     assert len(result.children) == 1
@@ -154,9 +173,9 @@ async def test_build_catalog_item_movie(media_source):
         "poster": "https://example.com/poster.jpg",
         "year": "1994",
     }
-    
+
     result = media_source._build_catalog_item(item)
-    
+
     assert result is not None
     assert result.title == "The Shawshank Redemption (1994)"
     assert result.media_class == MediaClass.MOVIE
@@ -173,9 +192,9 @@ async def test_build_catalog_item_series(media_source):
         "type": "series",
         "poster": "https://example.com/poster.jpg",
     }
-    
+
     result = media_source._build_catalog_item(item)
-    
+
     assert result is not None
     assert result.title == "Breaking Bad"
     assert result.media_class == MediaClass.TV_SHOW
@@ -186,7 +205,7 @@ async def test_build_catalog_item_series(media_source):
 async def test_build_catalog_item_invalid(media_source):
     """Test building catalog item with invalid data."""
     item = {"type": "movie"}  # Missing required fields
-    
+
     result = media_source._build_catalog_item(item)
-    
+
     assert result is None

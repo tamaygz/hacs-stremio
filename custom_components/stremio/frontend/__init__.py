@@ -112,13 +112,13 @@ class JSModuleRegistration:
         # Only register modules if Lovelace is in storage mode
         mode = self.lovelace_mode
         resources = self.lovelace_resources
-        
+
         _LOGGER.debug(
             "Lovelace mode: %s, resources available: %s",
             mode,
             resources is not None,
         )
-        
+
         if mode == "storage" and resources is not None:
             await self._async_wait_for_lovelace_resources()
         else:
@@ -131,7 +131,7 @@ class JSModuleRegistration:
 
     async def _async_register_path(self) -> None:
         """Register the static HTTP path for serving JS files.
-        
+
         Note: Cache busting is achieved through version query params on resource URLs.
         The static path serves files without caching by default in HA dev mode.
         """
@@ -209,9 +209,7 @@ class JSModuleRegistration:
         # Get existing resources from this integration
         try:
             existing_resources = [
-                r
-                for r in resources.async_items()
-                if r["url"].startswith(URL_BASE)
+                r for r in resources.async_items() if r["url"].startswith(URL_BASE)
             ]
             _LOGGER.debug(
                 "Found %d existing Stremio resources: %s",
@@ -232,14 +230,14 @@ class JSModuleRegistration:
                     registered = True
                     current_version = self._get_version(resource["url"])
                     target_version = module["version"]
-                    
+
                     _LOGGER.debug(
                         "Found existing resource %s: current=%s, target=%s",
                         module["name"],
                         current_version,
                         target_version,
                     )
-                    
+
                     # Update if version differs
                     if current_version != target_version:
                         _LOGGER.info(
@@ -262,7 +260,9 @@ class JSModuleRegistration:
                                 target_version,
                             )
                         except Exception as err:  # noqa: BLE001
-                            _LOGGER.error("Failed to update resource %s: %s", module["name"], err)
+                            _LOGGER.error(
+                                "Failed to update resource %s: %s", module["name"], err
+                            )
                     else:
                         _LOGGER.debug(
                             "%s already at v%s, no update needed",
@@ -290,7 +290,9 @@ class JSModuleRegistration:
                         module["version"],
                     )
                 except Exception as err:  # noqa: BLE001
-                    _LOGGER.error("Failed to register resource %s: %s", module["name"], err)
+                    _LOGGER.error(
+                        "Failed to register resource %s: %s", module["name"], err
+                    )
 
     def _get_path(self, url: str) -> str:
         """Extract path without query parameters.
@@ -327,12 +329,12 @@ class JSModuleRegistration:
             url = f"{URL_BASE}/{module['filename']}"
             try:
                 resource_list = [
-                    r
-                    for r in resources.async_items()
-                    if r["url"].startswith(url)
+                    r for r in resources.async_items() if r["url"].startswith(url)
                 ]
                 for resource in resource_list:
                     await resources.async_delete_item(resource["id"])
                     _LOGGER.info("Unregistered resource: %s", module["name"])
             except Exception as err:  # noqa: BLE001
-                _LOGGER.error("Failed to unregister resource %s: %s", module["name"], err)
+                _LOGGER.error(
+                    "Failed to unregister resource %s: %s", module["name"], err
+                )

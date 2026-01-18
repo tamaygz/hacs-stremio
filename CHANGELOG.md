@@ -5,7 +5,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.4.0] - 2025-01-XX
+
+### Added
+
+- **Comprehensive UI Editor Support** for all cards
+  - Collapsible sections (Entity, Display, Layout, Behavior, Device)
+  - All configuration options now accessible via visual editor
+  - Entity quick-select buttons for Stremio sensors
+
+- **New Configuration Options** for Library and Continue Watching cards:
+  - `poster_aspect_ratio`: 2:3, 16:9, 1:1, 4:3 options
+  - `horizontal_scroll`: Carousel mode for compact layouts
+  - `card_height`: Custom card height (px) or auto
+  - `show_title`: Toggle titles below posters
+  - `show_media_type_badge`: Movie/TV badge overlay
+  - `tap_action`: details, play, or streams on tap
+  - `default_sort`: recent, title, or progress
+  - `apple_tv_entity`: Device integration for handover
+
+- **New Configuration Options** for Browse Card:
+  - Layout options: columns, poster_aspect_ratio, horizontal_scroll
+  - Display toggles: show_title, show_rating
+  - Behavior options: default_view, default_type, tap_action
+
+- **New Configuration Options** for Media Details Card:
+  - `show_description`, `show_progress` toggles
+  - `expand_description`: Start expanded
+  - `max_description_lines`: Collapsed line limit
+  - `apple_tv_entity`: Device handover support
+
+- **New Configuration Options** for Player Card:
+  - `show_browse_button`, `show_backdrop`
+  - `compact_mode`: Smaller layout option
+  - `apple_tv_entity`: Device handover support
 
 ### Changed
 
@@ -13,6 +46,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Resolves pydantic v2 dependency conflict with Home Assistant's pydantic v1
   - Improves compatibility and reduces external dependencies
   - All API calls now use aiohttp directly with proper error handling
+
+- Card editors now use modern collapsible section design consistent with HA style
+- Improved CSS variables for dynamic grid columns and poster aspect ratios
+- Version bumped to 0.4.0 for automatic cache busting
+
+## [0.3.6] - Previous Release
 
 ## [1.0.0] - 2026-01-17
 

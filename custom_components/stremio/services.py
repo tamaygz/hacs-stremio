@@ -260,7 +260,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
 
     async def handle_get_series_metadata(call: ServiceCall) -> ServiceResponse:  # type: ignore[return-value]
         """Handle get_series_metadata service call.
-        
+
         Fetch series metadata including seasons and episodes from Cinemeta.
         Returns structured data for the episode picker UI.
         """
@@ -506,7 +506,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
 
     async def handle_browse_catalog(call: ServiceCall) -> ServiceResponse:
         """Handle browse_catalog service call.
-        
+
         Browse the Stremio catalog for popular or new movies/series, optionally filtered by genre.
         Returns a list of catalog items with metadata.
         """

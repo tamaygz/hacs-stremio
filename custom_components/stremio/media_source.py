@@ -1212,7 +1212,9 @@ class StremioMediaSource(MediaSource):
 
         coordinator = self._get_coordinator()
         if not coordinator:
-            return self._build_empty_browse(identifier, f"{genre} {media_type.title()}s")
+            return self._build_empty_browse(
+                identifier, f"{genre} {media_type.title()}s"
+            )
 
         try:
             client = coordinator.client
@@ -1237,7 +1239,9 @@ class StremioMediaSource(MediaSource):
                 domain=DOMAIN,
                 identifier=identifier,
                 media_class=MediaClass.DIRECTORY,
-                media_content_type=MediaType.MOVIE if media_type == "movie" else MediaType.TVSHOW,
+                media_content_type=(
+                    MediaType.MOVIE if media_type == "movie" else MediaType.TVSHOW
+                ),
                 title=title,
                 can_play=False,
                 can_expand=True,
@@ -1245,7 +1249,9 @@ class StremioMediaSource(MediaSource):
             )
         except Exception as err:
             _LOGGER.error("Error fetching %s genre content: %s", genre, err)
-            return self._build_empty_browse(identifier, f"{genre} {media_type.title()}s")
+            return self._build_empty_browse(
+                identifier, f"{genre} {media_type.title()}s"
+            )
 
     def _build_catalog_item(self, item: dict[str, Any]) -> BrowseMediaSource | None:
         """Build a BrowseMediaSource for a catalog item.
