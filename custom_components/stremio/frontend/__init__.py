@@ -213,6 +213,11 @@ class JSModuleRegistration:
                 for r in resources.async_items()
                 if r["url"].startswith(URL_BASE)
             ]
+            _LOGGER.debug(
+                "Found %d existing Stremio resources: %s",
+                len(existing_resources),
+                [r["url"] for r in existing_resources],
+            )
         except Exception as err:  # noqa: BLE001
             _LOGGER.error("Failed to get existing resources: %s", err)
             return
@@ -222,30 +227,53 @@ class JSModuleRegistration:
             registered = False
 
             for resource in existing_resources:
-                if self._get_path(resource["url"]) == url:
+                resource_path = self._get_path(resource["url"])
+                if resource_path == url:
                     registered = True
-                    # Check if update needed
-                    if self._get_version(resource["url"]) != module["version"]:
+                    current_version = self._get_version(resource["url"])
+                    target_version = module["version"]
+                    
+                    _LOGGER.debug(
+                        "Found existing resource %s: current=%s, target=%s",
+                        module["name"],
+                        current_version,
+                        target_version,
+                    )
+                    
+                    # Update if version differs
+                    if current_version != target_version:
                         _LOGGER.info(
-                            "Updating %s to version %s",
+                            "Updating %s from v%s to v%s",
                             module["name"],
-                            module["version"],
+                            current_version,
+                            target_version,
                         )
                         try:
                             await resources.async_update_item(
                                 resource["id"],
                                 {
                                     "res_type": "module",
-                                    "url": f"{url}?v={module['version']}",
+                                    "url": f"{url}?v={target_version}",
                                 },
+                            )
+                            _LOGGER.info(
+                                "Successfully updated %s to v%s",
+                                module["name"],
+                                target_version,
                             )
                         except Exception as err:  # noqa: BLE001
                             _LOGGER.error("Failed to update resource %s: %s", module["name"], err)
+                    else:
+                        _LOGGER.debug(
+                            "%s already at v%s, no update needed",
+                            module["name"],
+                            target_version,
+                        )
                     break
 
             if not registered:
                 _LOGGER.info(
-                    "Registering %s version %s",
+                    "Registering new resource: %s v%s",
                     module["name"],
                     module["version"],
                 )
@@ -255,6 +283,11 @@ class JSModuleRegistration:
                             "res_type": "module",
                             "url": f"{url}?v={module['version']}",
                         }
+                    )
+                    _LOGGER.info(
+                        "Successfully registered %s v%s",
+                        module["name"],
+                        module["version"],
                     )
                 except Exception as err:  # noqa: BLE001
                     _LOGGER.error("Failed to register resource %s: %s", module["name"], err)
