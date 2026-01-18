@@ -304,8 +304,8 @@ class StremioBrowseCard extends LitElement {
     this.requestUpdate();
 
     try {
-      // Use media browser API to fetch catalog
-      const catalogId = `${this._viewMode}_${this._mediaType === 'movie' ? 'movies' : 'series'}`;
+      // Build catalog ID from view mode and media type
+      const catalogId = this._getCatalogId();
       const mediaSource = `media-source://stremio/${catalogId}`;
 
       const response = await this._hass.callWS({
@@ -325,6 +325,12 @@ class StremioBrowseCard extends LitElement {
       this._loading = false;
       this.requestUpdate();
     }
+  }
+
+  _getCatalogId() {
+    // Build catalog identifier from current view and media type
+    const mediaTypeSuffix = this._mediaType === 'movie' ? 'movies' : 'series';
+    return `${this._viewMode}_${mediaTypeSuffix}`;
   }
 
   _handleViewChange(view) {
@@ -361,8 +367,11 @@ class StremioBrowseCard extends LitElement {
   _openMediaBrowser(item) {
     // Navigate to media browser for this item
     if (item.media_content_id) {
+      const contentId = item.media_content_id;
+      // Don't double-encode - media_content_id is already the raw identifier
+      const encodedPath = `/media-browser/media-source%3A%2F%2Fstremio%2F${contentId}`;
       this._hass.callService('browser_mod', 'navigate', {
-        path: `/media-browser/media-source%3A%2F%2Fstremio%2F${encodeURIComponent(item.media_content_id)}`,
+        path: encodedPath,
       });
     }
   }

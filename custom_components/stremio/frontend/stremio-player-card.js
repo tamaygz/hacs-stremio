@@ -316,8 +316,8 @@ class StremioPlayerCard extends LitElement {
       this._hass.callService('browser_mod', 'navigate', {
         path: '/media-browser/media-source%3A%2F%2Fstremio%2Fcatalogs',
       }).catch(() => {
-        // Fallback if browser_mod not available - just fire the event
-        console.log('Browse event fired - add a stremio-browse-card to your dashboard');
+        // Fallback if browser_mod not available
+        // Event was already fired above for alternative handling
       });
     }
   }
