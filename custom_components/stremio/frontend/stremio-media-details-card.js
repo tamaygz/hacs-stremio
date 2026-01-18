@@ -816,6 +816,7 @@ class StremioMediaDetailsCardEditor extends LitElement {
       hass: { type: Object },
       config: { type: Object },
       _stremioEntities: { type: Array },
+      _appleTvEntities: { type: Array },
       _expandedSections: { type: Object },
     };
   }
@@ -823,6 +824,7 @@ class StremioMediaDetailsCardEditor extends LitElement {
   constructor() {
     super();
     this._stremioEntities = [];
+    this._appleTvEntities = [];
     this._expandedSections = {
       entity: true,
       display: false,
@@ -977,10 +979,37 @@ class StremioMediaDetailsCardEditor extends LitElement {
         entity_id: entityId,
         friendly_name: this.hass.states[entityId].attributes.friendly_name || entityId,
       }));
+
+    // Find Apple TV media_player entities
+    this._appleTvEntities = Object.keys(this.hass.states)
+      .filter(entityId => {
+        if (!entityId.startsWith('media_player.')) return false;
+        const state = this.hass.states[entityId];
+        const friendlyName = (state.attributes.friendly_name || '').toLowerCase();
+        const entityLower = entityId.toLowerCase();
+        // Match Apple TV by entity ID or friendly name
+        return entityLower.includes('apple_tv') ||
+               entityLower.includes('appletv') ||
+               friendlyName.includes('apple tv') ||
+               friendlyName.includes('appletv');
+      })
+      .map(entityId => ({
+        entity_id: entityId,
+        friendly_name: this.hass.states[entityId].attributes.friendly_name || entityId,
+      }));
   }
 
   _selectEntity(entityId) {
     this.config = { ...this.config, entity: entityId };
+    this.dispatchEvent(new CustomEvent('config-changed', {
+      bubbles: true,
+      composed: true,
+      detail: { config: this.config },
+    }));
+  }
+
+  _selectAppleTv(entityId) {
+    this.config = { ...this.config, apple_tv_entity: entityId || undefined };
     this.dispatchEvent(new CustomEvent('config-changed', {
       bubbles: true,
       composed: true,
@@ -1151,6 +1180,28 @@ class StremioMediaDetailsCardEditor extends LitElement {
           ${this._expandedSections.device ? html`
             <div class="section-content">
               <p class="helper-text">Select an Apple TV to enable handover functionality.</p>
+              
+              ${this._appleTvEntities?.length > 0 ? html`
+                <div class="entity-buttons">
+                  ${this._appleTvEntities.map(entity => html`
+                    <button 
+                      class="entity-btn ${this.config.apple_tv_entity === entity.entity_id ? 'selected' : ''}"
+                      @click=${() => this._selectAppleTv(entity.entity_id)}
+                    >
+                      <ha-icon icon="mdi:apple"></ha-icon>
+                      <span>${entity.friendly_name}</span>
+                    </button>
+                  `)}
+                  <button 
+                    class="entity-btn ${!this.config.apple_tv_entity ? 'selected' : ''}"
+                    @click=${() => this._selectAppleTv('')}
+                  >
+                    <ha-icon icon="mdi:close"></ha-icon>
+                    <span>None</span>
+                  </button>
+                </div>
+              ` : ''}
+
               <ha-entity-picker
                 .hass=${this.hass}
                 .value=${this.config.apple_tv_entity || ''}
