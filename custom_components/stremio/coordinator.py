@@ -63,10 +63,12 @@ class StremioDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             logic that requires hass or async operations is deferred to _async_setup().
         """
         self.client = client
-        self.entry = entry
+        self._entry_param = entry  # Store temporarily
         self._previous_watching: dict[str, Any] | None = None
         self._previous_library_count: int = 0
-        self._previous_series_episodes: dict[str, tuple[int, int]] = {}  # imdb_id -> (season, episode)
+        self._previous_series_episodes: dict[str, tuple[int, int]] = (
+            {}
+        )  # imdb_id -> (season, episode)
         self._consecutive_failures: int = 0
         self._state_change_unsub: list[Any] = []
         self._is_polling_gated: bool = False
@@ -90,6 +92,9 @@ class StremioDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             name=DOMAIN,
             update_interval=timedelta(seconds=self._configured_scan_interval),
         )
+
+        # Set entry after parent init to avoid it being overwritten
+        self.entry = self._entry_param
 
     @property
     def config_entry(self):
@@ -511,7 +516,9 @@ class StremioDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
             # Fetch continue watching with retry
             continue_watching = await self._async_fetch_with_retry(
-                lambda: self.client.async_get_continue_watching(limit=DEFAULT_CONTINUE_WATCHING_LIMIT),
+                lambda: self.client.async_get_continue_watching(
+                    limit=DEFAULT_CONTINUE_WATCHING_LIMIT
+                ),
                 "continue watching",
             )
             _LOGGER.info(
@@ -744,17 +751,21 @@ class StremioDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 prev_season, prev_episode = self._previous_series_episodes[imdb_id]
 
                 # New episode detected if season or episode increased
-                if season > prev_season or (season == prev_season and episode > prev_episode):
-                    new_episodes_detected.append({
-                        "imdb_id": imdb_id,
-                        "title": item.get("title", "Unknown"),
-                        "previous_season": prev_season,
-                        "previous_episode": prev_episode,
-                        "new_season": season,
-                        "new_episode": episode,
-                        "episode_title": item.get("episode_title"),
-                        "poster": item.get("poster"),
-                    })
+                if season > prev_season or (
+                    season == prev_season and episode > prev_episode
+                ):
+                    new_episodes_detected.append(
+                        {
+                            "imdb_id": imdb_id,
+                            "title": item.get("title", "Unknown"),
+                            "previous_season": prev_season,
+                            "previous_episode": prev_episode,
+                            "new_season": season,
+                            "new_episode": episode,
+                            "episode_title": item.get("episode_title"),
+                            "poster": item.get("poster"),
+                        }
+                    )
                     _LOGGER.debug(
                         "New episode detected for %s: S%02dE%02d -> S%02dE%02d",
                         item.get("title"),
@@ -818,11 +829,13 @@ class StremioDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         # Add series-specific info if applicable
         if resume_item.get("type") == "series":
-            event_data.update({
-                "season": resume_item.get("season"),
-                "episode": resume_item.get("episode"),
-                "episode_title": resume_item.get("episode_title"),
-            })
+            event_data.update(
+                {
+                    "season": resume_item.get("season"),
+                    "episode": resume_item.get("episode"),
+                    "episode_title": resume_item.get("episode_title"),
+                }
+            )
 
         # Include remaining time for display purposes
         duration = resume_item.get("duration", 0)

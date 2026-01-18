@@ -386,7 +386,11 @@ class TestGetStreamsIntegration:
 
         mock_streams = [
             {"name": "720p", "title": "720p WEB", "url": "http://test.com/720.mp4"},
-            {"name": "1080p", "title": "1080p BluRay", "url": "http://test.com/1080.mp4"},
+            {
+                "name": "1080p",
+                "title": "1080p BluRay",
+                "url": "http://test.com/1080.mp4",
+            },
         ]
 
         with patch.object(
