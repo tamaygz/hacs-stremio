@@ -585,10 +585,22 @@ class StremioBrowseCard extends LitElement {
       return item.type === 'tvshow' ? 'series' : item.type;
     }
     if (item.media_content_type) {
+      // Handle Home Assistant MediaType values (e.g., "video/movie", "video/tvshow")
+      if (item.media_content_type.includes('movie')) {
+        return 'movie';
+      }
+      if (item.media_content_type.includes('tvshow') || item.media_content_type.includes('series')) {
+        return 'series';
+      }
       return item.media_content_type === 'tvshow' ? 'series' : item.media_content_type;
     }
     if (item.media_content_id) {
-      const parts = item.media_content_id.split('/');
+      // Handle media-source:// URLs
+      let path = item.media_content_id;
+      if (path.includes('media-source://stremio/')) {
+        path = path.replace('media-source://stremio/', '');
+      }
+      const parts = path.split('/');
       if (parts.length > 0) {
         const typeFromId = parts[0];
         if (typeFromId === 'series' || typeFromId === 'movie') {
@@ -696,8 +708,22 @@ class StremioBrowseCard extends LitElement {
     if (item.id && item.id.startsWith('tt')) {
       return item.id;
     }
-    // Try to extract from media_content_id (format is "type/id")
+    // Try to extract from media_content_id
+    // Format can be:
+    // - "media-source://stremio/movie/tt1234567" (from browse_media)
+    // - "movie/tt1234567" (simple format)
     if (item.media_content_id) {
+      // Handle media-source:// URLs
+      if (item.media_content_id.includes('media-source://stremio/')) {
+        const path = item.media_content_id.replace('media-source://stremio/', '');
+        const parts = path.split('/');
+        // Path is now "movie/tt1234567" or "series/tt1234567"
+        if (parts.length > 1) {
+          return parts[1]; // Return the IMDB ID
+        }
+        return parts[0];
+      }
+      // Simple format: "type/id"
       const parts = item.media_content_id.split('/');
       if (parts.length > 1) {
         return parts[1];
