@@ -55,6 +55,14 @@ jobs:
           sed -i "s|\"version\": \".*\"|\"version\": \"$VERSION\"|" custom_components/stremio/manifest.json
           cat custom_components/stremio/manifest.json
 
+      - name: Commit version update
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add custom_components/stremio/manifest.json
+          git commit -m "chore: bump version to ${{ steps.version.outputs.version }}"
+          git push
+
       - name: Create release zip
         run: |
           cd custom_components
