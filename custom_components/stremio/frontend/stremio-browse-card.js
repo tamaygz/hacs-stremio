@@ -2,11 +2,12 @@
  * Stremio Browse Card
  * 
  * Browse popular movies, TV shows, and new content from Stremio catalogs.
+ * Features inline detail view (like library cards) and episode selection for TV shows.
  * 
  * @customElement stremio-browse-card
  * @extends LitElement
- * @version 0.3.1
- * @cacheBust 20260118
+ * @version 0.4.0
+ * @cacheBust 20260118b
  */
 
 // Safe LitElement access - wait for HA frontend to be ready
@@ -95,6 +96,8 @@ class StremioBrowseCard extends LitElement {
         grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
         gap: 12px;
         padding: 16px;
+        max-height: 500px;
+        overflow-y: auto;
       }
 
       @media (max-width: 768px) {
@@ -114,6 +117,12 @@ class StremioBrowseCard extends LitElement {
       }
 
       .catalog-item:hover {
+        transform: scale(1.05);
+      }
+
+      .catalog-item:focus {
+        outline: 2px solid var(--primary-color);
+        outline-offset: 2px;
         transform: scale(1.05);
       }
 
@@ -137,6 +146,19 @@ class StremioBrowseCard extends LitElement {
         overflow: hidden;
       }
 
+      .media-type-badge {
+        position: absolute;
+        top: 6px;
+        left: 6px;
+        background: rgba(0, 0, 0, 0.7);
+        color: #fff;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-size: 0.65em;
+        text-transform: uppercase;
+        font-weight: 600;
+      }
+
       .loading-spinner {
         display: flex;
         align-items: center;
@@ -151,28 +173,28 @@ class StremioBrowseCard extends LitElement {
         color: var(--secondary-text-color);
       }
 
-      .modal-overlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: rgba(0, 0, 0, 0.7);
+      /* Back button */
+      .back-button {
+        background: transparent;
+        border: none;
+        color: var(--primary-color);
+        cursor: pointer;
+        padding: 12px 16px;
         display: flex;
         align-items: center;
-        justify-content: center;
-        z-index: 1000;
+        gap: 8px;
+        font-size: 0.95em;
+        font-weight: 500;
+        transition: background-color 0.2s;
       }
 
-      .item-detail {
-        background: var(--card-background-color);
-        border-radius: 12px;
-        padding: 20px;
-        max-width: 400px;
-        width: 90%;
-        max-height: 80vh;
-        overflow-y: auto;
-        position: relative;
+      .back-button:hover {
+        background-color: var(--secondary-background-color);
+      }
+
+      /* Inline detail view */
+      .item-detail-view {
+        padding: 16px;
       }
 
       .detail-header {
@@ -182,21 +204,58 @@ class StremioBrowseCard extends LitElement {
       }
 
       .detail-poster {
-        width: 100px;
-        height: 150px;
+        width: 120px;
+        height: 180px;
         object-fit: cover;
         border-radius: 8px;
+        flex-shrink: 0;
+      }
+
+      .detail-poster-placeholder {
+        width: 120px;
+        height: 180px;
+        background: var(--secondary-background-color);
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+      }
+
+      .detail-poster-placeholder ha-icon {
+        width: 48px;
+        height: 48px;
+        color: var(--disabled-text-color);
+      }
+
+      .detail-info {
+        flex: 1;
       }
 
       .detail-info h3 {
         margin: 0 0 8px 0;
         color: var(--primary-text-color);
+        font-size: 1.3em;
       }
 
-      .detail-info p {
+      .detail-type {
+        margin: 4px 0;
+        font-size: 0.95em;
+        color: var(--primary-color);
+        font-weight: 500;
+      }
+
+      .detail-meta {
         margin: 4px 0;
         font-size: 0.9em;
         color: var(--secondary-text-color);
+      }
+
+      .detail-episode {
+        color: var(--primary-color);
+        font-weight: 500;
+        font-size: 0.95em;
+        margin: 4px 0;
       }
 
       .detail-actions {
@@ -207,7 +266,7 @@ class StremioBrowseCard extends LitElement {
 
       .detail-button {
         flex: 1;
-        padding: 10px 16px;
+        padding: 12px 16px;
         border: none;
         border-radius: 6px;
         cursor: pointer;
@@ -216,6 +275,11 @@ class StremioBrowseCard extends LitElement {
         align-items: center;
         justify-content: center;
         gap: 6px;
+        transition: opacity 0.2s;
+      }
+
+      .detail-button:hover {
+        opacity: 0.9;
       }
 
       .detail-button.primary {
@@ -228,19 +292,15 @@ class StremioBrowseCard extends LitElement {
         color: var(--primary-text-color);
       }
 
-      .close-button {
-        position: absolute;
-        top: 10px;
-        right: 10px;
-        background: var(--secondary-background-color);
-        border: none;
-        border-radius: 50%;
-        width: 32px;
-        height: 32px;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
+      .detail-button.tertiary {
+        background: transparent;
+        color: var(--primary-color);
+        border: 1px solid var(--primary-color);
+      }
+
+      .detail-button.tertiary:hover {
+        background: var(--primary-color);
+        color: var(--text-primary-color);
       }
     `;
   }
@@ -275,11 +335,13 @@ class StremioBrowseCard extends LitElement {
       show_genre_filter: true,
       show_title: true, // Show titles below posters
       show_rating: true, // Show rating badge
+      show_media_type_badge: false, // Show movie/series badge on poster
+      show_similar_button: true, // Show "Find Similar" button in detail view
       
       // Layout options
       columns: 4,
       max_items: 50,
-      card_height: 0, // 0 for auto
+      card_height: 500, // Max height in pixels (0 for auto)
       poster_aspect_ratio: '2/3', // 2/3, 16/9, 1/1, 4/3
       horizontal_scroll: false, // Horizontal carousel mode
       
