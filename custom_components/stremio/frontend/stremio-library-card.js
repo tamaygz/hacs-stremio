@@ -316,6 +316,24 @@ class StremioLibraryCard extends LitElement {
         background: var(--secondary-background-color);
         color: var(--primary-text-color);
       }
+
+      .detail-button.tertiary {
+        background: transparent;
+        color: var(--primary-color);
+        border: 1px solid var(--primary-color);
+      }
+
+      .detail-button.tertiary:hover {
+        background: var(--primary-color);
+        color: var(--text-primary-color);
+      }
+
+      .detail-episode {
+        color: var(--primary-color);
+        font-weight: 500;
+        font-size: 0.95em;
+        margin: 4px 0;
+      }
     `;
   }
 

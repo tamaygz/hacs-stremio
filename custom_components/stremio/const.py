@@ -143,6 +143,7 @@ EVENT_STREAM_URL: Final = "stremio_stream_url"
 
 # Service Names
 SERVICE_GET_STREAMS: Final = "get_streams"
+SERVICE_GET_SERIES_METADATA: Final = "get_series_metadata"
 SERVICE_SEARCH_LIBRARY: Final = "search_library"
 SERVICE_ADD_TO_LIBRARY: Final = "add_to_library"
 SERVICE_REMOVE_FROM_LIBRARY: Final = "remove_from_library"
