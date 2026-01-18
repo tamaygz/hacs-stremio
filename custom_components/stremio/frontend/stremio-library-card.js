@@ -580,19 +580,79 @@ class StremioLibraryCard extends LitElement {
       return;
     }
 
-    console.log('[Library Card] Getting streams for:', id, item.type);
+    // For series, show episode picker first
+    if (item.type === 'series') {
+      console.log('[Library Card] TV Show detected, opening episode picker');
+      this._showEpisodePicker(item);
+      return;
+    }
+
+    // For movies, fetch streams directly
+    this._fetchStreams(item, null, null);
+  }
+
+  _showEpisodePicker(item) {
+    // Use the global helper if available
+    if (window.StremioEpisodePicker) {
+      window.StremioEpisodePicker.show(
+        this._hass,
+        {
+          title: item.title || item.name,
+          type: item.type,
+          poster: item.poster,
+          imdb_id: item.imdb_id || item.id,
+          // Pass watch progress info for highlighting
+          lastWatchedSeason: item.last_season || item.season,
+          lastWatchedEpisode: item.last_episode || item.episode,
+          total_seasons: item.total_seasons,
+          watched_episodes: item.watched_episodes || [],
+        },
+        (selection) => {
+          console.log('[Library Card] Episode selected:', selection);
+          this._fetchStreams(item, selection.season, selection.episode);
+        }
+      );
+    } else {
+      // Fallback: Create picker directly
+      let picker = document.querySelector('stremio-episode-picker');
+      if (!picker) {
+        picker = document.createElement('stremio-episode-picker');
+        document.body.appendChild(picker);
+      }
+      picker.hass = this._hass;
+      picker.mediaItem = {
+        title: item.title || item.name,
+        type: item.type,
+        imdb_id: item.imdb_id || item.id,
+        lastWatchedSeason: item.last_season || item.season,
+        lastWatchedEpisode: item.last_episode || item.episode,
+        total_seasons: item.total_seasons,
+      };
+      picker.open = true;
+      
+      // Listen for selection
+      const handler = (e) => {
+        picker.removeEventListener('episode-selected', handler);
+        this._fetchStreams(item, e.detail.season, e.detail.episode);
+      };
+      picker.addEventListener('episode-selected', handler);
+    }
+  }
+
+  _fetchStreams(item, season, episode) {
+    const id = item.imdb_id || item.id;
+    console.log('[Library Card] Getting streams for:', id, item.type, season ? `S${season}E${episode}` : '');
     this._showToast('Fetching streams...');
     
-    // For series, we need season/episode - for now default to S1E1 if not available
     const serviceData = {
       media_id: id,
       media_type: item.type || 'movie',
     };
     
     // Add season/episode for series
-    if (item.type === 'series') {
-      serviceData.season = item.season || 1;
-      serviceData.episode = item.episode || 1;
+    if (item.type === 'series' && season && episode) {
+      serviceData.season = season;
+      serviceData.episode = episode;
     }
 
     // Call service with return_response to get streams back
@@ -606,7 +666,11 @@ class StremioLibraryCard extends LitElement {
           
           if (streams.length > 0) {
             // Show the stream dialog
-            this._showStreamDialog(item, streams);
+            const displayItem = { ...item };
+            if (season && episode) {
+              displayItem.title = `${item.title || item.name} - S${season}E${episode}`;
+            }
+            this._showStreamDialog(displayItem, streams);
           } else {
             this._showToast('No streams found for this title');
           }
@@ -869,11 +933,31 @@ class StremioLibraryCardEditor extends LitElement {
     return {
       hass: { type: Object },
       _config: { type: Object },
+      _stremioEntities: { type: Array },
     };
   }
 
   setConfig(config) {
     this._config = config;
+  }
+
+  updated(changedProps) {
+    if (changedProps.has('hass') && this.hass) {
+      this._updateStremioEntities();
+    }
+  }
+
+  _updateStremioEntities() {
+    // Find all Stremio library sensors
+    this._stremioEntities = Object.keys(this.hass.states)
+      .filter(entityId => 
+        entityId.includes('stremio') && 
+        entityId.includes('library_count')
+      )
+      .map(entityId => ({
+        entity_id: entityId,
+        friendly_name: this.hass.states[entityId].attributes.friendly_name || entityId,
+      }));
   }
 
   render() {
@@ -883,17 +967,39 @@ class StremioLibraryCardEditor extends LitElement {
 
     return html`
       <div class="card-config">
-        <ha-entity-picker
-          .hass=${this.hass}
-          .value=${this._config.entity || 'sensor.stremio_library_count'}
-          .configValue=${'entity'}
-          .includeDomains=${['sensor']}
-          .entityFilter=${(entity) => entity.entity_id.includes('library')}
-          label="Library Sensor or Device Name"
-          helper="Enter full entity ID (e.g., sensor.stremio_post_tamaygunduz_de_library_count) or just device identifier (e.g., tamaygunduz)"
-          allow-custom-entity
-          @value-changed=${this._valueChanged}
-        ></ha-entity-picker>
+        <div class="entity-section">
+          <label class="section-label">Library Sensor</label>
+          
+          ${this._stremioEntities?.length > 0 ? html`
+            <div class="entity-buttons">
+              ${this._stremioEntities.map(entity => html`
+                <button 
+                  class="entity-btn ${this._config.entity === entity.entity_id ? 'selected' : ''}"
+                  @click=${() => this._selectEntity(entity.entity_id)}
+                >
+                  <ha-icon icon="mdi:movie"></ha-icon>
+                  <span>${entity.friendly_name}</span>
+                </button>
+              `)}
+            </div>
+          ` : html`
+            <div class="no-entities">
+              <ha-icon icon="mdi:alert-circle-outline"></ha-icon>
+              <span>No Stremio library sensors found. Make sure the integration is configured.</span>
+            </div>
+          `}
+          
+          <ha-entity-picker
+            .hass=${this.hass}
+            .value=${this._config.entity || ''}
+            .configValue=${'entity'}
+            .includeDomains=${['sensor']}
+            .includeEntities=${this._stremioEntities?.map(e => e.entity_id) || []}
+            label="Or select manually"
+            allow-custom-entity
+            @value-changed=${this._valueChanged}
+          ></ha-entity-picker>
+        </div>
 
         <ha-textfield
           label="Title"
@@ -941,6 +1047,15 @@ class StremioLibraryCardEditor extends LitElement {
     `;
   }
 
+  _selectEntity(entityId) {
+    this._config = { ...this._config, entity: entityId };
+    this.dispatchEvent(new CustomEvent('config-changed', {
+      detail: { config: this._config },
+      bubbles: true,
+      composed: true,
+    }));
+  }
+
   _valueChanged(ev) {
     if (!this._config || !this.hass) {
       return;
@@ -978,6 +1093,68 @@ class StremioLibraryCardEditor extends LitElement {
         flex-direction: column;
         gap: 16px;
         padding: 16px;
+      }
+
+      .entity-section {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .section-label {
+        font-weight: 500;
+        color: var(--primary-text-color);
+        font-size: 0.9em;
+      }
+
+      .entity-buttons {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .entity-btn {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        border: 1px solid var(--divider-color);
+        border-radius: 8px;
+        background: var(--card-background-color);
+        color: var(--primary-text-color);
+        cursor: pointer;
+        font-size: 0.9em;
+        transition: all 0.2s ease;
+      }
+
+      .entity-btn:hover {
+        background: var(--secondary-background-color);
+        border-color: var(--primary-color);
+      }
+
+      .entity-btn.selected {
+        background: var(--primary-color);
+        color: var(--text-primary-color);
+        border-color: var(--primary-color);
+      }
+
+      .entity-btn ha-icon {
+        --mdc-icon-size: 18px;
+      }
+
+      .no-entities {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 12px;
+        background: var(--warning-color, #ff9800);
+        color: white;
+        border-radius: 8px;
+        font-size: 0.9em;
+      }
+
+      .no-entities ha-icon {
+        --mdc-icon-size: 20px;
       }
 
       ha-entity-picker {

@@ -539,19 +539,58 @@ class StremioContinueWatchingCard extends LitElement {
       return;
     }
 
-    console.log('[Continue Watching Card] Getting streams for:', id, item.type);
+    // For series, show episode picker first (but pre-select current episode)
+    if (item.type === 'series') {
+      console.log('[Continue Watching Card] TV Show detected, opening episode picker');
+      this._showEpisodePicker(item);
+      return;
+    }
+
+    // For movies, fetch streams directly
+    this._fetchStreams(item, null, null);
+  }
+
+  _showEpisodePicker(item) {
+    // Use the global helper if available
+    if (window.StremioEpisodePicker) {
+      window.StremioEpisodePicker.show(
+        this._hass,
+        {
+          title: item.title || item.name,
+          type: item.type,
+          poster: item.poster,
+          imdb_id: item.imdb_id || item.id,
+          // Pre-select the episode they were watching
+          lastWatchedSeason: item.season,
+          lastWatchedEpisode: item.episode,
+          total_seasons: item.total_seasons,
+          watched_episodes: item.watched_episodes || [],
+        },
+        (selection) => {
+          console.log('[Continue Watching Card] Episode selected:', selection);
+          this._fetchStreams(item, selection.season, selection.episode);
+        }
+      );
+    } else {
+      // Fallback: Use current season/episode directly
+      this._fetchStreams(item, item.season, item.episode);
+    }
+  }
+
+  _fetchStreams(item, season, episode) {
+    const id = item.imdb_id || item.id;
+    console.log('[Continue Watching Card] Getting streams for:', id, item.type, season ? `S${season}E${episode}` : '');
     this._showToast('Fetching streams...');
     
-    // For series, we need season/episode
     const serviceData = {
       media_id: id,
       media_type: item.type || 'movie',
     };
     
     // Add season/episode for series
-    if (item.type === 'series') {
-      serviceData.season = item.season || 1;
-      serviceData.episode = item.episode || 1;
+    if (item.type === 'series' && season && episode) {
+      serviceData.season = season;
+      serviceData.episode = episode;
     }
 
     // Call service with return_response to get streams back
@@ -564,7 +603,12 @@ class StremioContinueWatchingCard extends LitElement {
           console.log('[Continue Watching Card] Found', streams.length, 'streams');
           
           if (streams.length > 0) {
-            this._showStreamDialog(item, streams);
+            // Show the stream dialog
+            const displayItem = { ...item };
+            if (season && episode) {
+              displayItem.title = `${item.title || item.name} - S${season}E${episode}`;
+            }
+            this._showStreamDialog(displayItem, streams);
           } else {
             this._showToast('No streams found for this title');
           }
