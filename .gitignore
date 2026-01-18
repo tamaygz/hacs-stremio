@@ -95,3 +95,4 @@ config/custom_components
 /config/home-assistant.log*
 /config/home-assistant*.db*
 /config/blueprints/*
+config/.ha_run.lock
