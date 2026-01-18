@@ -50,7 +50,7 @@ async def test_async_setup_entry_success(hass: HomeAssistant, mock_config_entry)
         assert result is True
         assert DOMAIN in hass.data
         assert mock_config_entry.entry_id in hass.data[DOMAIN]
-        
+
         # Verify platforms were forwarded
         mock_forward.assert_called_once()
 

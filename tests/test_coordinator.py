@@ -105,7 +105,7 @@ async def test_coordinator_fetch_data_auth_failure(
     )
 
     # Ensure the config entry has the async_start_reauth method as a mock
-    if not hasattr(mock_config_entry, 'async_start_reauth'):
+    if not hasattr(mock_config_entry, "async_start_reauth"):
         mock_config_entry.async_start_reauth = MagicMock()
 
     coordinator = StremioDataUpdateCoordinator(

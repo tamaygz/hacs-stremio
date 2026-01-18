@@ -154,7 +154,11 @@ async def test_options_flow_update(hass: HomeAssistant, mock_config_entry):
         return_value=[
             {
                 "transportName": "Torrentio",
-                "manifest": {"id": "torrentio", "name": "Torrentio", "version": "1.0.0"},
+                "manifest": {
+                    "id": "torrentio",
+                    "name": "Torrentio",
+                    "version": "1.0.0",
+                },
             },
             {
                 "transportName": "CinemetaStreams",
@@ -176,7 +180,10 @@ async def test_options_flow_update(hass: HomeAssistant, mock_config_entry):
         "handover_method": "direct",  # Use direct instead of airplay
         "show_copy_url": True,
         "default_catalog_source": "cinemeta",
-        "addon_stream_order": ["Torrentio", "CinemetaStreams"],  # List instead of string
+        "addon_stream_order": [
+            "Torrentio",
+            "CinemetaStreams",
+        ],  # List instead of string
         "reset_addon_order": False,
         "stream_quality_preference": "1080p",
     }
@@ -202,7 +209,11 @@ async def test_options_flow_reset_addon_order(hass: HomeAssistant, mock_config_e
         return_value=[
             {
                 "transportName": "Torrentio",
-                "manifest": {"id": "torrentio", "name": "Torrentio", "version": "1.0.0"},
+                "manifest": {
+                    "id": "torrentio",
+                    "name": "Torrentio",
+                    "version": "1.0.0",
+                },
             },
         ]
     )

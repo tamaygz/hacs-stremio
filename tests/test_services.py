@@ -35,34 +35,40 @@ def mock_service_hass(hass: HomeAssistant, mock_coordinator):
     mock_client.async_get_streams = AsyncMock(return_value=MOCK_STREAMS)
     mock_client.async_add_to_library = AsyncMock(return_value=True)
     mock_client.async_remove_from_library = AsyncMock(return_value=True)
-    mock_client.async_get_upcoming_episodes = AsyncMock(return_value=[
-        {
-            "series_id": "tt0903747",
-            "series_title": "Breaking Bad",
-            "season": 5,
-            "episode": 10,
-            "episode_title": "Buried",
-            "air_date": "2024-01-15T00:00:00Z",
-            "air_date_formatted": "2024-01-15",
-            "days_until": 3,
-        }
-    ])
-    mock_client.async_get_recommendations = AsyncMock(return_value=[
-        {
-            "id": "tt1234567",
-            "title": "Recommended Movie",
-            "type": "movie",
-            "recommendation_reason": "Based on your interest in Drama",
-        }
-    ])
-    mock_client.async_get_similar_content = AsyncMock(return_value=[
-        {
-            "id": "tt7654321",
-            "title": "Similar Show",
-            "type": "series",
-            "similarity_reason": "Similar Drama content",
-        }
-    ])
+    mock_client.async_get_upcoming_episodes = AsyncMock(
+        return_value=[
+            {
+                "series_id": "tt0903747",
+                "series_title": "Breaking Bad",
+                "season": 5,
+                "episode": 10,
+                "episode_title": "Buried",
+                "air_date": "2024-01-15T00:00:00Z",
+                "air_date_formatted": "2024-01-15",
+                "days_until": 3,
+            }
+        ]
+    )
+    mock_client.async_get_recommendations = AsyncMock(
+        return_value=[
+            {
+                "id": "tt1234567",
+                "title": "Recommended Movie",
+                "type": "movie",
+                "recommendation_reason": "Based on your interest in Drama",
+            }
+        ]
+    )
+    mock_client.async_get_similar_content = AsyncMock(
+        return_value=[
+            {
+                "id": "tt7654321",
+                "title": "Similar Show",
+                "type": "series",
+                "similarity_reason": "Similar Drama content",
+            }
+        ]
+    )
 
     hass.data[DOMAIN] = {
         "test_entry": {
@@ -447,7 +453,9 @@ class TestGetUpcomingEpisodesService:
         client.async_get_upcoming_episodes.assert_called_once_with(days_ahead=7)
 
     @pytest.mark.asyncio
-    async def test_get_upcoming_episodes_default_days(self, mock_service_hass, mock_coordinator):
+    async def test_get_upcoming_episodes_default_days(
+        self, mock_service_hass, mock_coordinator
+    ):
         """Test getting upcoming episodes with default days_ahead."""
         await async_setup_services(mock_service_hass)
 
@@ -492,7 +500,9 @@ class TestGetRecommendationsService:
         )
 
     @pytest.mark.asyncio
-    async def test_get_recommendations_movies_only(self, mock_service_hass, mock_coordinator):
+    async def test_get_recommendations_movies_only(
+        self, mock_service_hass, mock_coordinator
+    ):
         """Test getting movie recommendations only."""
         await async_setup_services(mock_service_hass)
 
@@ -515,7 +525,9 @@ class TestGetRecommendationsService:
         )
 
     @pytest.mark.asyncio
-    async def test_get_recommendations_series_only(self, mock_service_hass, mock_coordinator):
+    async def test_get_recommendations_series_only(
+        self, mock_service_hass, mock_coordinator
+    ):
         """Test getting series recommendations only."""
         await async_setup_services(mock_service_hass)
 
@@ -565,7 +577,9 @@ class TestGetSimilarContentService:
         )
 
     @pytest.mark.asyncio
-    async def test_get_similar_content_default_limit(self, mock_service_hass, mock_coordinator):
+    async def test_get_similar_content_default_limit(
+        self, mock_service_hass, mock_coordinator
+    ):
         """Test getting similar content with default limit."""
         await async_setup_services(mock_service_hass)
 

@@ -482,7 +482,9 @@ class StremioClient:
 
             # Sort addons by user preference if addon_order is provided
             if addon_order:
-                stream_addons = self._sort_addons_by_preference(stream_addons, addon_order)
+                stream_addons = self._sort_addons_by_preference(
+                    stream_addons, addon_order
+                )
                 _LOGGER.debug(
                     "Sorted addons by user preference: %s",
                     [a.get("name") for a in stream_addons],
@@ -499,7 +501,9 @@ class StremioClient:
 
             # Filter streams by quality preference
             if quality_preference and quality_preference != "any":
-                all_streams = self._filter_streams_by_quality(all_streams, quality_preference)
+                all_streams = self._filter_streams_by_quality(
+                    all_streams, quality_preference
+                )
                 _LOGGER.debug(
                     "Filtered to %d streams matching quality preference: %s",
                     len(all_streams),
@@ -550,7 +554,9 @@ class StremioClient:
             resources = manifest.get("resources", [])
             provides_stream = False
             types_match = False
-            prefix_match = True  # Default to true if no prefix defined or media_id is empty
+            prefix_match = (
+                True  # Default to true if no prefix defined or media_id is empty
+            )
 
             for resource in resources:
                 if isinstance(resource, str):
@@ -617,9 +623,7 @@ class StremioClient:
         order_list: list[str]
         if isinstance(addon_order, str):
             order_list = [
-                line.strip()
-                for line in addon_order.split("\n")
-                if line.strip()
+                line.strip() for line in addon_order.split("\n") if line.strip()
             ]
         else:
             order_list = addon_order
@@ -652,29 +656,55 @@ class StremioClient:
 
             # First try exact match (case-insensitive)
             if name_lower in preference_map:
-                _LOGGER.debug("Addon '%s' matched by exact name at position %d", name, preference_map[name_lower])
+                _LOGGER.debug(
+                    "Addon '%s' matched by exact name at position %d",
+                    name,
+                    preference_map[name_lower],
+                )
                 return (preference_map[name_lower], name_lower)
             if addon_id_lower in preference_map:
-                _LOGGER.debug("Addon '%s' matched by exact ID at position %d", name, preference_map[addon_id_lower])
+                _LOGGER.debug(
+                    "Addon '%s' matched by exact ID at position %d",
+                    name,
+                    preference_map[addon_id_lower],
+                )
                 return (preference_map[addon_id_lower], name_lower)
 
             # Try normalized match (ignore special characters)
             name_normalized = "".join(c.lower() for c in name if c.isalnum())
             addon_id_normalized = "".join(c.lower() for c in addon_id if c.isalnum())
             if name_normalized in preference_map_normalized:
-                _LOGGER.debug("Addon '%s' matched by normalized name at position %d", name, preference_map_normalized[name_normalized])
+                _LOGGER.debug(
+                    "Addon '%s' matched by normalized name at position %d",
+                    name,
+                    preference_map_normalized[name_normalized],
+                )
                 return (preference_map_normalized[name_normalized], name_lower)
             if addon_id_normalized in preference_map_normalized:
-                _LOGGER.debug("Addon '%s' matched by normalized ID at position %d", name, preference_map_normalized[addon_id_normalized])
+                _LOGGER.debug(
+                    "Addon '%s' matched by normalized ID at position %d",
+                    name,
+                    preference_map_normalized[addon_id_normalized],
+                )
                 return (preference_map_normalized[addon_id_normalized], name_lower)
 
             # Try partial/contains match for preferences
             for pref_lower, idx in preference_map.items():
                 if pref_lower in name_lower or name_lower in pref_lower:
-                    _LOGGER.debug("Addon '%s' matched by partial name '%s' at position %d", name, pref_lower, idx)
+                    _LOGGER.debug(
+                        "Addon '%s' matched by partial name '%s' at position %d",
+                        name,
+                        pref_lower,
+                        idx,
+                    )
                     return (idx, name_lower)
                 if pref_lower in addon_id_lower or addon_id_lower in pref_lower:
-                    _LOGGER.debug("Addon '%s' matched by partial ID '%s' at position %d", name, pref_lower, idx)
+                    _LOGGER.debug(
+                        "Addon '%s' matched by partial ID '%s' at position %d",
+                        name,
+                        pref_lower,
+                        idx,
+                    )
                     return (idx, name_lower)
 
             # Not in preference list - put at the end
@@ -715,11 +745,13 @@ class StremioClient:
         def stream_matches_quality(stream: dict[str, Any]) -> bool:
             """Check if stream matches the quality preference."""
             # Check in name, title, and quality fields
-            searchable = " ".join([
-                str(stream.get("name", "")),
-                str(stream.get("title", "")),
-                str(stream.get("quality", "")),
-            ]).lower()
+            searchable = " ".join(
+                [
+                    str(stream.get("name", "")),
+                    str(stream.get("title", "")),
+                    str(stream.get("quality", "")),
+                ]
+            ).lower()
 
             return any(pattern in searchable for pattern in patterns)
 
@@ -1404,13 +1436,9 @@ class StremioClient:
 
         if extra_parts:
             extra_path = "&".join(extra_parts)
-            catalog_url = (
-                f"{CINEMETA_BASE_URL}/catalog/{media_type}/{catalog_id}/{extra_path}.json"
-            )
+            catalog_url = f"{CINEMETA_BASE_URL}/catalog/{media_type}/{catalog_id}/{extra_path}.json"
         else:
-            catalog_url = (
-                f"{CINEMETA_BASE_URL}/catalog/{media_type}/{catalog_id}.json"
-            )
+            catalog_url = f"{CINEMETA_BASE_URL}/catalog/{media_type}/{catalog_id}.json"
 
         try:
             session = await self._get_session()
@@ -1560,7 +1588,9 @@ class StremioClient:
             # Fetch metadata for each series (limit concurrent requests)
             for series in series_items[:20]:  # Limit to avoid rate limiting
                 try:
-                    imdb_id = series.get("imdb_id") or series.get("id", "").split(":")[-1]
+                    imdb_id = (
+                        series.get("imdb_id") or series.get("id", "").split(":")[-1]
+                    )
                     if not imdb_id:
                         continue
 
@@ -1583,17 +1613,23 @@ class StremioClient:
 
                                 # Check if it's upcoming (after today, before cutoff)
                                 if today <= air_date <= cutoff_date:
-                                    upcoming.append({
-                                        "series_id": imdb_id,
-                                        "series_title": series.get("title") or metadata.get("title"),
-                                        "poster": series.get("poster") or metadata.get("poster"),
-                                        "season": season.get("number"),
-                                        "episode": episode.get("number"),
-                                        "episode_title": episode.get("title"),
-                                        "air_date": released_str,
-                                        "air_date_formatted": air_date.strftime("%Y-%m-%d"),
-                                        "days_until": (air_date - today).days,
-                                    })
+                                    upcoming.append(
+                                        {
+                                            "series_id": imdb_id,
+                                            "series_title": series.get("title")
+                                            or metadata.get("title"),
+                                            "poster": series.get("poster")
+                                            or metadata.get("poster"),
+                                            "season": season.get("number"),
+                                            "episode": episode.get("number"),
+                                            "episode_title": episode.get("title"),
+                                            "air_date": released_str,
+                                            "air_date_formatted": air_date.strftime(
+                                                "%Y-%m-%d"
+                                            ),
+                                            "days_until": (air_date - today).days,
+                                        }
+                                    )
                             except (ValueError, TypeError):
                                 continue
 
@@ -1608,7 +1644,9 @@ class StremioClient:
             # Sort by air date
             upcoming.sort(key=lambda x: x.get("air_date", ""))
 
-            _LOGGER.info("Found %d upcoming episodes in next %d days", len(upcoming), days_ahead)
+            _LOGGER.info(
+                "Found %d upcoming episodes in next %d days", len(upcoming), days_ahead
+            )
             return upcoming
 
         except StremioAuthError:
@@ -1617,7 +1655,9 @@ class StremioClient:
             raise
         except Exception as err:
             _LOGGER.exception("Failed to get upcoming episodes: %s", err)
-            raise StremioConnectionError(f"Failed to get upcoming episodes: {err}") from err
+            raise StremioConnectionError(
+                f"Failed to get upcoming episodes: {err}"
+            ) from err
 
     async def async_get_recommendations(
         self,
@@ -1661,7 +1701,9 @@ class StremioClient:
             # Filter library by type if specified
             filtered_library = library
             if media_type:
-                filtered_library = [item for item in library if item.get("type") == media_type]
+                filtered_library = [
+                    item for item in library if item.get("type") == media_type
+                ]
 
             # Analyze genres from library
             genre_counts: dict[str, int] = {}
@@ -1672,7 +1714,9 @@ class StremioClient:
                     genre_counts[genre] = genre_counts.get(genre, 0) + 1
 
             # Get top genres (sorted by count)
-            top_genres = sorted(genre_counts.items(), key=lambda x: x[1], reverse=True)[:3]
+            top_genres = sorted(genre_counts.items(), key=lambda x: x[1], reverse=True)[
+                :3
+            ]
             _LOGGER.debug("Top genres from library: %s", top_genres)
 
             recommendations = []
@@ -1690,8 +1734,14 @@ class StremioClient:
                         )
                         for movie in movies:
                             item_id = movie.get("imdb_id") or movie.get("id")
-                            if item_id and item_id not in library_ids and item_id not in seen_ids:
-                                movie["recommendation_reason"] = f"Based on your interest in {genre}"
+                            if (
+                                item_id
+                                and item_id not in library_ids
+                                and item_id not in seen_ids
+                            ):
+                                movie["recommendation_reason"] = (
+                                    f"Based on your interest in {genre}"
+                                )
                                 recommendations.append(movie)
                                 seen_ids.add(item_id)
 
@@ -1704,13 +1754,21 @@ class StremioClient:
                         )
                         for show in series:
                             item_id = show.get("imdb_id") or show.get("id")
-                            if item_id and item_id not in library_ids and item_id not in seen_ids:
-                                show["recommendation_reason"] = f"Based on your interest in {genre}"
+                            if (
+                                item_id
+                                and item_id not in library_ids
+                                and item_id not in seen_ids
+                            ):
+                                show["recommendation_reason"] = (
+                                    f"Based on your interest in {genre}"
+                                )
                                 recommendations.append(show)
                                 seen_ids.add(item_id)
 
                 except Exception as err:
-                    _LOGGER.debug("Error fetching recommendations for genre %s: %s", genre, err)
+                    _LOGGER.debug(
+                        "Error fetching recommendations for genre %s: %s", genre, err
+                    )
                     continue
 
                 if len(recommendations) >= limit:
@@ -1726,7 +1784,11 @@ class StremioClient:
                     )
                     for item in popular:
                         item_id = item.get("imdb_id") or item.get("id")
-                        if item_id and item_id not in library_ids and item_id not in seen_ids:
+                        if (
+                            item_id
+                            and item_id not in library_ids
+                            and item_id not in seen_ids
+                        ):
                             item["recommendation_reason"] = "Popular right now"
                             recommendations.append(item)
                             seen_ids.add(item_id)
@@ -1744,7 +1806,9 @@ class StremioClient:
             raise
         except Exception as err:
             _LOGGER.exception("Failed to get recommendations: %s", err)
-            raise StremioConnectionError(f"Failed to get recommendations: {err}") from err
+            raise StremioConnectionError(
+                f"Failed to get recommendations: {err}"
+            ) from err
 
     async def async_get_similar_content(
         self,
@@ -1830,7 +1894,9 @@ class StremioClient:
                             item_genres = item.get("genres", [])
                             shared_genres = set(source_genres) & set(item_genres)
                             item["similarity_score"] = len(shared_genres)
-                            item["similarity_reason"] = f"Similar {primary_genre} content"
+                            item["similarity_reason"] = (
+                                f"Similar {primary_genre} content"
+                            )
                             similar.append(item)
                             seen_ids.add(item_id)
 
@@ -1854,7 +1920,9 @@ class StremioClient:
                             item_genres = item.get("genres", [])
                             shared_genres = set(source_genres) & set(item_genres)
                             item["similarity_score"] = len(shared_genres)
-                            item["similarity_reason"] = f"You might also like this {secondary_genre}"
+                            item["similarity_reason"] = (
+                                f"You might also like this {secondary_genre}"
+                            )
                             similar.append(item)
                             seen_ids.add(item_id)
                             if len(similar) >= limit * 2:
@@ -1872,7 +1940,9 @@ class StremioClient:
 
         except Exception as err:
             _LOGGER.exception("Failed to get similar content for %s: %s", media_id, err)
-            raise StremioConnectionError(f"Failed to get similar content: {err}") from err
+            raise StremioConnectionError(
+                f"Failed to get similar content: {err}"
+            ) from err
 
 
 class StremioAuthError(HomeAssistantError):

@@ -727,11 +727,13 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                 catalog_info = []
                 for catalog in catalogs:
                     if isinstance(catalog, dict):
-                        catalog_info.append({
-                            "type": catalog.get("type"),
-                            "id": catalog.get("id"),
-                            "name": catalog.get("name"),
-                        })
+                        catalog_info.append(
+                            {
+                                "type": catalog.get("type"),
+                                "id": catalog.get("id"),
+                                "name": catalog.get("name"),
+                            }
+                        )
 
                 processed_addon = {
                     "id": manifest.get("id", ""),

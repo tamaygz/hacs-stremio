@@ -219,7 +219,7 @@ class TestButtonPlatformSetup:
     ):
         """Test button platform setup with Apple TV handover enabled."""
         from pytest_homeassistant_custom_component.common import MockConfigEntry
-        
+
         # Create a new config entry with Apple TV enabled
         entry_with_apple_tv = MockConfigEntry(
             domain=DOMAIN,
@@ -245,7 +245,7 @@ class TestButtonPlatformSetup:
         async_add_entities.assert_called_once()
         entities = async_add_entities.call_args[0][0]
         assert len(entities) == len(BUTTON_TYPES) + 1
-        
+
         # Check we have both types
         button_types = [type(e).__name__ for e in entities]
         assert "StremioButton" in button_types

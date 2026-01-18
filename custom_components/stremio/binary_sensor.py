@@ -54,12 +54,14 @@ def _get_series_with_new_episodes(data: dict[str, Any]) -> list[dict[str, str]]:
             imdb_id = item.get("imdb_id", "")
             if imdb_id and imdb_id not in seen_ids:
                 seen_ids.add(imdb_id)
-                series_list.append({
-                    "title": item.get("title", "Unknown"),
-                    "imdb_id": imdb_id,
-                    "season": item.get("season"),
-                    "episode": item.get("episode"),
-                })
+                series_list.append(
+                    {
+                        "title": item.get("title", "Unknown"),
+                        "imdb_id": imdb_id,
+                        "season": item.get("season"),
+                        "episode": item.get("episode"),
+                    }
+                )
 
     return series_list
 
