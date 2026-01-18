@@ -287,16 +287,37 @@ class StremioLibraryCard extends LitElement {
     this._sortBy = 'recent';
     this._libraryItems = [];
     this._selectedItem = null;
+    this._viewMode = 'library'; // 'library' or 'catalog'
   }
 
   setConfig(config) {
+    if (!config) {
+      throw new Error('Invalid configuration');
+    }
     this.config = {
       title: 'Stremio Library',
       show_search: true,
       show_filters: true,
+      show_view_toggle: true,
+      default_view: 'library',
       columns: 4,
       max_items: 50,
       ...config,
+    };
+    this._viewMode = this.config.default_view;
+  }
+
+  // Define card type for UI editor
+  static getConfigElement() {
+    return document.createElement('stremio-library-card-editor');
+  }
+
+  static getStubConfig() {
+    return {
+      type: 'custom:stremio-library-card',
+      title: 'Stremio Library',
+      show_view_toggle: true,
+      default_view: 'library',
     };
   }
 

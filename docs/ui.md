@@ -30,6 +30,7 @@ name: Living Room Stremio
 show_progress: true
 show_buttons: true
 show_background: true
+show_browse_button: true
 tap_action:
   action: more-info
 ```
@@ -43,6 +44,7 @@ tap_action:
 | `show_progress` | boolean | true | Show progress bar |
 | `show_buttons` | boolean | true | Show control buttons |
 | `show_background` | boolean | true | Show poster as background |
+| `show_browse_button` | boolean | false | Show browse catalog button when idle |
 
 ---
 
@@ -67,6 +69,8 @@ entity: sensor.stremio_library_count
 title: My Stremio Library
 show_search: true
 show_filters: true
+show_view_toggle: true
+default_view: library
 max_items: 50
 columns: 4
 ```
@@ -79,6 +83,8 @@ columns: 4
 | `title` | string | "Stremio Library" | Card title |
 | `show_search` | boolean | true | Show search box |
 | `show_filters` | boolean | true | Show filter/sort options |
+| `show_view_toggle` | boolean | true | Show library/catalog view toggle |
+| `default_view` | string | "library" | Default view ("library" or "catalog") |
 | `max_items` | number | 50 | Maximum items to display |
 | `columns` | number | 4 | Grid columns (desktop) |
 

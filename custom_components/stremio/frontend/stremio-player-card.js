@@ -203,6 +203,7 @@ class StremioPlayerCard extends LitElement {
       show_poster: true,
       show_progress: true,
       show_actions: true,
+      show_browse_button: false,
       ...config,
     };
   }
@@ -300,6 +301,27 @@ class StremioPlayerCard extends LitElement {
     window.open(url, '_blank');
   }
 
+  _openBrowse() {
+    // Fire event to navigate to browse view or open browse card
+    this.dispatchEvent(
+      new CustomEvent('stremio-browse-requested', {
+        bubbles: true,
+        composed: true,
+        detail: {},
+      })
+    );
+
+    // Alternative: Navigate to media browser
+    if (this._hass) {
+      this._hass.callService('browser_mod', 'navigate', {
+        path: '/media-browser/media-source%3A%2F%2Fstremio%2Fcatalogs',
+      }).catch(() => {
+        // Fallback if browser_mod not available - just fire the event
+        console.log('Browse event fired - add a stremio-browse-card to your dashboard');
+      });
+    }
+  }
+
   _fireHassEvent(action) {
     this.dispatchEvent(
       new CustomEvent('hass-action', {
@@ -350,6 +372,17 @@ class StremioPlayerCard extends LitElement {
       <div class="state-idle">
         <ha-icon icon="mdi:television-off"></ha-icon>
         <div>Nothing playing</div>
+        ${this.config.show_browse_button ? html`
+          <button 
+            class="action-button" 
+            @click="${() => this._openBrowse()}"
+            aria-label="Browse Stremio catalog"
+            style="margin-top: 16px;"
+          >
+            <ha-icon icon="mdi:compass"></ha-icon>
+            Browse Content
+          </button>
+        ` : ''}
       </div>
     `;
   }
