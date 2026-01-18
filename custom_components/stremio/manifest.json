@@ -5,7 +5,6 @@
     "@tamaygz"
   ],
   "config_flow": true,
-
   "documentation": "https://github.com/tamaygz/hacs-stremio",
   "integration_type": "service",
   "iot_class": "cloud_polling",
@@ -13,5 +12,5 @@
   "requirements": [
     "pyatv>=0.14.0"
   ],
-  "version": "0.2.2"
+  "version": "0.2.3"
 }
