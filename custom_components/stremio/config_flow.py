@@ -92,7 +92,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call
         config_entry: config_entries.ConfigEntry,
     ) -> OptionsFlowHandler:
         """Get the options flow for this handler."""
-        return OptionsFlowHandler()
+        return OptionsFlowHandler(config_entry)
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -142,6 +142,10 @@ class InvalidAuth(HomeAssistantError):
 class OptionsFlowHandler(config_entries.OptionsFlow):
     """Handle options flow for Stremio integration."""
 
+    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
+        """Initialize options flow."""
+        self._config_entry = config_entry
+
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
@@ -155,47 +159,47 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 {
                     vol.Optional(
                         CONF_PLAYER_SCAN_INTERVAL,
-                        default=self.config_entry.options.get(
+                        default=self._config_entry.options.get(
                             CONF_PLAYER_SCAN_INTERVAL, DEFAULT_PLAYER_SCAN_INTERVAL
                         ),
                     ): vol.All(vol.Coerce(int), vol.Range(min=10, max=300)),
                     vol.Optional(
                         CONF_LIBRARY_SCAN_INTERVAL,
-                        default=self.config_entry.options.get(
+                        default=self._config_entry.options.get(
                             CONF_LIBRARY_SCAN_INTERVAL, DEFAULT_LIBRARY_SCAN_INTERVAL
                         ),
                     ): vol.All(vol.Coerce(int), vol.Range(min=60, max=3600)),
                     vol.Optional(
                         CONF_ENABLE_APPLE_TV_HANDOVER,
-                        default=self.config_entry.options.get(
+                        default=self._config_entry.options.get(
                             CONF_ENABLE_APPLE_TV_HANDOVER,
                             DEFAULT_ENABLE_APPLE_TV_HANDOVER,
                         ),
                     ): bool,
                     vol.Optional(
                         CONF_HANDOVER_METHOD,
-                        default=self.config_entry.options.get(
+                        default=self._config_entry.options.get(
                             CONF_HANDOVER_METHOD, DEFAULT_HANDOVER_METHOD
                         ),
                     ): vol.In(HANDOVER_METHODS),
                     vol.Optional(
                         CONF_APPLE_TV_DEVICE,
-                        default=self.config_entry.options.get(
+                        default=self._config_entry.options.get(
                             CONF_APPLE_TV_DEVICE, DEFAULT_APPLE_TV_DEVICE
                         ),
                         description={
-                            "suggested_value": self.config_entry.options.get(
+                            "suggested_value": self._config_entry.options.get(
                                 CONF_APPLE_TV_DEVICE, ""
                             )
                         },
                     ): str,
                     vol.Optional(
                         CONF_APPLE_TV_ENTITY_ID,
-                        default=self.config_entry.options.get(
+                        default=self._config_entry.options.get(
                             CONF_APPLE_TV_ENTITY_ID, DEFAULT_APPLE_TV_ENTITY_ID
                         ),
                         description={
-                            "suggested_value": self.config_entry.options.get(
+                            "suggested_value": self._config_entry.options.get(
                                 CONF_APPLE_TV_ENTITY_ID, ""
                             )
                         },
