@@ -333,19 +333,27 @@ class StremioContinueWatchingCard extends LitElement {
 
   _updateContinueWatchingItems() {
     if (!this._hass) {
+      console.log('[Continue Watching Card] No hass instance');
       this._continueWatchingItems = [];
       return;
     }
 
     // Get continue watching data from sensor
     const entity = this._hass.states[this.config.entity];
+    
+    console.log('[Continue Watching Card] Looking for entity:', this.config.entity);
+    console.log('[Continue Watching Card] Entity found:', entity);
+    console.log('[Continue Watching Card] Entity attributes:', entity?.attributes);
+    console.log('[Continue Watching Card] Items in attributes:', entity?.attributes?.items);
 
     if (!entity?.attributes?.items) {
       this._continueWatchingItems = [];
+      console.log('[Continue Watching Card] No items found');
       return;
     }
 
     this._continueWatchingItems = entity.attributes.items || [];
+    console.log('[Continue Watching Card] Items loaded:', this._continueWatchingItems.length);
   }
 
   _getFilteredItems() {

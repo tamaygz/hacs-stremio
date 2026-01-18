@@ -361,6 +361,7 @@ class StremioLibraryCard extends LitElement {
 
   _updateLibraryItems() {
     if (!this._hass) {
+      console.log('[Library Card] No hass instance');
       this._libraryItems = [];
       return;
     }
@@ -368,19 +369,30 @@ class StremioLibraryCard extends LitElement {
     // Get library data from sensor
     const sensorEntity = this.config.entity || `sensor.stremio_library_count`;
     const entity = this._hass.states[sensorEntity];
+    
+    console.log('[Library Card] Looking for entity:', sensorEntity);
+    console.log('[Library Card] Entity found:', entity);
+    console.log('[Library Card] Entity attributes:', entity?.attributes);
+    console.log('[Library Card] Items in attributes:', entity?.attributes?.items);
 
     if (!entity?.attributes?.items) {
+      console.log('[Library Card] No items in library sensor, trying continue watching sensor');
       // Try to get from continue watching sensor
       const continueEntity = this._hass.states[`sensor.stremio_continue_watching_count`];
+      console.log('[Library Card] Continue watching entity:', continueEntity);
+      console.log('[Library Card] Continue watching items:', continueEntity?.attributes?.items);
       if (continueEntity?.attributes?.items) {
         this._libraryItems = continueEntity.attributes.items || [];
+        console.log('[Library Card] Using continue watching items:', this._libraryItems.length);
       } else {
         this._libraryItems = [];
+        console.log('[Library Card] No items found in either sensor');
       }
       return;
     }
 
     this._libraryItems = entity.attributes.items || [];
+    console.log('[Library Card] Library items loaded:', this._libraryItems.length);
   }
 
   _getFilteredItems() {
