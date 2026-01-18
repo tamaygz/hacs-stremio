@@ -35,19 +35,16 @@ async def test_form_user_step_success(mock_hass):
     flow.hass = mock_hass
     flow.context = {}
 
-    # Create mock user object with email attribute
-    mock_user = MagicMock()
-    mock_user.email = MOCK_CONFIG_ENTRY[CONF_EMAIL]
-
-    # Create mock client context manager
+    # Create mock client
     mock_client = AsyncMock()
-    mock_client.login = AsyncMock(return_value="test_auth_key")
-    mock_client.get_user = AsyncMock(return_value=mock_user)
-    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-    mock_client.__aexit__ = AsyncMock(return_value=None)
+    mock_client.async_authenticate = AsyncMock(return_value="test_auth_key")
+    mock_client.async_get_user = AsyncMock(
+        return_value={"email": MOCK_CONFIG_ENTRY[CONF_EMAIL]}
+    )
+    mock_client.async_close = AsyncMock()
 
     with patch(
-        "custom_components.stremio.config_flow.StremioAPIClient",
+        "custom_components.stremio.config_flow.StremioClient",
         return_value=mock_client,
     ), patch.object(flow, "async_set_unique_id", new_callable=AsyncMock), patch.object(
         flow, "_abort_if_unique_id_configured"
