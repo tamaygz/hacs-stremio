@@ -33,6 +33,7 @@ CONTINUE_WATCHING_IDENTIFIER = "continue_watching"
 MOVIES_IDENTIFIER = "movies"
 SERIES_IDENTIFIER = "series"
 SEARCH_IDENTIFIER = "search"
+STREAMS_IDENTIFIER = "streams"
 
 
 async def async_get_media_source(hass: HomeAssistant) -> StremioMediaSource:
@@ -158,6 +159,10 @@ class StremioMediaSource(MediaSource):
         # Handle individual movie items (movie/imdb_id)
         if identifier.startswith("movie/"):
             return await self._build_movie_detail_browse(identifier)
+
+        # Handle streams browsing (streams/type/imdb_id or streams/series/imdb_id/season/episode)
+        if identifier.startswith(f"{STREAMS_IDENTIFIER}/"):
+            return await self._build_streams_browse(identifier)
 
         raise BrowseError(f"Unknown media identifier: {identifier}")
 
