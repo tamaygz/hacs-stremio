@@ -1,26 +1,31 @@
 Add these config options:
-| **Default Catalog Source** | Choose preferred addon (Cinemeta, TMDB, etc.) | More control over metadata source |
-| **ADDON Stream Listing Order** | Let the user sort the available addons in his preferred order | when showing streams, always respect this configured order |
-| **Stream Quality Preference** | Prefer 4K, 1080p, 720p | Filter streams by quality |
+| **Default Catalog Source** | Choose preferred addon (Cinemeta, TMDB, etc.) | More control over metadata source | ✅ DONE |
+| **ADDON Stream Listing Order** | Let the user sort the available addons in his preferred order | when showing streams, always respect this configured order | ✅ DONE |
+| **Stream Quality Preference** | Prefer 4K, 1080p, 720p | Filter streams by quality | ✅ DONE |
 
 Add these entities to our stremio devices:
-| **`has_new_episodes`** | True if any series has unwatched episodes |
+| **`has_new_episodes`** | True if any series has unwatched episodes | ✅ DONE |
 
-Update the Catalog related UI Cards:
-- Selecting media should behave like the library cards
-- details view inside the card
-- in case of tvshow, dialog with season/episode selection
+~~Update the Catalog related UI Cards:~~
+~~- Selecting media should behave like the library cards~~
+~~- details view inside the card~~
+~~- in case of tvshow, dialog with season/episode selection~~
+✅ DONE - Browse card now has inline detail view and episode picker for TV shows
 
 Add these new service calls:
-| **`get_upcoming_episodes`** | Get air dates for series in library | `days_ahead` (default 7) |
-| **`get_recommendations`** | Get suggested content based on library | `limit`, `type` |
-| **`get_similar_content`** | Get similar movies/shows | `media_id`, `limit` |
-Update all ui cards that show media items:
-- add a icon button to show similar media
-- make that button configurable via ui
-Add a new ui card:
-- Stremio Recommendations
-- Add good level of configurability via ui 
+| **`get_upcoming_episodes`** | Get air dates for series in library | `days_ahead` (default 7) | ✅ DONE |
+| **`get_recommendations`** | Get suggested content based on library | `limit`, `type` | ✅ DONE |
+| **`get_similar_content`** | Get similar movies/shows | `media_id`, `limit` | ✅ DONE |
+
+~~Update all ui cards that show media items:~~
+~~- add a icon button to show similar media~~
+~~- make that button configurable via ui~~
+✅ DONE - Library, Continue Watching, and Browse cards have "Find Similar" button
+
+~~Add a new ui card:~~
+~~- Stremio Recommendations~~
+~~- Add good level of configurability via ui~~ 
+✅ DONE - New stremio-recommendations-card with full configurability 
 
 
 Extend functionality so these automation scenarios are possible, also add examples & docs:

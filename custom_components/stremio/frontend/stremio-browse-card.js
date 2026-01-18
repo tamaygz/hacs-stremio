@@ -376,9 +376,11 @@ class StremioBrowseCard extends LitElement {
       show_genre_filter: true,
       show_title: true,
       show_rating: true,
+      show_media_type_badge: false,
+      show_similar_button: true,
       columns: 4,
       max_items: 50,
-      card_height: 0,
+      card_height: 500,
       poster_aspect_ratio: '2/3',
       horizontal_scroll: false,
       tap_action: 'details',
@@ -460,6 +462,39 @@ class StremioBrowseCard extends LitElement {
   }
 
   _handleItemClick(item) {
+    // Extract media type from content ID or use current media type filter
+    const mediaType = this._getItemMediaType(item);
+    
+    // For TV series, show episode picker first
+    if (mediaType === 'series') {
+      console.log('[Browse Card] TV Series clicked, showing episode picker first');
+      this._showEpisodePicker(item, 'detail');
+      return;
+    }
+    
+    // For movies, go directly to detail view
+    this._showDetailView(item);
+  }
+
+  _getItemMediaType(item) {
+    // Try to determine media type from item or content ID
+    if (item.media_content_type) {
+      return item.media_content_type === 'tvshow' ? 'series' : item.media_content_type;
+    }
+    if (item.media_content_id) {
+      const parts = item.media_content_id.split('/');
+      if (parts.length > 0) {
+        const typeFromId = parts[0];
+        if (typeFromId === 'series' || typeFromId === 'movie') {
+          return typeFromId;
+        }
+      }
+    }
+    // Fallback to current filter
+    return this._mediaType;
+  }
+
+  _showDetailView(item) {
     this._selectedItem = item;
     
     // Fire event for external listeners
@@ -471,6 +506,7 @@ class StremioBrowseCard extends LitElement {
           item,
           mediaId: item.media_content_id,
           title: item.title,
+          type: this._getItemMediaType(item),
         },
       })
     );
@@ -478,110 +514,332 @@ class StremioBrowseCard extends LitElement {
 
   _closeDetail() {
     this._selectedItem = null;
-  }
-
-  _openMediaBrowser(item) {
-    // Navigate to media browser for this item
-    if (!item || !item.media_content_id) {
-      console.error('Stremio Browse Card: Invalid item or missing media_content_id', { 
-        item: item ? { title: item.title, type: item.media_content_type } : null 
-      });
-      return;
-    }
-
-    if (!this._hass) {
-      console.error('Stremio Browse Card: Unable to open media browser - hass instance is unavailable.');
-      return;
-    }
-
-    const hass = this._hass;
-    const contentId = item.media_content_id;
-
-    // Try native HA navigation first (most compatible method)
-    try {
-      // Use Home Assistant's history API to navigate to media browser
-      const mediaSourceId = `media-source://stremio/${contentId}`;
-      
-      // Fire a more-info event that HA can handle
-      this.dispatchEvent(
-        new CustomEvent('hass-more-info', {
-          bubbles: true,
-          composed: true,
-          detail: {
-            entityId: null, // No specific entity
-          },
-        })
-      );
-
-      // Try to open the media browser programmatically using HA's built-in methods
-      if (window.history && window.location) {
-        const currentPath = window.location.pathname;
-        // Check if we can navigate within HA
-        if (currentPath.includes('/lovelace/') || currentPath.includes('/config/')) {
-          // Use native browser navigation to media-browser
-          const encodedPath = `/media-browser/${encodeURIComponent(mediaSourceId)}`;
-          window.history.pushState(null, '', encodedPath);
-          
-          // Dispatch a popstate event to notify HA of the navigation
-          window.dispatchEvent(new PopStateEvent('popstate'));
-          return;
-        }
-      }
-    } catch (error) {
-      console.warn('Stremio Browse Card: Native navigation failed:', error);
-    }
-
-    // Fallback 1: Try browser_mod if available
-    const hasBrowserMod =
-      hass.services &&
-      hass.services.browser_mod &&
-      hass.services.browser_mod.navigate;
-
-    if (hasBrowserMod) {
-      const encodedPath = `/media-browser/media-source%3A%2F%2Fstremio%2F${contentId}`;
-      
-      hass.callService('browser_mod', 'navigate', {
-        path: encodedPath,
-      }).catch((error) => {
-        console.error('Stremio Browse Card: browser_mod navigation failed:', error);
-        this._showNavigationFallback(item);
-      });
-      return;
-    }
-
-    // Fallback 2: Show enhanced detail dialog with more information
-    this._showNavigationFallback(item);
-  }
-
-  _showNavigationFallback(item) {
-    // Show notification with instructions
-    if (this._hass && this._hass.services?.persistent_notification?.create) {
-      const mediaSourceId = `media-source://stremio/${item.media_content_id}`;
-      this._hass.callService('persistent_notification', 'create', {
-        title: 'Stremio - View Details',
-        message: `To view full details for "${item.title}", open the Media Browser from the sidebar and navigate to Stremio section.\n\nMedia ID: ${mediaSourceId}`,
-        notification_id: `stremio_media_${item.media_content_id}`,
-      }).catch(err => console.error('Failed to create notification:', err));
-    }
     
-    // Also log to console for debugging
-    console.info('Stremio Browse Card: Media browser path:', `/media-browser/media-source://stremio/${item.media_content_id}`);
+    // Fire event for external listeners
+    this.dispatchEvent(
+      new CustomEvent('stremio-detail-closed', {
+        bubbles: true,
+        composed: true,
+      })
+    );
+  }
+
+  _showEpisodePicker(item, mode = 'streams') {
+    const onEpisodeSelected = (season, episode) => {
+      console.log('[Browse Card] Episode selected:', { season, episode, mode });
+      if (mode === 'detail') {
+        // Create a modified item with selected episode info and show detail
+        const itemWithEpisode = {
+          ...item,
+          selectedSeason: season,
+          selectedEpisode: episode,
+        };
+        this._showDetailView(itemWithEpisode);
+      } else {
+        // Default: fetch streams for the selected episode
+        this._fetchStreams(item, season, episode);
+      }
+    };
+    
+    // Extract media ID from item
+    const mediaId = this._extractMediaId(item);
+    
+    // Use the global helper if available
+    if (window.StremioEpisodePicker) {
+      window.StremioEpisodePicker.show(
+        this._hass,
+        {
+          title: item.title,
+          type: 'series',
+          poster: item.thumbnail,
+          imdb_id: mediaId,
+        },
+        (selection) => {
+          onEpisodeSelected(selection.season, selection.episode);
+        }
+      );
+    } else {
+      // Fallback: Create picker directly
+      let picker = document.querySelector('stremio-episode-picker');
+      if (!picker) {
+        picker = document.createElement('stremio-episode-picker');
+        document.body.appendChild(picker);
+      }
+      picker.hass = this._hass;
+      picker.mediaItem = {
+        title: item.title,
+        type: 'series',
+        imdb_id: mediaId,
+      };
+      picker.open = true;
+      
+      // Listen for selection
+      const handler = (e) => {
+        picker.removeEventListener('episode-selected', handler);
+        onEpisodeSelected(e.detail.season, e.detail.episode);
+      };
+      picker.addEventListener('episode-selected', handler);
+    }
+  }
+
+  _extractMediaId(item) {
+    // Extract IMDb ID or similar from media_content_id
+    if (item.media_content_id) {
+      const parts = item.media_content_id.split('/');
+      if (parts.length > 1) {
+        return parts[1]; // Usually format is "type/id"
+      }
+      return parts[0];
+    }
+    return item.id || item.imdb_id;
+  }
+
+  _openInStremio(item) {
+    const type = this._getItemMediaType(item);
+    const id = this._extractMediaId(item);
+    
+    // Validate ID format to prevent protocol injection
+    if (id && typeof id === 'string') {
+      const sanitizedId = id.replace(/[^a-zA-Z0-9_-]/g, '');
+      if (sanitizedId && sanitizedId.length > 0) {
+        window.open(`stremio://detail/${type}/${sanitizedId}`, '_blank');
+      } else {
+        console.warn('Stremio Browse Card: Invalid media ID format', id);
+      }
+    }
+  }
+
+  _getStreams(item) {
+    const mediaType = this._getItemMediaType(item);
+    
+    // For series, show episode picker first
+    if (mediaType === 'series') {
+      console.log('[Browse Card] TV Show detected, opening episode picker');
+      this._showEpisodePicker(item, 'streams');
+      return;
+    }
+
+    // For movies, fetch streams directly
+    this._fetchStreams(item, null, null);
+  }
+
+  _fetchStreams(item, season, episode) {
+    const id = this._extractMediaId(item);
+    const mediaType = this._getItemMediaType(item);
+    
+    console.log('[Browse Card] Getting streams for:', id, mediaType, season ? `S${season}E${episode}` : '');
+    this._showToast('Fetching streams...');
+    
+    const serviceData = {
+      media_id: id,
+      media_type: mediaType,
+    };
+    
+    // Add season/episode for series
+    if (mediaType === 'series' && season && episode) {
+      serviceData.season = season;
+      serviceData.episode = episode;
+    }
+
+    // Call service with return_response using WebSocket directly
+    this._hass.callWS({
+      type: 'call_service',
+      domain: 'stremio',
+      service: 'get_streams',
+      service_data: serviceData,
+      return_response: true,
+    })
+      .then((response) => {
+        console.log('[Browse Card] Streams response:', response);
+        
+        let streams = null;
+        if (response?.response?.streams) {
+          streams = response.response.streams;
+        } else if (response?.streams) {
+          streams = response.streams;
+        }
+        
+        if (streams && streams.length > 0) {
+          console.log('[Browse Card] Found', streams.length, 'streams');
+          const displayItem = { ...item };
+          if (season && episode) {
+            displayItem.title = `${item.title} - S${season}E${episode}`;
+          }
+          this._showStreamDialog(displayItem, streams);
+        } else {
+          console.log('[Browse Card] No streams in response:', response);
+          this._showToast('No streams found for this title');
+        }
+      })
+      .catch((error) => {
+        console.error('[Browse Card] Failed to get streams:', error);
+        this._showToast(`Failed to get streams: ${error.message}`, 'error');
+      });
+  }
+
+  _showStreamDialog(item, streams) {
+    console.log('[Browse Card] Opening stream dialog with', streams.length, 'streams');
+    
+    // Use the global helper if available
+    if (window.StremioStreamDialog) {
+      window.StremioStreamDialog.show(
+        this._hass,
+        {
+          title: item.title,
+          type: this._getItemMediaType(item),
+          poster: item.thumbnail,
+          imdb_id: this._extractMediaId(item),
+        },
+        streams
+      );
+    } else {
+      // Fallback: Create dialog directly
+      let dialog = document.querySelector('stremio-stream-dialog');
+      if (!dialog) {
+        dialog = document.createElement('stremio-stream-dialog');
+        document.body.appendChild(dialog);
+      }
+      dialog.hass = this._hass;
+      dialog.mediaItem = {
+        title: item.title,
+        type: this._getItemMediaType(item),
+        poster: item.thumbnail,
+      };
+      dialog.streams = streams;
+      dialog.open = true;
+    }
   }
 
   _addToLibrary(item) {
-    const parts = item.media_content_id.split('/');
-    const mediaType = parts[0];
-    const mediaId = parts[1];
+    const mediaType = this._getItemMediaType(item);
+    const mediaId = this._extractMediaId(item);
 
     if (mediaId && this._hass) {
       this._hass.callService('stremio', 'add_to_library', {
         media_id: mediaId,
         media_type: mediaType,
+      }).then(() => {
+        this._showToast(`Added "${item.title}" to library`);
+      }).catch((error) => {
+        console.error('[Browse Card] Failed to add to library:', error);
+        this._showToast(`Failed to add to library: ${error.message}`, 'error');
       });
     }
   }
 
+  _getSimilarContent(item) {
+    const mediaId = this._extractMediaId(item);
+    if (!mediaId || !this._hass) {
+      console.error('[Browse Card] Cannot get similar: missing ID or hass');
+      return;
+    }
+
+    this._showToast('Finding similar content...');
+
+    this._hass.callWS({
+      type: 'call_service',
+      domain: 'stremio',
+      service: 'get_similar_content',
+      service_data: {
+        media_id: mediaId,
+        limit: 10,
+      },
+      return_response: true,
+    })
+      .then((response) => {
+        console.log('[Browse Card] Similar content response:', response);
+        
+        let similarItems = null;
+        if (response?.response?.similar) {
+          similarItems = response.response.similar;
+        } else if (response?.similar) {
+          similarItems = response.similar;
+        }
+        
+        if (similarItems && similarItems.length > 0) {
+          console.log('[Browse Card] Found', similarItems.length, 'similar items');
+          this._showSimilarDialog(item, similarItems);
+        } else {
+          console.log('[Browse Card] No similar content found');
+          this._showToast('No similar content found');
+        }
+      })
+      .catch((error) => {
+        console.error('[Browse Card] Failed to get similar content:', error);
+        this._showToast(`Failed to get similar content: ${error.message}`, 'error');
+      });
+  }
+
+  _showSimilarDialog(sourceItem, similarItems) {
+    // Fire an event for integration with other cards
+    this.dispatchEvent(
+      new CustomEvent('stremio-similar-content', {
+        bubbles: true,
+        composed: true,
+        detail: {
+          sourceItem,
+          similarItems,
+        },
+      })
+    );
+
+    // Use the global similar dialog if available
+    if (window.StremioSimilarDialog) {
+      window.StremioSimilarDialog.show(this._hass, sourceItem, similarItems);
+    } else {
+      const titles = similarItems.slice(0, 5).map(i => i.title || i.name).join(', ');
+      this._showToast(`Similar: ${titles}...`);
+    }
+  }
+
+  /**
+   * Get streams for the item shown in detail view.
+   * For series with a selected episode, use that. Otherwise, prompt for episode.
+   */
+  _getStreamsForDetailItem(item) {
+    const mediaType = this._getItemMediaType(item);
+    
+    if (mediaType === 'series') {
+      if (item.selectedSeason && item.selectedEpisode) {
+        // Episode already selected, fetch streams directly
+        this._fetchStreams(item, item.selectedSeason, item.selectedEpisode);
+      } else {
+        // No episode selected, show picker
+        this._showEpisodePicker(item, 'streams');
+      }
+    } else {
+      // Movie - fetch directly
+      this._fetchStreams(item, null, null);
+    }
+  }
+
+  _showToast(message, type = 'info') {
+    const event = new CustomEvent('hass-notification', {
+      detail: { message: message },
+      bubbles: true,
+      composed: true,
+    });
+    this.dispatchEvent(event);
+    console.log(`[Browse Card] Toast: ${message}`);
+  }
+
   render() {
+    // If an item is selected, show detail view instead of grid
+    if (this._selectedItem) {
+      return html`
+        <ha-card>
+          <div class="header">
+            <button class="back-button" @click=${this._closeDetail} aria-label="Back to browse">
+              <ha-icon icon="mdi:arrow-left"></ha-icon>
+              Back to Browse
+            </button>
+          </div>
+          ${this._renderDetailView()}
+        </ha-card>
+      `;
+    }
+
+    // Normal grid view
     return html`
       <ha-card>
         <div class="header">
@@ -656,70 +914,119 @@ class StremioBrowseCard extends LitElement {
             No ${this._viewMode} ${this._mediaType === 'movie' ? 'movies' : 'TV shows'} found
           </div>
         ` : html`
-          <div class="catalog-grid" style="grid-template-columns: repeat(auto-fill, minmax(${100 + (this.config.columns - 4) * 20}px, 1fr))">
-            ${this._catalogItems.map(item => html`
-              <div 
-                class="catalog-item" 
-                role="button"
-                tabindex="0"
-                aria-label="${item.title}"
-                @click=${() => this._handleItemClick(item)}
-                @keydown=${(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    this._handleItemClick(item);
-                  }
-                }}
-              >
-                ${item.thumbnail ? html`
-                  <img 
-                    class="catalog-poster" 
-                    src="${item.thumbnail}" 
-                    alt="${item.title}"
-                    loading="lazy"
-                  />
-                ` : html`
-                  <div class="catalog-poster"></div>
-                `}
-                <div class="catalog-title">${item.title}</div>
-              </div>
-            `)}
+          <div 
+            class="catalog-grid" 
+            role="list"
+            aria-label="Catalog items"
+            style="grid-template-columns: repeat(auto-fill, minmax(${100 + (this.config.columns - 4) * 20}px, 1fr)); ${this.config.card_height > 0 ? `max-height: ${this.config.card_height}px` : ''}"
+          >
+            ${this._catalogItems.map(item => this._renderCatalogItem(item))}
           </div>
         `}
+      </ha-card>
+    `;
+  }
 
-        ${this._selectedItem ? html`
-          <div class="modal-overlay" @click=${this._closeDetail}>
-            <div class="item-detail" @click=${(e) => e.stopPropagation()}>
-              <button class="close-button" aria-label="Close" @click=${this._closeDetail}>✕</button>
-              <div class="detail-header">
-                ${this._selectedItem.thumbnail ? html`
-                  <img class="detail-poster" src="${this._selectedItem.thumbnail}" alt="${this._selectedItem.title}" />
-                ` : ''}
-                <div class="detail-info">
-                  <h3>${this._selectedItem.title}</h3>
-                  <p>Type: ${this._selectedItem.media_content_type || 'Unknown'}</p>
-                </div>
-              </div>
-              <div class="detail-actions">
-                <button 
-                  class="detail-button primary" 
-                  aria-label="View details for ${this._selectedItem.title}"
-                  @click=${() => this._openMediaBrowser(this._selectedItem)}
-                >
-                  View Details
-                </button>
-                <button 
-                  class="detail-button secondary" 
-                  aria-label="Add ${this._selectedItem.title} to library"
-                  @click=${() => this._addToLibrary(this._selectedItem)}
-                >
-                  + Library
-                </button>
-              </div>
+  _renderCatalogItem(item) {
+    const mediaType = this._getItemMediaType(item);
+    
+    return html`
+      <div 
+        class="catalog-item" 
+        role="listitem"
+        tabindex="0"
+        aria-label="${item.title}"
+        @click=${() => this._handleItemClick(item)}
+        @keydown=${(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            this._handleItemClick(item);
+          }
+        }}
+      >
+        ${item.thumbnail ? html`
+          <img 
+            class="catalog-poster" 
+            src="${item.thumbnail}" 
+            alt="${item.title}"
+            loading="lazy"
+          />
+        ` : html`
+          <div class="catalog-poster"></div>
+        `}
+        ${this.config.show_media_type_badge ? html`
+          <span class="media-type-badge ${mediaType}">${mediaType === 'series' ? 'TV' : 'Movie'}</span>
+        ` : ''}
+        ${this.config.show_title !== false ? html`
+          <div class="catalog-title">${item.title}</div>
+        ` : ''}
+      </div>
+    `;
+  }
+
+  _renderDetailView() {
+    const item = this._selectedItem;
+    const title = item.title || 'Unknown';
+    const mediaType = this._getItemMediaType(item);
+    const hasSelectedEpisode = mediaType === 'series' && item.selectedSeason && item.selectedEpisode;
+    const episodeLabel = hasSelectedEpisode 
+      ? `S${String(item.selectedSeason).padStart(2, '0')}E${String(item.selectedEpisode).padStart(2, '0')}`
+      : null;
+
+    return html`
+      <div class="item-detail-view">
+        <div class="detail-header">
+          ${item.thumbnail ? html`
+            <img class="detail-poster" src="${item.thumbnail}" alt="${title}" />
+          ` : html`
+            <div class="detail-poster-placeholder">
+              <ha-icon icon="mdi:movie-outline"></ha-icon>
             </div>
+          `}
+          <div class="detail-info">
+            <h3>${title}</h3>
+            <p class="detail-type">${mediaType === 'series' ? 'TV Series' : 'Movie'}</p>
+            ${episodeLabel ? html`<p class="detail-episode">Episode: ${episodeLabel}</p>` : ''}
+            ${item.year ? html`<p class="detail-meta">Year: ${item.year}</p>` : ''}
+          </div>
+        </div>
+
+        ${mediaType === 'series' ? html`
+          <div class="detail-actions">
+            <button class="detail-button tertiary" @click=${() => this._showEpisodePicker(item, 'detail')}>
+              <ha-icon icon="mdi:playlist-play"></ha-icon>
+              ${hasSelectedEpisode ? 'Change Episode' : 'Select Episode'}
+            </button>
           </div>
         ` : ''}
-      </ha-card>
+
+        <div class="detail-actions">
+          <button class="detail-button primary" @click=${() => this._openInStremio(item)}>
+            <ha-icon icon="mdi:play"></ha-icon>
+            Open in Stremio
+          </button>
+          <button class="detail-button secondary" @click=${() => this._getStreamsForDetailItem(item)}>
+            <ha-icon icon="mdi:format-list-bulleted"></ha-icon>
+            Get Streams
+          </button>
+        </div>
+
+        <div class="detail-actions">
+          <button class="detail-button secondary" @click=${() => this._addToLibrary(item)}>
+            <ha-icon icon="mdi:plus"></ha-icon>
+            Add to Library
+          </button>
+        </div>
+
+        ${this.config.show_similar_button !== false ? html`
+          <div class="detail-actions">
+            <button class="detail-button tertiary" @click=${() => this._getSimilarContent(item)}>
+              <ha-icon icon="mdi:movie-search"></ha-icon>
+              Find Similar
+            </button>
+          </div>
+        ` : ''}
+      </div>
     `;
   }
 
@@ -923,10 +1230,18 @@ class StremioBrowseCardEditor extends LitElement {
                   ></ha-switch>
                 </ha-formfield>
 
-                <ha-formfield label="Show Rating Badge">
+                <ha-formfield label="Show Media Type Badge">
                   <ha-switch
-                    .checked=${this._config.show_rating !== false}
-                    .configValue=${'show_rating'}
+                    .checked=${this._config.show_media_type_badge === true}
+                    .configValue=${'show_media_type_badge'}
+                    @change=${this._valueChanged}
+                  ></ha-switch>
+                </ha-formfield>
+
+                <ha-formfield label="Show Find Similar Button">
+                  <ha-switch
+                    .checked=${this._config.show_similar_button !== false}
+                    .configValue=${'show_similar_button'}
                     @change=${this._valueChanged}
                   ></ha-switch>
                 </ha-formfield>

@@ -146,7 +146,7 @@ This card is typically not added directly but is used by other cards when you cl
 
 ### 5. Stremio Browse Card
 
-Browse popular and new movies/TV shows from Stremio catalogs.
+Browse popular and new movies/TV shows from Stremio catalogs with inline details view.
 
 **Type:** `stremio-browse-card`
 
@@ -166,8 +166,13 @@ default_type: movie
 show_view_controls: true
 show_type_controls: true
 show_genre_filter: true
+show_title: true
+show_media_type_badge: false
+show_similar_button: true
 columns: 4
 max_items: 50
+card_height: 500
+poster_aspect_ratio: '2/3'
 ```
 
 #### Options
@@ -180,15 +185,22 @@ max_items: 50
 | `show_view_controls` | boolean | true | Show Popular/New toggle buttons |
 | `show_type_controls` | boolean | true | Show Movies/TV Shows toggle buttons |
 | `show_genre_filter` | boolean | true | Show genre filter dropdown |
+| `show_title` | boolean | true | Show title below poster |
+| `show_media_type_badge` | boolean | false | Show Movie/TV badge on poster |
+| `show_similar_button` | boolean | true | Show "Find Similar" button in detail view |
 | `columns` | number | 4 | Grid columns (desktop) |
 | `max_items` | number | 50 | Maximum items to display |
+| `card_height` | number | 500 | Max height in px (0 for auto) |
+| `poster_aspect_ratio` | string | "2/3" | Poster ratio ("2/3", "16/9", "1/1", "4/3") |
 
 #### Features
 
 - **View Modes**: Toggle between Popular and New content
 - **Media Types**: Switch between Movies and TV Shows
 - **Genre Filtering**: Filter content by genre (Action, Drama, Comedy, etc.)
-- **Click Actions**: Click any item for details and streaming options
+- **Inline Detail View**: Click any item to see details within the card (consistent with Library Card)
+- **Episode Picker**: For TV shows, a dialog appears to select season/episode before viewing details
+- **Quick Actions**: Open in Stremio, Get Streams, Add to Library, Find Similar
 - **Responsive**: Adapts to mobile and desktop screens
 - **Direct Integration**: Uses Stremio's catalog API via media browser
 
