@@ -534,7 +534,7 @@ class StremioContinueWatchingCard extends LitElement {
 
   _renderItem(item) {
     const title = item.title || 'Unknown';
-    const progress = item.progress_percent || 0;
+    const progress = typeof item.progress_percent === 'number' ? item.progress_percent : 0;
 
     return html`
       <div 
