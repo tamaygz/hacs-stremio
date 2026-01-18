@@ -326,13 +326,13 @@ class StremioMediaSource(MediaSource):
         )
 
     async def _build_movie_detail_browse(self, identifier: str) -> BrowseMediaSource:
-        """Build movie detail view showing the movie as playable.
+        """Build movie detail view showing streams as children.
 
         Args:
             identifier: Format is movie/imdb_id
 
         Returns:
-            BrowseMediaSource for the movie
+            BrowseMediaSource for the movie with streams as children
         """
         parts = identifier.split("/")
         media_id = parts[1] if len(parts) > 1 else None
@@ -356,25 +356,34 @@ class StremioMediaSource(MediaSource):
             None,
         )
 
-        if not movie_item:
-            # Return a placeholder for movies not in library (e.g., from search)
-            return BrowseMediaSource(
-                domain=DOMAIN,
-                identifier=identifier,
-                media_class=MediaClass.MOVIE,
-                media_content_type=MediaType.MOVIE,
-                title=f"Movie ({media_id})",
-                can_play=True,
-                can_expand=False,
-                thumbnail=None,
-            )
+        title = "Unknown Movie"
+        poster = None
+        year = None
 
-        title = movie_item.get("title") or movie_item.get("name") or "Unknown Movie"
-        poster = movie_item.get("poster") or movie_item.get("thumbnail")
-        year = movie_item.get("year")
+        if movie_item:
+            title = movie_item.get("title") or movie_item.get("name") or "Unknown Movie"
+            poster = movie_item.get("poster") or movie_item.get("thumbnail")
+            year = movie_item.get("year")
+        else:
+            title = f"Movie ({media_id})"
 
         if year:
             title = f"{title} ({year})"
+
+        # Create a child that leads to streams
+        streams_identifier = f"{STREAMS_IDENTIFIER}/movie/{media_id}"
+        children = [
+            BrowseMediaSource(
+                domain=DOMAIN,
+                identifier=streams_identifier,
+                media_class=MediaClass.DIRECTORY,
+                media_content_type=MediaType.VIDEO,
+                title="Available Streams",
+                can_play=False,
+                can_expand=True,
+                thumbnail=poster,
+            )
+        ]
 
         return BrowseMediaSource(
             domain=DOMAIN,
@@ -382,9 +391,10 @@ class StremioMediaSource(MediaSource):
             media_class=MediaClass.MOVIE,
             media_content_type=MediaType.MOVIE,
             title=title,
-            can_play=True,
-            can_expand=False,
+            can_play=False,
+            can_expand=True,
             thumbnail=poster,
+            children=children,
         )
 
     async def _build_series_detail_browse(self, identifier: str) -> BrowseMediaSource:
