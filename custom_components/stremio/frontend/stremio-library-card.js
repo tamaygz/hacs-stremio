@@ -123,6 +123,8 @@ class StremioLibraryCard extends LitElement {
         cursor: pointer;
         transition: transform 0.2s ease;
         position: relative;
+        display: flex;
+        flex-direction: column;
       }
 
       .library-item:hover {
@@ -140,19 +142,31 @@ class StremioLibraryCard extends LitElement {
         outline-offset: 2px;
       }
 
-      .item-poster {
+      .item-poster-container {
         width: 100%;
         aspect-ratio: var(--poster-aspect-ratio, 2/3);
-        object-fit: cover;
+        position: relative;
+        overflow: hidden;
         border-radius: 6px;
         background: var(--secondary-background-color);
+        flex-shrink: 0;
+      }
+
+      .item-poster {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        position: absolute;
+        top: 0;
+        left: 0;
       }
 
       .item-poster-placeholder {
         width: 100%;
-        aspect-ratio: var(--poster-aspect-ratio, 2/3);
-        border-radius: 6px;
-        background: var(--secondary-background-color);
+        height: 100%;
+        position: absolute;
+        top: 0;
+        left: 0;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -1028,13 +1042,15 @@ class StremioLibraryCard extends LitElement {
         aria-label="${title}${progress > 0 ? `, ${progress.toFixed(0)}% watched` : ''}"
         style="--poster-aspect-ratio: ${this.config.poster_aspect_ratio || '2/3'}"
       >
-        ${item.poster ? html`
-          <img class="item-poster" src="${item.poster}" alt="" loading="lazy" style="aspect-ratio: ${this.config.poster_aspect_ratio || '2/3'}" />
-        ` : html`
-          <div class="item-poster-placeholder" style="aspect-ratio: ${this.config.poster_aspect_ratio || '2/3'}">
-            <ha-icon icon="mdi:movie-outline"></ha-icon>
-          </div>
-        `}
+        <div class="item-poster-container">
+          ${item.poster ? html`
+            <img class="item-poster" src="${item.poster}" alt="" loading="lazy" />
+          ` : html`
+            <div class="item-poster-placeholder">
+              <ha-icon icon="mdi:movie-outline"></ha-icon>
+            </div>
+          `}
+        </div>
         ${this.config.show_media_type_badge && item.type ? html`
           <span class="media-type-badge ${item.type}">${item.type === 'series' ? 'TV' : 'Movie'}</span>
         ` : ''}
