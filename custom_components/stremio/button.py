@@ -257,11 +257,13 @@ class StremioAppleTVHandoverButton(
             # Determine device identifier based on method and configuration
             device_id: str | None = None
 
-            if handover_method == "vlc" and configured_entity:
-                # For VLC method, prefer the configured entity_id
+            if handover_method in ("vlc", "direct") and configured_entity:
+                # For VLC/Direct method, prefer the configured entity_id
                 device_id = configured_entity
                 _LOGGER.info(
-                    "Using configured entity_id for VLC handover: %s", device_id
+                    "Using configured entity_id for %s handover: %s",
+                    handover_method,
+                    device_id,
                 )
             elif configured_device:
                 # Use configured device name

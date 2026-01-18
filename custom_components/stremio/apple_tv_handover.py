@@ -1,7 +1,16 @@
 """Apple TV Handover module for Stremio integration.
 
-This module provides functionality to send Stremio streams to Apple TV devices
-using either AirPlay (via pyatv) or VLC deep links as a fallback.
+This module provides functionality to send Stremio streams to Apple TV devices.
+
+IMPORTANT: tvOS has significant limitations for URL schemes and deep links:
+- VLC deep links (vlc://, vlc-x-callback://) do NOT work on tvOS
+- Only certain apps support deep links (YouTube, Netflix, Disney+, etc.)
+- Generic HTTP/HTTPS URLs can only be played via:
+  1. AirPlay using pyatv library (recommended)
+  2. Direct playback for HLS/MP4 streams (limited support)
+
+The recommended approach is AirPlay via pyatv, which uses the native player
+and supports HLS (.m3u8) and MP4 streams.
 """
 
 from __future__ import annotations
@@ -11,7 +20,6 @@ import logging
 import re
 from enum import Enum
 from typing import Any
-from urllib.parse import quote, urlencode
 
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
@@ -34,6 +42,7 @@ class HandoverMethod(Enum):
     AUTO = "auto"
     AIRPLAY = "airplay"
     VLC = "vlc"
+    DIRECT = "direct"
 
 
 class StreamFormat(Enum):
@@ -112,6 +121,20 @@ class HandoverManager:
     def get_recommended_method(self, stream_url: str) -> HandoverMethod:
         """Get the recommended handover method for a stream.
 
+        For Apple TV streaming, the options are:
+        1. AIRPLAY (recommended) - Uses pyatv to stream directly via AirPlay protocol
+           - Works with HLS (.m3u8) and MP4 streams
+           - Most reliable method
+           - Requires pyatv library to be installed
+
+        2. DIRECT - Uses media_player.play_media with the raw URL
+           - May work for some HLS streams
+           - Less reliable than AirPlay
+
+        3. VLC - Does NOT work on tvOS!
+           - tvOS does not support VLC URL schemes
+           - Kept for compatibility but will fail
+
         Args:
             stream_url: The stream URL
 
@@ -120,20 +143,37 @@ class HandoverManager:
         """
         stream_format = self.detect_stream_format(stream_url)
 
-        # HLS works well with AirPlay
-        if stream_format == StreamFormat.HLS and PYATV_AVAILABLE:
-            return HandoverMethod.AIRPLAY
+        # Always prefer AirPlay if pyatv is available - it's the most reliable
+        if PYATV_AVAILABLE:
+            if stream_format in (StreamFormat.HLS, StreamFormat.MP4):
+                return HandoverMethod.AIRPLAY
 
-        # For MKV and other formats, VLC is more reliable
+        # Fall back to DIRECT for HLS/MP4 if pyatv not available
+        if stream_format in (StreamFormat.HLS, StreamFormat.MP4):
+            return HandoverMethod.DIRECT
+
+        # For MKV and WebM formats:
+        # - VLC deep links do NOT work on tvOS
+        # - AirPlay via pyatv is the only option that might work
+        # - Direct playback will likely fail (unsupported format)
         if stream_format in (StreamFormat.MKV, StreamFormat.WEBM):
-            return HandoverMethod.VLC
+            if PYATV_AVAILABLE:
+                _LOGGER.warning(
+                    "MKV/WebM format detected. AirPlay may not support this format. "
+                    "Consider using an HLS or MP4 stream instead."
+                )
+                return HandoverMethod.AIRPLAY
+            else:
+                _LOGGER.warning(
+                    "MKV/WebM format detected but pyatv not installed. "
+                    "Handover will likely fail. Install pyatv for AirPlay support."
+                )
+                return HandoverMethod.DIRECT
 
-        # MP4 can work with either, prefer AirPlay if available
-        if stream_format == StreamFormat.MP4 and PYATV_AVAILABLE:
+        # Default to AirPlay if available, otherwise DIRECT
+        if PYATV_AVAILABLE:
             return HandoverMethod.AIRPLAY
-
-        # Default to VLC for unknown formats
-        return HandoverMethod.VLC
+        return HandoverMethod.DIRECT
 
     async def discover_apple_tv_devices(self, timeout: float = 5.0) -> dict[str, Any]:
         """Discover Apple TV devices on the network.
@@ -355,31 +395,32 @@ class HandoverManager:
     ) -> str:
         """Generate a VLC deep link URL.
 
+        WARNING: VLC deep links (vlc://, vlc-x-callback://) do NOT work on tvOS!
+        This is a known platform limitation. The tvOS version of VLC does not
+        expose URL schemes the same way the iOS version does.
+
+        This method is kept for potential future compatibility or iOS use cases,
+        but will NOT work for Apple TV handover.
+
+        For Apple TV, use the AirPlay method instead.
+
         Args:
             stream_url: URL of the stream to play
-            title: Optional title for display
-            subtitle_url: Optional subtitle file URL
+            title: Optional title for display (not used)
+            subtitle_url: Optional subtitle file URL (not used)
 
         Returns:
-            VLC deep link URL
+            VLC deep link URL (note: won't work on tvOS)
         """
-        # VLC URL scheme: vlc-x-callback://x-callback-url/stream?url=...
-        base_url = "vlc-x-callback://x-callback-url/stream"
+        # Note: Neither vlc:// nor vlc-x-callback:// work on tvOS
+        # Keeping this for reference but it will not work
+        deep_link = f"vlc://{stream_url}"
 
-        params = {
-            "url": stream_url,
-        }
-
-        if title:
-            params["title"] = title
-
-        if subtitle_url:
-            params["sub"] = subtitle_url
-
-        # Build the URL with proper encoding
-        deep_link = f"{base_url}?{urlencode(params, quote_via=quote)}"
-
-        _LOGGER.debug("Generated VLC deep link: %s", deep_link[:100])
+        _LOGGER.warning(
+            "VLC deep links do NOT work on tvOS. Use AirPlay method instead. "
+            "Generated URL (will likely fail): %s",
+            deep_link[:100],
+        )
         return deep_link
 
     async def handover_via_vlc(
@@ -389,27 +430,30 @@ class HandoverManager:
         title: str | None = None,
         subtitle_url: str | None = None,
     ) -> bool:
-        """Send stream to device via VLC deep link.
+        """Attempt to send stream to Apple TV via VLC deep link.
 
-        This uses Home Assistant's media_player service to send the VLC deep link
-        to the target device (typically an Apple TV with VLC installed).
+        WARNING: This method will likely NOT work on tvOS!
+        VLC deep links are not supported on tvOS - this is a known platform limitation.
+        The tvOS version of VLC does not expose URL schemes.
+
+        Use AirPlay method (handover_via_airplay) for reliable Apple TV streaming.
 
         Args:
-            device_entity_id: Entity ID of the target media player (e.g., media_player.apple_tv_living_room)
+            device_entity_id: Entity ID of the target media player
             stream_url: URL of the stream to play
             title: Optional title for display
             subtitle_url: Optional subtitle file URL
 
         Returns:
-            True if the deep link was sent
+            True if the command was sent (but playback may not start)
 
         Raises:
             HandoverError: If handover fails
         """
-        _LOGGER.info(
-            "Starting VLC handover to '%s': %s",
+        _LOGGER.warning(
+            "Attempting VLC handover to '%s' - NOTE: VLC deep links do NOT work "
+            "on tvOS. Use AirPlay method for reliable streaming.",
             device_entity_id,
-            stream_url[:100],
         )
 
         # Validate entity_id format
@@ -432,7 +476,8 @@ class HandoverManager:
         try:
             vlc_url = self.generate_vlc_deep_link(stream_url, title, subtitle_url)
 
-            # Use media_player service to send the deep link
+            # Use media_player.play_media to open VLC with the stream
+            # The Apple TV integration will handle opening VLC via deep link
             await self.hass.services.async_call(
                 "media_player",
                 "play_media",
@@ -451,6 +496,67 @@ class HandoverManager:
             _LOGGER.error("VLC handover failed: %s", err)
             raise HandoverError(f"VLC handover failed: {err}") from err
 
+    async def handover_direct(
+        self,
+        device_entity_id: str,
+        stream_url: str,
+    ) -> bool:
+        """Send stream URL directly to Apple TV's native player.
+
+        This attempts to play the stream URL directly on Apple TV without
+        using VLC. Works best with HLS (.m3u8) and MP4 streams.
+
+        Args:
+            device_entity_id: Entity ID of the target media player
+            stream_url: URL of the stream to play
+
+        Returns:
+            True if the command was sent
+
+        Raises:
+            HandoverError: If handover fails
+        """
+        _LOGGER.info(
+            "Starting direct handover to '%s': %s",
+            device_entity_id,
+            stream_url[:100],
+        )
+
+        # Validate entity_id format
+        if not device_entity_id or not device_entity_id.startswith("media_player."):
+            raise HandoverError(
+                f"Invalid entity_id '{device_entity_id}'. Direct handover requires a valid "
+                "media_player entity_id."
+            )
+
+        # Check if entity exists
+        state = self.hass.states.get(device_entity_id)
+        if state is None:
+            raise HandoverError(f"Entity '{device_entity_id}' not found.")
+
+        try:
+            # For direct playback, use media_content_type: video
+            # This tells Apple TV to try playing the URL directly
+            await self.hass.services.async_call(
+                "media_player",
+                "play_media",
+                {
+                    "entity_id": device_entity_id,
+                    "media_content_type": "video",
+                    "media_content_id": stream_url,
+                },
+                blocking=True,
+            )
+
+            _LOGGER.info(
+                "Successfully sent stream URL directly to '%s'", device_entity_id
+            )
+            return True
+
+        except Exception as err:
+            _LOGGER.error("Direct handover failed: %s", err)
+            raise HandoverError(f"Direct handover failed: {err}") from err
+
     async def handover(
         self,
         device_identifier: str,
@@ -462,8 +568,8 @@ class HandoverManager:
         """Perform handover to Apple TV using the specified method.
 
         Args:
-            device_identifier: Device name (for AirPlay) or entity_id (for VLC).
-                              For VLC, must be a valid media_player entity_id.
+            device_identifier: Device name (for AirPlay) or entity_id (for VLC/Direct).
+                              For VLC/Direct, must be a valid media_player entity_id.
                               For AirPlay, can be the Apple TV device name.
             stream_url: URL of the stream to play
             method: Handover method to use
@@ -496,8 +602,8 @@ class HandoverManager:
         try:
             if method == HandoverMethod.AIRPLAY:
                 if not PYATV_AVAILABLE:
-                    _LOGGER.warning("AirPlay unavailable, falling back to VLC")
-                    method = HandoverMethod.VLC
+                    _LOGGER.warning("AirPlay unavailable, falling back to direct")
+                    method = HandoverMethod.DIRECT
                 else:
                     await self.handover_via_airplay(
                         device_identifier, stream_url, title
@@ -506,17 +612,22 @@ class HandoverManager:
                     result["method"] = "airplay"
                     return result
 
-            if method == HandoverMethod.VLC:
-                # For VLC, we need a valid entity_id
-                # If the device_identifier looks like a device name (not an entity_id),
-                # try to find the corresponding media_player entity
-                entity_id = device_identifier
-                if not device_identifier.startswith("media_player."):
-                    entity_id = await self._find_media_player_entity(device_identifier)
+            # For VLC and Direct methods, we need a valid entity_id
+            entity_id = device_identifier
+            if not device_identifier.startswith("media_player."):
+                entity_id = await self._find_media_player_entity(device_identifier)
 
+            if method == HandoverMethod.VLC:
                 await self.handover_via_vlc(entity_id, stream_url, title, subtitle_url)
                 result["success"] = True
                 result["method"] = "vlc"
+                result["entity_id"] = entity_id
+                return result
+
+            if method == HandoverMethod.DIRECT:
+                await self.handover_direct(entity_id, stream_url)
+                result["success"] = True
+                result["method"] = "direct"
                 result["entity_id"] = entity_id
                 return result
 
