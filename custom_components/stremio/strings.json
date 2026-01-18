@@ -28,16 +28,19 @@
           "player_scan_interval": "Player state update interval (seconds)",
           "library_scan_interval": "Library sync interval (seconds)",
           "enable_apple_tv_handover": "Enable Apple TV handover",
-          "handover_method": "Handover method"
+          "handover_method": "Handover method",
+          "apple_tv_device": "Apple TV device name (for AirPlay)",
+          "apple_tv_entity_id": "Apple TV entity ID (for VLC)"
         },
         "data_description": {
           "player_scan_interval": "How often to check for player state changes (10-300 seconds)",
           "library_scan_interval": "How often to sync library data (60-3600 seconds)",
           "enable_apple_tv_handover": "Allow sending content to Apple TV",
-          "handover_method": "Method to use for Apple TV handover (auto/airplay/vlc)"
+          "handover_method": "Method to use for Apple TV handover (auto/airplay/vlc)",
+          "apple_tv_device": "The name of your Apple TV (e.g., 'Living Room Apple TV'). Leave empty to auto-discover.",
+          "apple_tv_entity_id": "The media_player entity ID for VLC handover (e.g., 'media_player.apple_tv_living_room')"
         }
       }
     }
   }
 }
-

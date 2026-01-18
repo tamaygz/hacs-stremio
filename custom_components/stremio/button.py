@@ -246,21 +246,59 @@ class StremioAppleTVHandoverButton(
         # Use HandoverManager to discover and handover
         handover_manager = HandoverManager(self.hass)
 
-        try:
-            # Try to discover Apple TV devices
-            devices = await handover_manager.discover_apple_tv_devices(timeout=5)
-            if not devices:
-                _LOGGER.warning("No Apple TV devices discovered")
-                return
+        # Get configuration
+        configured_device = self._entry.options.get(CONF_APPLE_TV_DEVICE, "")
+        configured_entity = self._entry.options.get(CONF_APPLE_TV_ENTITY_ID, "")
+        handover_method = self._entry.options.get(
+            CONF_HANDOVER_METHOD, DEFAULT_HANDOVER_METHOD
+        )
 
-            # Use the first discovered device
-            device_id = list(devices.keys())[0]
+        try:
+            # Determine device identifier based on method and configuration
+            device_id: str | None = None
+
+            if handover_method == "vlc" and configured_entity:
+                # For VLC method, prefer the configured entity_id
+                device_id = configured_entity
+                _LOGGER.info("Using configured entity_id for VLC handover: %s", device_id)
+            elif configured_device:
+                # Use configured device name
+                device_id = configured_device
+                _LOGGER.info("Using configured Apple TV device: %s", device_id)
+            else:
+                # No configuration - discover and find an actual Apple TV
+                devices = await handover_manager.discover_apple_tv_devices(timeout=5)
+                if not devices:
+                    _LOGGER.warning("No Apple TV devices discovered")
+                    return
+
+                # Try to find an actual Apple TV (not HomePod, MacBook, etc.)
+                apple_tv_keywords = ["apple tv", "tv", "appletv"]
+                for name in devices.keys():
+                    name_lower = name.lower()
+                    if any(kw in name_lower for kw in apple_tv_keywords):
+                        device_id = name
+                        _LOGGER.info(
+                            "Auto-selected Apple TV device: %s (matched TV keyword)",
+                            device_id,
+                        )
+                        break
+
+                # If no TV found, use the first device but warn
+                if not device_id:
+                    device_id = list(devices.keys())[0]
+                    _LOGGER.warning(
+                        "No Apple TV found in discovered devices, using first device: %s. "
+                        "Consider configuring the target device in integration options.",
+                        device_id,
+                    )
+
             _LOGGER.info("Handing over to Apple TV: %s", device_id)
 
             result = await handover_manager.handover(
                 device_identifier=device_id,
                 stream_url=stream_url,
-                method="auto",
+                method=handover_method,
                 title=title,
             )
             _LOGGER.info("Handover result: %s", result)
