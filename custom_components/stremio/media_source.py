@@ -502,7 +502,7 @@ class StremioMediaSource(MediaSource):
         if not coordinator:
             raise BrowseError("Stremio coordinator not available")
 
-        # Find series in library for basic info
+        # Try to find series in library for basic info
         library_items = coordinator.data.get("library", [])
         series_item = next(
             (
@@ -513,22 +513,29 @@ class StremioMediaSource(MediaSource):
             None,
         )
 
-        if not series_item:
-            raise BrowseError(f"Series not found: {media_id}")
-
-        title = series_item.get("title") or series_item.get("name") or "Unknown Series"
-        poster = series_item.get("poster")
+        # Get title and poster from library item if available
+        title = None
+        poster = None
+        if series_item:
+            title = series_item.get("title") or series_item.get("name")
+            poster = series_item.get("poster")
 
         # Fetch detailed metadata from Cinemeta to get accurate season/episode info
+        # This works for both library items and catalog items
         client = coordinator.client
         metadata = await client.async_get_series_metadata(media_id)
 
-        seasons = []
-        if metadata:
-            seasons = metadata.get("seasons", [])
-            # Update poster if available from metadata
-            if not poster and metadata.get("poster"):
-                poster = metadata.get("poster")
+        if not metadata:
+            # If we can't get metadata, we can't display seasons/episodes
+            raise BrowseError(f"Could not fetch series metadata for {media_id}")
+
+        # Use metadata for title and poster if not from library
+        if not title:
+            title = metadata.get("name") or metadata.get("title") or "Unknown Series"
+        if not poster:
+            poster = metadata.get("poster")
+
+        seasons = metadata.get("seasons", [])
 
         # If no season specified, show season list
         if season is None:
