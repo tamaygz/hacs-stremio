@@ -14,7 +14,7 @@ from homeassistant.const import (
     STATE_UNAVAILABLE,
     STATE_UNKNOWN,
 )
-from homeassistant.core import Event, EventStateChangedData, HomeAssistant, callback
+from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
@@ -85,8 +85,19 @@ class StremioDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             _LOGGER,
             name=DOMAIN,
             update_interval=timedelta(seconds=self._configured_scan_interval),
-            config_entry=entry,
         )
+
+    @property
+    def config_entry(self):
+        """Return the config entry associated with this coordinator."""
+        return self.entry
+    
+    @config_entry.setter
+    def config_entry(self, value):
+        """Set the config entry (for Home Assistant compatibility)."""
+        # Home Assistant may try to set this during initialization
+        # We store it as self.entry instead
+        self.entry = value
 
     async def _async_setup(self) -> None:
         """Set up the coordinator.
@@ -133,9 +144,7 @@ class StremioDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._state_change_unsub.append(unsub)
 
     @callback
-    def _handle_gate_entity_state_change(
-        self, event: Event[EventStateChangedData]
-    ) -> None:
+    def _handle_gate_entity_state_change(self, event: Event) -> None:
         """Handle state change of a polling gate entity."""
         entity_id = event.data["entity_id"]
         old_state = event.data["old_state"]

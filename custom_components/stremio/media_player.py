@@ -523,12 +523,12 @@ class StremioMediaPlayer(
                             item.get("season") == season
                             and item.get("episode") == episode
                         ):
-                            media_info["title"] = media_info.get(
+                            media_info["title"] = media_info.get("title") or item.get(
                                 "title"
-                            ) or item.get("title")
-                            media_info["poster"] = media_info.get(
+                            )
+                            media_info["poster"] = media_info.get("poster") or item.get(
                                 "poster"
-                            ) or item.get("poster")
+                            )
                             media_info["year"] = media_info.get("year") or item.get(
                                 "year"
                             )

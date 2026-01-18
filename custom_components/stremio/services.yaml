@@ -162,3 +162,80 @@ handover_to_apple_tv:
             - "airplay"
             - "direct"
             - "vlc"
+
+browse_catalog:
+  name: Browse Catalog
+  description: Browse the Stremio catalog for popular or new movies/series, optionally filtered by genre.
+  fields:
+    media_type:
+      name: Media Type
+      description: Type of media to browse (movie or series).
+      required: false
+      default: "movie"
+      example: "movie"
+      selector:
+        select:
+          options:
+            - "movie"
+            - "series"
+    catalog_type:
+      name: Catalog Type
+      description: Type of catalog to browse (popular, new, or genre).
+      required: false
+      default: "popular"
+      example: "popular"
+      selector:
+        select:
+          options:
+            - "popular"
+            - "new"
+            - "genre"
+    genre:
+      name: Genre
+      description: Filter by genre (Action, Drama, Comedy, etc.). Only applicable when catalog_type is "genre" or for filtering popular/new results.
+      required: false
+      example: "Action"
+      selector:
+        select:
+          options:
+            - "Action"
+            - "Adventure"
+            - "Animation"
+            - "Biography"
+            - "Comedy"
+            - "Crime"
+            - "Documentary"
+            - "Drama"
+            - "Family"
+            - "Fantasy"
+            - "History"
+            - "Horror"
+            - "Mystery"
+            - "Romance"
+            - "Sci-Fi"
+            - "Sport"
+            - "Thriller"
+            - "War"
+            - "Western"
+    skip:
+      name: Skip
+      description: Number of items to skip for pagination.
+      required: false
+      default: 0
+      example: 0
+      selector:
+        number:
+          min: 0
+          max: 1000
+          mode: box
+    limit:
+      name: Limit
+      description: Maximum number of items to return.
+      required: false
+      default: 50
+      example: 50
+      selector:
+        number:
+          min: 1
+          max: 100
+          mode: slider

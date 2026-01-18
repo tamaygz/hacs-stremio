@@ -27,6 +27,7 @@ JSMODULES: Final[list[dict[str, str]]] = [
 # Update intervals
 DEFAULT_SCAN_INTERVAL: Final = timedelta(seconds=30)
 LIBRARY_SCAN_INTERVAL: Final = timedelta(minutes=5)
+CATALOG_SCAN_INTERVAL: Final = timedelta(hours=6)  # Catalogs change less frequently
 
 # Configuration
 CONF_AUTH_KEY: Final = "auth_key"
@@ -147,6 +148,7 @@ SERVICE_ADD_TO_LIBRARY: Final = "add_to_library"
 SERVICE_REMOVE_FROM_LIBRARY: Final = "remove_from_library"
 SERVICE_REFRESH_LIBRARY: Final = "refresh_library"
 SERVICE_HANDOVER_TO_APPLE_TV: Final = "handover_to_apple_tv"
+SERVICE_BROWSE_CATALOG: Final = "browse_catalog"
 
 # API Constants
 API_BASE_URL: Final = "https://api.strem.io"
@@ -154,3 +156,61 @@ API_TIMEOUT: Final = 10
 
 # Defaults
 DEFAULT_NAME: Final = "Stremio"
+
+# Catalog constants
+CINEMETA_BASE_URL: Final = "https://v3-cinemeta.strem.io"
+CATALOG_TYPE_MOVIE: Final = "movie"
+CATALOG_TYPE_SERIES: Final = "series"
+CATALOG_ID_TOP: Final = "top"
+CATALOG_ID_POPULAR: Final = "popular"
+
+# Catalog definitions for browsing
+CATALOG_DEFINITIONS: Final = {
+    "popular_movies": {
+        "name": "Popular Movies",
+        "type": CATALOG_TYPE_MOVIE,
+        "catalog_id": CATALOG_ID_TOP,
+        "extra": "popular.json",
+    },
+    "popular_series": {
+        "name": "Popular TV Shows",
+        "type": CATALOG_TYPE_SERIES,
+        "catalog_id": CATALOG_ID_TOP,
+        "extra": "popular.json",
+    },
+    "new_movies": {
+        "name": "New Movies",
+        "type": CATALOG_TYPE_MOVIE,
+        "catalog_id": CATALOG_ID_TOP,
+        "extra": "popular.json?genre=",  # Recent movies from popular
+    },
+    "new_series": {
+        "name": "New TV Shows",
+        "type": CATALOG_TYPE_SERIES,
+        "catalog_id": CATALOG_ID_TOP,
+        "extra": "popular.json?genre=",  # Recent series from popular
+    },
+}
+
+# Supported genres for Cinemeta filtering
+CINEMETA_GENRES: Final = [
+    "Action",
+    "Adventure",
+    "Animation",
+    "Biography",
+    "Comedy",
+    "Crime",
+    "Documentary",
+    "Drama",
+    "Family",
+    "Fantasy",
+    "History",
+    "Horror",
+    "Mystery",
+    "Romance",
+    "Sci-Fi",
+    "Sport",
+    "Thriller",
+    "War",
+    "Western",
+]

@@ -34,6 +34,13 @@ MOVIES_IDENTIFIER = "movies"
 SERIES_IDENTIFIER = "series"
 SEARCH_IDENTIFIER = "search"
 STREAMS_IDENTIFIER = "streams"
+CATALOGS_IDENTIFIER = "catalogs"
+POPULAR_MOVIES_IDENTIFIER = "popular_movies"
+POPULAR_SERIES_IDENTIFIER = "popular_series"
+NEW_MOVIES_IDENTIFIER = "new_movies"
+NEW_SERIES_IDENTIFIER = "new_series"
+MOVIE_GENRES_IDENTIFIER = "movie_genres"
+SERIES_GENRES_IDENTIFIER = "series_genres"
 
 
 async def async_get_media_source(hass: HomeAssistant) -> StremioMediaSource:
@@ -200,6 +207,26 @@ class StremioMediaSource(MediaSource):
             return await self._build_movies_browse()
         if identifier == SERIES_IDENTIFIER:
             return await self._build_series_browse()
+        if identifier == CATALOGS_IDENTIFIER:
+            return self._build_catalogs_browse()
+        if identifier == POPULAR_MOVIES_IDENTIFIER:
+            return await self._build_popular_movies_browse()
+        if identifier == POPULAR_SERIES_IDENTIFIER:
+            return await self._build_popular_series_browse()
+        if identifier == NEW_MOVIES_IDENTIFIER:
+            return await self._build_new_movies_browse()
+        if identifier == NEW_SERIES_IDENTIFIER:
+            return await self._build_new_series_browse()
+        if identifier == MOVIE_GENRES_IDENTIFIER:
+            return self._build_movie_genres_browse()
+        if identifier == SERIES_GENRES_IDENTIFIER:
+            return self._build_series_genres_browse()
+
+        # Handle genre browsing with format: movie_genres/Genre or series_genres/Genre
+        if identifier.startswith(f"{MOVIE_GENRES_IDENTIFIER}/"):
+            return await self._build_genre_content_browse(identifier, "movie")
+        if identifier.startswith(f"{SERIES_GENRES_IDENTIFIER}/"):
+            return await self._build_genre_content_browse(identifier, "series")
 
         # Handle individual series items (series/imdb_id or series/imdb_id/season)
         if identifier.startswith(f"{SERIES_IDENTIFIER}/"):
@@ -239,10 +266,20 @@ class StremioMediaSource(MediaSource):
                 ),
                 BrowseMediaSource(
                     domain=DOMAIN,
+                    identifier=CATALOGS_IDENTIFIER,
+                    media_class=MediaClass.DIRECTORY,
+                    media_content_type="",
+                    title="Browse Catalogs",
+                    can_play=False,
+                    can_expand=True,
+                    thumbnail=None,
+                ),
+                BrowseMediaSource(
+                    domain=DOMAIN,
                     identifier=LIBRARY_IDENTIFIER,
                     media_class=MediaClass.DIRECTORY,
                     media_content_type="",
-                    title="Library",
+                    title="My Library",
                     can_play=False,
                     can_expand=True,
                     thumbnail=None,
@@ -252,7 +289,7 @@ class StremioMediaSource(MediaSource):
                     identifier=MOVIES_IDENTIFIER,
                     media_class=MediaClass.DIRECTORY,
                     media_content_type=MediaType.MOVIE,
-                    title="Movies",
+                    title="My Movies",
                     can_play=False,
                     can_expand=True,
                     thumbnail=None,
@@ -262,7 +299,7 @@ class StremioMediaSource(MediaSource):
                     identifier=SERIES_IDENTIFIER,
                     media_class=MediaClass.DIRECTORY,
                     media_content_type=MediaType.TVSHOW,
-                    title="TV Series",
+                    title="My TV Series",
                     can_play=False,
                     can_expand=True,
                     thumbnail=None,
@@ -465,7 +502,7 @@ class StremioMediaSource(MediaSource):
         if not coordinator:
             raise BrowseError("Stremio coordinator not available")
 
-        # Find series in library for basic info
+        # Try to find series in library for basic info
         library_items = coordinator.data.get("library", [])
         series_item = next(
             (
@@ -476,22 +513,29 @@ class StremioMediaSource(MediaSource):
             None,
         )
 
-        if not series_item:
-            raise BrowseError(f"Series not found: {media_id}")
-
-        title = series_item.get("title") or series_item.get("name") or "Unknown Series"
-        poster = series_item.get("poster")
+        # Get title and poster from library item if available
+        title = None
+        poster = None
+        if series_item:
+            title = series_item.get("title") or series_item.get("name")
+            poster = series_item.get("poster")
 
         # Fetch detailed metadata from Cinemeta to get accurate season/episode info
+        # This works for both library items and catalog items
         client = coordinator.client
         metadata = await client.async_get_series_metadata(media_id)
 
-        seasons = []
-        if metadata:
-            seasons = metadata.get("seasons", [])
-            # Update poster if available from metadata
-            if not poster and metadata.get("poster"):
-                poster = metadata.get("poster")
+        if not metadata:
+            # If we can't get metadata, we can't display seasons/episodes
+            raise BrowseError(f"Could not fetch series metadata for {media_id}")
+
+        # Use metadata for title and poster if not from library
+        if not title:
+            title = metadata.get("name") or metadata.get("title") or "Unknown Series"
+        if not poster:
+            poster = metadata.get("poster")
+
+        seasons = metadata.get("seasons", [])
 
         # If no season specified, show season list
         if season is None:
@@ -881,6 +925,375 @@ class StremioMediaSource(MediaSource):
             thumbnail=poster,
             children=children,
             children_media_class=MediaClass.TRACK,  # Hint to render children as list
+        )
+
+    def _build_catalogs_browse(self) -> BrowseMediaSource:
+        """Build catalogs browse menu showing available catalog categories."""
+        return BrowseMediaSource(
+            domain=DOMAIN,
+            identifier=CATALOGS_IDENTIFIER,
+            media_class=MediaClass.DIRECTORY,
+            media_content_type="",
+            title="Browse Catalogs",
+            can_play=False,
+            can_expand=True,
+            children=[
+                BrowseMediaSource(
+                    domain=DOMAIN,
+                    identifier=POPULAR_MOVIES_IDENTIFIER,
+                    media_class=MediaClass.DIRECTORY,
+                    media_content_type=MediaType.MOVIE,
+                    title="🔥 Popular Movies",
+                    can_play=False,
+                    can_expand=True,
+                    thumbnail=None,
+                ),
+                BrowseMediaSource(
+                    domain=DOMAIN,
+                    identifier=POPULAR_SERIES_IDENTIFIER,
+                    media_class=MediaClass.DIRECTORY,
+                    media_content_type=MediaType.TVSHOW,
+                    title="🔥 Popular TV Shows",
+                    can_play=False,
+                    can_expand=True,
+                    thumbnail=None,
+                ),
+                BrowseMediaSource(
+                    domain=DOMAIN,
+                    identifier=NEW_MOVIES_IDENTIFIER,
+                    media_class=MediaClass.DIRECTORY,
+                    media_content_type=MediaType.MOVIE,
+                    title="🆕 New Movies",
+                    can_play=False,
+                    can_expand=True,
+                    thumbnail=None,
+                ),
+                BrowseMediaSource(
+                    domain=DOMAIN,
+                    identifier=NEW_SERIES_IDENTIFIER,
+                    media_class=MediaClass.DIRECTORY,
+                    media_content_type=MediaType.TVSHOW,
+                    title="🆕 New TV Shows",
+                    can_play=False,
+                    can_expand=True,
+                    thumbnail=None,
+                ),
+                BrowseMediaSource(
+                    domain=DOMAIN,
+                    identifier=MOVIE_GENRES_IDENTIFIER,
+                    media_class=MediaClass.DIRECTORY,
+                    media_content_type=MediaType.MOVIE,
+                    title="🎭 Movie Genres",
+                    can_play=False,
+                    can_expand=True,
+                    thumbnail=None,
+                ),
+                BrowseMediaSource(
+                    domain=DOMAIN,
+                    identifier=SERIES_GENRES_IDENTIFIER,
+                    media_class=MediaClass.DIRECTORY,
+                    media_content_type=MediaType.TVSHOW,
+                    title="🎭 TV Show Genres",
+                    can_play=False,
+                    can_expand=True,
+                    thumbnail=None,
+                ),
+            ],
+        )
+
+    async def _build_popular_movies_browse(self) -> BrowseMediaSource:
+        """Build popular movies catalog view."""
+        coordinator = self._get_coordinator()
+        if not coordinator:
+            return self._build_empty_browse(POPULAR_MOVIES_IDENTIFIER, "Popular Movies")
+
+        try:
+            client = coordinator.client
+            catalog_items = await client.async_get_popular_movies(limit=50)
+
+            children = []
+            for item in catalog_items:
+                child = self._build_catalog_item(item)
+                if child:
+                    children.append(child)
+
+            return BrowseMediaSource(
+                domain=DOMAIN,
+                identifier=POPULAR_MOVIES_IDENTIFIER,
+                media_class=MediaClass.DIRECTORY,
+                media_content_type=MediaType.MOVIE,
+                title="Popular Movies",
+                can_play=False,
+                can_expand=True,
+                children=children,
+            )
+        except Exception as err:
+            _LOGGER.error("Error fetching popular movies: %s", err)
+            return self._build_empty_browse(POPULAR_MOVIES_IDENTIFIER, "Popular Movies")
+
+    async def _build_popular_series_browse(self) -> BrowseMediaSource:
+        """Build popular TV series catalog view."""
+        coordinator = self._get_coordinator()
+        if not coordinator:
+            return self._build_empty_browse(
+                POPULAR_SERIES_IDENTIFIER, "Popular TV Shows"
+            )
+
+        try:
+            client = coordinator.client
+            catalog_items = await client.async_get_popular_series(limit=50)
+
+            children = []
+            for item in catalog_items:
+                child = self._build_catalog_item(item)
+                if child:
+                    children.append(child)
+
+            return BrowseMediaSource(
+                domain=DOMAIN,
+                identifier=POPULAR_SERIES_IDENTIFIER,
+                media_class=MediaClass.DIRECTORY,
+                media_content_type=MediaType.TVSHOW,
+                title="Popular TV Shows",
+                can_play=False,
+                can_expand=True,
+                children=children,
+            )
+        except Exception as err:
+            _LOGGER.error("Error fetching popular series: %s", err)
+            return self._build_empty_browse(
+                POPULAR_SERIES_IDENTIFIER, "Popular TV Shows"
+            )
+
+    async def _build_new_movies_browse(self) -> BrowseMediaSource:
+        """Build new movies catalog view (same as popular for now)."""
+        # Note: Cinemeta doesn't have a specific "new releases" catalog
+        # Using popular catalog which tends to include recent releases
+        coordinator = self._get_coordinator()
+        if not coordinator:
+            return self._build_empty_browse(NEW_MOVIES_IDENTIFIER, "New Movies")
+
+        try:
+            client = coordinator.client
+            # Get popular movies which tend to include recent releases
+            catalog_items = await client.async_get_popular_movies(limit=50)
+
+            children = []
+            for item in catalog_items:
+                child = self._build_catalog_item(item)
+                if child:
+                    children.append(child)
+
+            return BrowseMediaSource(
+                domain=DOMAIN,
+                identifier=NEW_MOVIES_IDENTIFIER,
+                media_class=MediaClass.DIRECTORY,
+                media_content_type=MediaType.MOVIE,
+                title="New Movies",
+                can_play=False,
+                can_expand=True,
+                children=children,
+            )
+        except Exception as err:
+            _LOGGER.error("Error fetching new movies: %s", err)
+            return self._build_empty_browse(NEW_MOVIES_IDENTIFIER, "New Movies")
+
+    async def _build_new_series_browse(self) -> BrowseMediaSource:
+        """Build new TV series catalog view (same as popular for now)."""
+        # Note: Cinemeta doesn't have a specific "new releases" catalog
+        # Using popular catalog which tends to include recent series
+        coordinator = self._get_coordinator()
+        if not coordinator:
+            return self._build_empty_browse(NEW_SERIES_IDENTIFIER, "New TV Shows")
+
+        try:
+            client = coordinator.client
+            # Get popular series which tend to include recent releases
+            catalog_items = await client.async_get_popular_series(limit=50)
+
+            children = []
+            for item in catalog_items:
+                child = self._build_catalog_item(item)
+                if child:
+                    children.append(child)
+
+            return BrowseMediaSource(
+                domain=DOMAIN,
+                identifier=NEW_SERIES_IDENTIFIER,
+                media_class=MediaClass.DIRECTORY,
+                media_content_type=MediaType.TVSHOW,
+                title="New TV Shows",
+                can_play=False,
+                can_expand=True,
+                children=children,
+            )
+        except Exception as err:
+            _LOGGER.error("Error fetching new series: %s", err)
+            return self._build_empty_browse(NEW_SERIES_IDENTIFIER, "New TV Shows")
+
+    def _build_movie_genres_browse(self) -> BrowseMediaSource:
+        """Build movie genres list view."""
+        from .const import CINEMETA_GENRES
+
+        children = []
+        for genre in CINEMETA_GENRES:
+            children.append(
+                BrowseMediaSource(
+                    domain=DOMAIN,
+                    identifier=f"{MOVIE_GENRES_IDENTIFIER}/{genre}",
+                    media_class=MediaClass.DIRECTORY,
+                    media_content_type=MediaType.MOVIE,
+                    title=genre,
+                    can_play=False,
+                    can_expand=True,
+                    thumbnail=None,
+                )
+            )
+
+        return BrowseMediaSource(
+            domain=DOMAIN,
+            identifier=MOVIE_GENRES_IDENTIFIER,
+            media_class=MediaClass.DIRECTORY,
+            media_content_type=MediaType.MOVIE,
+            title="Movie Genres",
+            can_play=False,
+            can_expand=True,
+            children=children,
+        )
+
+    def _build_series_genres_browse(self) -> BrowseMediaSource:
+        """Build TV show genres list view."""
+        from .const import CINEMETA_GENRES
+
+        children = []
+        for genre in CINEMETA_GENRES:
+            children.append(
+                BrowseMediaSource(
+                    domain=DOMAIN,
+                    identifier=f"{SERIES_GENRES_IDENTIFIER}/{genre}",
+                    media_class=MediaClass.DIRECTORY,
+                    media_content_type=MediaType.TVSHOW,
+                    title=genre,
+                    can_play=False,
+                    can_expand=True,
+                    thumbnail=None,
+                )
+            )
+
+        return BrowseMediaSource(
+            domain=DOMAIN,
+            identifier=SERIES_GENRES_IDENTIFIER,
+            media_class=MediaClass.DIRECTORY,
+            media_content_type=MediaType.TVSHOW,
+            title="TV Show Genres",
+            can_play=False,
+            can_expand=True,
+            children=children,
+        )
+
+    async def _build_genre_content_browse(
+        self, identifier: str, media_type: str
+    ) -> BrowseMediaSource:
+        """Build genre content view showing movies/series for a specific genre.
+
+        Args:
+            identifier: Format is movie_genres/Genre or series_genres/Genre
+            media_type: "movie" or "series"
+
+        Returns:
+            BrowseMediaSource with genre-filtered catalog items
+        """
+        # Extract genre from identifier
+        parts = identifier.split("/")
+        genre = parts[1] if len(parts) > 1 else None
+
+        if not genre:
+            raise BrowseError("Invalid genre identifier")
+
+        coordinator = self._get_coordinator()
+        if not coordinator:
+            return self._build_empty_browse(identifier, f"{genre} {media_type.title()}s")
+
+        try:
+            client = coordinator.client
+            # Fetch catalog with genre filter
+            if media_type == "movie":
+                catalog_items = await client.async_get_popular_movies(
+                    genre=genre, limit=50
+                )
+            else:
+                catalog_items = await client.async_get_popular_series(
+                    genre=genre, limit=50
+                )
+
+            children = []
+            for item in catalog_items:
+                child = self._build_catalog_item(item)
+                if child:
+                    children.append(child)
+
+            title = f"{genre} {media_type.title()}s"
+            return BrowseMediaSource(
+                domain=DOMAIN,
+                identifier=identifier,
+                media_class=MediaClass.DIRECTORY,
+                media_content_type=MediaType.MOVIE if media_type == "movie" else MediaType.TVSHOW,
+                title=title,
+                can_play=False,
+                can_expand=True,
+                children=children,
+            )
+        except Exception as err:
+            _LOGGER.error("Error fetching %s genre content: %s", genre, err)
+            return self._build_empty_browse(identifier, f"{genre} {media_type.title()}s")
+
+    def _build_catalog_item(self, item: dict[str, Any]) -> BrowseMediaSource | None:
+        """Build a BrowseMediaSource for a catalog item.
+
+        Args:
+            item: Catalog item dictionary from Cinemeta
+
+        Returns:
+            BrowseMediaSource or None if item is invalid
+        """
+        title = item.get("title")
+        if not title:
+            return None
+
+        media_type = item.get("type", "movie")
+        media_id = item.get("imdb_id") or item.get("id")
+
+        if not media_id:
+            return None
+
+        # Format identifier - catalog items use same format as library items
+        identifier = f"{media_type}/{media_id}"
+
+        # Get poster/thumbnail
+        poster = item.get("poster")
+
+        # Add year to title if available
+        year = item.get("year")
+        if year:
+            title = f"{title} ({year})"
+
+        # Determine media class
+        if media_type == "series":
+            media_class = MediaClass.TV_SHOW
+            content_type = MediaType.TVSHOW
+        else:
+            media_class = MediaClass.MOVIE
+            content_type = MediaType.MOVIE
+
+        return BrowseMediaSource(
+            domain=DOMAIN,
+            identifier=identifier,
+            media_class=media_class,
+            media_content_type=content_type,
+            title=title,
+            can_play=False,  # Need to drill down to streams
+            can_expand=True,
+            thumbnail=poster,
         )
 
     def _build_empty_browse(self, identifier: str, title: str) -> BrowseMediaSource:

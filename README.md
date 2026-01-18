@@ -24,6 +24,7 @@ A comprehensive Home Assistant Custom Component (HACS) integration that connects
 | 🎨 **Custom UI Cards**     | Beautiful Lovelace cards for library browsing   |
 | 🔍 **Media Source**        | Browse library from HA media browser            |
 | 🎯 **Services**            | Search, manage library, get stream URLs         |
+| 🎭 **Catalog Browsing**    | Browse popular movies, TV shows, and by genre   |
 
 ---
 

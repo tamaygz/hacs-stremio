@@ -30,6 +30,7 @@ name: Living Room Stremio
 show_progress: true
 show_buttons: true
 show_background: true
+show_browse_button: true
 tap_action:
   action: more-info
 ```
@@ -43,6 +44,7 @@ tap_action:
 | `show_progress` | boolean | true | Show progress bar |
 | `show_buttons` | boolean | true | Show control buttons |
 | `show_background` | boolean | true | Show poster as background |
+| `show_browse_button` | boolean | false | Show browse catalog button when idle |
 
 ---
 
@@ -67,6 +69,8 @@ entity: sensor.stremio_library_count
 title: My Stremio Library
 show_search: true
 show_filters: true
+show_view_toggle: true
+default_view: library
 max_items: 50
 columns: 4
 ```
@@ -79,6 +83,8 @@ columns: 4
 | `title` | string | "Stremio Library" | Card title |
 | `show_search` | boolean | true | Show search box |
 | `show_filters` | boolean | true | Show filter/sort options |
+| `show_view_toggle` | boolean | true | Show library/catalog view toggle |
+| `default_view` | string | "library" | Default view ("library" or "catalog") |
 | `max_items` | number | 50 | Maximum items to display |
 | `columns` | number | 4 | Grid columns (desktop) |
 
@@ -138,6 +144,56 @@ This card is typically not added directly but is used by other cards when you cl
 
 ---
 
+### 5. Stremio Browse Card
+
+Browse popular and new movies/TV shows from Stremio catalogs.
+
+**Type:** `stremio-browse-card`
+
+#### Basic Configuration
+
+```yaml
+type: custom:stremio-browse-card
+```
+
+#### Full Configuration
+
+```yaml
+type: custom:stremio-browse-card
+title: Browse Stremio
+default_view: popular
+default_type: movie
+show_view_controls: true
+show_type_controls: true
+show_genre_filter: true
+columns: 4
+max_items: 50
+```
+
+#### Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `title` | string | "Browse Stremio" | Card title |
+| `default_view` | string | "popular" | Default view ("popular" or "new") |
+| `default_type` | string | "movie" | Default media type ("movie" or "series") |
+| `show_view_controls` | boolean | true | Show Popular/New toggle buttons |
+| `show_type_controls` | boolean | true | Show Movies/TV Shows toggle buttons |
+| `show_genre_filter` | boolean | true | Show genre filter dropdown |
+| `columns` | number | 4 | Grid columns (desktop) |
+| `max_items` | number | 50 | Maximum items to display |
+
+#### Features
+
+- **View Modes**: Toggle between Popular and New content
+- **Media Types**: Switch between Movies and TV Shows
+- **Genre Filtering**: Filter content by genre (Action, Drama, Comedy, etc.)
+- **Click Actions**: Click any item for details and streaming options
+- **Responsive**: Adapts to mobile and desktop screens
+- **Direct Integration**: Uses Stremio's catalog API via media browser
+
+---
+
 ## Dashboard Examples
 
 ### Minimal Dashboard
@@ -162,8 +218,53 @@ views:
             entity: media_player.stremio
           - type: custom:stremio-media-details-card
             entity: media_player.stremio
+      - type: custom:stremio-browse-card
+        title: Discover Content
+        default_view: popular
       - type: custom:stremio-library-card
         title: My Library
+```
+
+### Discovery-Focused Dashboard
+
+```yaml
+views:
+  - title: Discover
+    cards:
+      - type: custom:stremio-browse-card
+        title: 🔥 Popular Movies
+        default_view: popular
+        default_type: movie
+        show_type_controls: false
+      - type: custom:stremio-browse-card
+        title: 🔥 Popular TV Shows
+        default_view: popular
+        default_type: series
+        show_type_controls: false
+      - type: custom:stremio-browse-card
+        title: 🆕 New Releases
+        default_view: new
+        columns: 6
+```
+
+### Genre-Focused Dashboard
+
+```yaml
+views:
+  - title: Browse by Genre
+    cards:
+      - type: custom:stremio-browse-card
+        title: Browse Movies by Genre
+        default_type: movie
+        show_view_controls: false
+        show_type_controls: false
+        show_genre_filter: true
+      - type: custom:stremio-browse-card
+        title: Browse TV Shows by Genre
+        default_type: series
+        show_view_controls: false
+        show_type_controls: false
+        show_genre_filter: true
 ```
 
 ### Mobile-Optimized Dashboard

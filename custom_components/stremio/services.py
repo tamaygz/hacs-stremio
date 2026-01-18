@@ -24,6 +24,7 @@ from .const import (
     EVENT_NEW_CONTENT,
     EVENT_PLAYBACK_STARTED,
     SERVICE_ADD_TO_LIBRARY,
+    SERVICE_BROWSE_CATALOG,
     SERVICE_GET_STREAMS,
     SERVICE_HANDOVER_TO_APPLE_TV,
     SERVICE_REFRESH_LIBRARY,
@@ -46,6 +47,9 @@ ATTR_EPISODE = "episode"
 ATTR_DEVICE_ID = "device_id"
 ATTR_STREAM_URL = "stream_url"
 ATTR_METHOD = "method"
+ATTR_GENRE = "genre"
+ATTR_SKIP = "skip"
+ATTR_CATALOG_TYPE = "catalog_type"
 
 # Service schemas
 SEARCH_LIBRARY_SCHEMA = vol.Schema(
@@ -88,6 +92,22 @@ HANDOVER_SCHEMA = vol.Schema(
         vol.Optional(ATTR_MEDIA_ID): cv.string,
         vol.Optional(ATTR_STREAM_URL): cv.string,
         vol.Optional(ATTR_METHOD): vol.In(["auto", "airplay", "vlc", "direct"]),
+    }
+)
+
+BROWSE_CATALOG_SCHEMA = vol.Schema(
+    {
+        vol.Optional(ATTR_MEDIA_TYPE, default="movie"): vol.In(["movie", "series"]),
+        vol.Optional(ATTR_CATALOG_TYPE, default="popular"): vol.In(
+            ["popular", "new", "genre"]
+        ),
+        vol.Optional(ATTR_GENRE): cv.string,
+        vol.Optional(ATTR_SKIP, default=0): vol.All(
+            vol.Coerce(int), vol.Range(min=0)  # type: ignore[arg-type]
+        ),
+        vol.Optional(ATTR_LIMIT, default=50): vol.All(
+            vol.Coerce(int), vol.Range(min=1, max=100)  # type: ignore[arg-type]
+        ),
     }
 )
 
@@ -444,6 +464,53 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             },
         )
 
+    async def handle_browse_catalog(call: ServiceCall) -> ServiceResponse:
+        """Handle browse_catalog service call.
+        
+        Browse the Stremio catalog for popular or new movies/series, optionally filtered by genre.
+        Returns a list of catalog items with metadata.
+        """
+        _, client, _ = _get_entry_data(hass)
+
+        media_type = call.data.get(ATTR_MEDIA_TYPE, "movie")
+        catalog_type = call.data.get(ATTR_CATALOG_TYPE, "popular")
+        genre = call.data.get(ATTR_GENRE)
+        skip = call.data.get(ATTR_SKIP, 0)
+        limit = call.data.get(ATTR_LIMIT, 50)
+
+        _LOGGER.debug(
+            "Browsing catalog: type=%s, catalog=%s, genre=%s, skip=%d, limit=%d",
+            media_type,
+            catalog_type,
+            genre,
+            skip,
+            limit,
+        )
+
+        try:
+            # Fetch catalog based on media type and catalog type
+            # Note: Currently only "popular" is fully implemented
+            # "new" and "genre" catalog types can be added when API supports them
+            if media_type == "movie":
+                catalog_items = await client.async_get_popular_movies(
+                    genre=genre, skip=skip, limit=limit
+                )
+            else:  # series
+                catalog_items = await client.async_get_popular_series(
+                    genre=genre, skip=skip, limit=limit
+                )
+
+            return {
+                "items": catalog_items,
+                "count": len(catalog_items),
+                "media_type": media_type,
+                "catalog_type": catalog_type,
+                "genre": genre,
+            }
+
+        except StremioConnectionError as err:
+            raise HomeAssistantError(f"Failed to browse catalog: {err}") from err
+
     # Register services
     hass.services.async_register(
         DOMAIN,
@@ -488,6 +555,14 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         schema=HANDOVER_SCHEMA,
     )
 
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_BROWSE_CATALOG,
+        handle_browse_catalog,
+        schema=BROWSE_CATALOG_SCHEMA,
+        supports_response=SupportsResponse.OPTIONAL,
+    )
+
 
 async def async_unload_services(hass: HomeAssistant) -> None:
     """Unload Stremio services.
@@ -501,3 +576,4 @@ async def async_unload_services(hass: HomeAssistant) -> None:
     hass.services.async_remove(DOMAIN, SERVICE_REMOVE_FROM_LIBRARY)
     hass.services.async_remove(DOMAIN, SERVICE_REFRESH_LIBRARY)
     hass.services.async_remove(DOMAIN, SERVICE_HANDOVER_TO_APPLE_TV)
+    hass.services.async_remove(DOMAIN, SERVICE_BROWSE_CATALOG)

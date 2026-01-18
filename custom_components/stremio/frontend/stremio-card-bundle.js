@@ -13,6 +13,7 @@ import './stremio-library-card.js';
 import './stremio-media-details-card.js';
 import './stremio-player-card.js';
 import './stremio-stream-dialog.js';
+import './stremio-browse-card.js';
 
 // Card registration info - should match manifest.json version
 const CARD_VERSION = '0.2.7';
@@ -55,5 +56,13 @@ window.customCards.push({
   name: 'Stremio Stream Dialog',
   description: 'Stream selector dialog for choosing playback sources',
   preview: false,
+  documentationURL: 'https://github.com/tamaygz/hacs-stremio/blob/main/docs/ui.md',
+});
+
+window.customCards.push({
+  type: 'stremio-browse-card',
+  name: 'Stremio Browse Card',
+  description: 'Browse popular movies, TV shows, and new content from Stremio catalogs',
+  preview: true,
   documentationURL: 'https://github.com/tamaygz/hacs-stremio/blob/main/docs/ui.md',
 });

@@ -92,6 +92,62 @@ data:
   method: "auto"
 ```
 
+### stremio.browse_catalog
+
+Browse the Stremio catalog for popular or new movies/series with optional genre filtering.
+
+**Parameters:**
+- `media_type` (optional): "movie" or "series" (default: "movie")
+- `catalog_type` (optional): "popular", "new", or "genre" (default: "popular")
+- `genre` (optional): Genre filter (Action, Drama, Comedy, etc.)
+- `skip` (optional): Number of items to skip for pagination (default: 0)
+- `limit` (optional): Maximum items to return, 1-100 (default: 50)
+
+**Returns:**
+- `items`: List of catalog items with metadata
+- `count`: Number of items returned
+- `media_type`: The media type that was browsed
+- `catalog_type`: The catalog type that was browsed
+- `genre`: The genre filter applied (if any)
+
+**Examples:**
+
+Browse popular movies:
+```yaml
+service: stremio.browse_catalog
+data:
+  media_type: "movie"
+  catalog_type: "popular"
+  limit: 20
+```
+
+Browse action movies:
+```yaml
+service: stremio.browse_catalog
+data:
+  media_type: "movie"
+  genre: "Action"
+  limit: 50
+```
+
+Browse popular TV series:
+```yaml
+service: stremio.browse_catalog
+data:
+  media_type: "series"
+  catalog_type: "popular"
+```
+
+Browse drama series with pagination:
+```yaml
+service: stremio.browse_catalog
+data:
+  media_type: "series"
+  genre: "Drama"
+  skip: 20
+  limit: 20
+```
+
 ## Service Automation Examples
 
 See [automations.md](guides/automations.md) for complete automation examples.

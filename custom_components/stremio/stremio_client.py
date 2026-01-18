@@ -1176,6 +1176,178 @@ class StremioClient:
             _LOGGER.debug("Error fetching series metadata for %s: %s", media_id, err)
             return None
 
+    async def async_get_catalog(
+        self,
+        media_type: str = "movie",
+        catalog_id: str = "top",
+        genre: str | None = None,
+        skip: int = 0,
+        limit: int = 50,
+    ) -> list[dict[str, Any]]:
+        """Fetch catalog items from Cinemeta (popular, trending, etc.).
+
+        Uses Cinemeta's catalog endpoint to browse popular movies and series.
+        Endpoint format: /catalog/{type}/{catalog_id}/{extra}.json
+
+        Example URLs:
+        - https://v3-cinemeta.strem.io/catalog/movie/top/popular.json
+        - https://v3-cinemeta.strem.io/catalog/series/top/popular.json?genre=Drama
+        - https://v3-cinemeta.strem.io/catalog/movie/top/popular.json?skip=20
+
+        Args:
+            media_type: Content type ("movie" or "series")
+            catalog_id: Catalog identifier ("top" for popular/trending)
+            genre: Optional genre filter (Action, Drama, etc.)
+            skip: Number of items to skip for pagination
+            limit: Maximum items to return (default 50)
+
+        Returns:
+            List of catalog item dictionaries with keys:
+            - id: IMDb ID
+            - type: "movie" or "series"
+            - name: Title
+            - poster: Poster image URL
+            - posterShape: "poster" or "square"
+            - year: Release year (optional)
+            - description: Plot summary (optional)
+
+        Raises:
+            StremioConnectionError: Connection or request failed
+        """
+        _LOGGER.debug(
+            "Fetching catalog: type=%s, catalog=%s, genre=%s, skip=%d",
+            media_type,
+            catalog_id,
+            genre,
+            skip,
+        )
+
+        # Build catalog URL
+        from .const import CINEMETA_BASE_URL
+
+        catalog_url = (
+            f"{CINEMETA_BASE_URL}/catalog/{media_type}/{catalog_id}/popular.json"
+        )
+
+        # Add query parameters
+        params = {}
+        if genre:
+            params["genre"] = genre
+        if skip > 0:
+            params["skip"] = str(skip)
+
+        try:
+            session = await self._get_session()
+
+            async with session.get(
+                catalog_url,
+                params=params if params else None,
+                timeout=aiohttp.ClientTimeout(total=15),
+            ) as response:
+                if response.status != 200:
+                    _LOGGER.warning(
+                        "Cinemeta catalog returned status %d for %s/%s",
+                        response.status,
+                        media_type,
+                        catalog_id,
+                    )
+                    return []
+
+                data = await response.json()
+                metas = data.get("metas", [])
+
+                if not metas:
+                    _LOGGER.debug(
+                        "No catalog items found for %s/%s", media_type, catalog_id
+                    )
+                    return []
+
+                # Limit results
+                metas = metas[:limit]
+
+                # Process catalog items into consistent format
+                processed_items = []
+                for meta in metas:
+                    try:
+                        item = {
+                            "id": meta.get("id"),
+                            "imdb_id": meta.get("id"),
+                            "type": meta.get("type", media_type),
+                            "title": meta.get("name"),
+                            "poster": meta.get("poster"),
+                            "posterShape": meta.get("posterShape", "poster"),
+                            "year": meta.get("releaseInfo"),
+                            "description": meta.get("description"),
+                            "genres": meta.get("genres", []),
+                            "cast": meta.get("cast", []),
+                            "director": meta.get("director"),
+                            "rating": meta.get("imdbRating"),
+                        }
+                        processed_items.append(item)
+                    except (AttributeError, TypeError, KeyError) as err:
+                        _LOGGER.debug(
+                            "Error processing catalog item %s: %s",
+                            meta.get("id", "unknown"),
+                            err,
+                        )
+                        continue
+
+                _LOGGER.info(
+                    "Fetched %d catalog items for %s/%s",
+                    len(processed_items),
+                    media_type,
+                    catalog_id,
+                )
+                return processed_items
+
+        except Exception as err:
+            _LOGGER.error(
+                "Error fetching catalog %s/%s: %s", media_type, catalog_id, err
+            )
+            raise StremioConnectionError(f"Failed to fetch catalog: {err}") from err
+
+    async def async_get_popular_movies(
+        self, genre: str | None = None, skip: int = 0, limit: int = 50
+    ) -> list[dict[str, Any]]:
+        """Get popular movies from Cinemeta.
+
+        Args:
+            genre: Optional genre filter
+            skip: Number of items to skip
+            limit: Maximum items to return
+
+        Returns:
+            List of popular movie dictionaries
+        """
+        return await self.async_get_catalog(
+            media_type="movie",
+            catalog_id="top",
+            genre=genre,
+            skip=skip,
+            limit=limit,
+        )
+
+    async def async_get_popular_series(
+        self, genre: str | None = None, skip: int = 0, limit: int = 50
+    ) -> list[dict[str, Any]]:
+        """Get popular TV series from Cinemeta.
+
+        Args:
+            genre: Optional genre filter
+            skip: Number of items to skip
+            limit: Maximum items to return
+
+        Returns:
+            List of popular series dictionaries
+        """
+        return await self.async_get_catalog(
+            media_type="series",
+            catalog_id="top",
+            genre=genre,
+            skip=skip,
+            limit=limit,
+        )
+
 
 class StremioAuthError(HomeAssistantError):
     """Error to indicate authentication failure."""

@@ -52,6 +52,50 @@ Get available streams for content.
 
 **Returns:** List of stream dictionaries
 
+##### `async def async_get_catalog(media_type: str = "movie", catalog_id: str = "top", genre: str | None = None, skip: int = 0, limit: int = 50) -> list`
+
+Fetch catalog items from Cinemeta (popular, trending, etc.).
+
+**Parameters:**
+- `media_type`: Content type ("movie" or "series")
+- `catalog_id`: Catalog identifier ("top" for popular/trending)
+- `genre`: Optional genre filter (Action, Drama, Comedy, etc.)
+- `skip`: Number of items to skip for pagination
+- `limit`: Maximum items to return (default 50)
+
+**Returns:** List of catalog item dictionaries with metadata
+
+##### `async def async_get_popular_movies(genre: str | None = None, skip: int = 0, limit: int = 50) -> list`
+
+Get popular movies from Cinemeta.
+
+**Parameters:**
+- `genre`: Optional genre filter
+- `skip`: Number of items to skip
+- `limit`: Maximum items to return
+
+**Returns:** List of popular movie dictionaries
+
+##### `async def async_get_popular_series(genre: str | None = None, skip: int = 0, limit: int = 50) -> list`
+
+Get popular TV series from Cinemeta.
+
+**Parameters:**
+- `genre`: Optional genre filter
+- `skip`: Number of items to skip
+- `limit`: Maximum items to return
+
+**Returns:** List of popular series dictionaries
+
+## Supported Genres
+
+The following 19 genres are supported for catalog filtering:
+- Action, Adventure, Animation, Biography
+- Comedy, Crime, Documentary, Drama
+- Family, Fantasy, History, Horror
+- Mystery, Romance, Sci-Fi, Sport
+- Thriller, War, Western
+
 ## Coordinator
 
 ### StremioDataUpdateCoordinator
