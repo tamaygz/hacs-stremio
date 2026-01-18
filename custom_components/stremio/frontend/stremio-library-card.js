@@ -112,6 +112,17 @@ class StremioLibraryCard extends LitElement {
         transform: scale(1.05);
       }
 
+      .library-item:focus {
+        outline: 2px solid var(--primary-color);
+        outline-offset: 2px;
+        transform: scale(1.05);
+      }
+
+      .library-item:focus-visible {
+        outline: 2px solid var(--primary-color);
+        outline-offset: 2px;
+      }
+
       .item-poster {
         width: 100%;
         aspect-ratio: 2/3;
@@ -474,58 +485,79 @@ class StremioLibraryCard extends LitElement {
   }
 
   render() {
-    const filteredItems = this._getFilteredItems();
+    try {
+      const filteredItems = this._getFilteredItems();
 
-    return html`
-      <ha-card>
-        <div class="header">
-          <h2 class="header-title">
-            ${this.config.title}
-            <span class="count-badge">(${filteredItems.length})</span>
-          </h2>
+      return html`
+        <ha-card>
+          <div class="header">
+            <h2 class="header-title">
+              ${this.config.title}
+              <span class="count-badge" aria-label="${filteredItems.length} items">(${filteredItems.length})</span>
+            </h2>
 
-          ${this.config.show_search ? html`
-            <div class="search-row">
-              <input
-                type="text"
-                class="search-input"
-                placeholder="Search library..."
-                .value=${this._searchQuery}
-                @input=${this._handleSearch}
-              />
-            </div>
-          ` : ''}
+            ${this.config.show_search ? html`
+              <div class="search-row">
+                <input
+                  type="search"
+                  class="search-input"
+                  placeholder="Search library..."
+                  .value=${this._searchQuery}
+                  @input=${this._handleSearch}
+                  aria-label="Search library"
+                />
+              </div>
+            ` : ''}
 
-          ${this.config.show_filters ? html`
-            <div class="filter-row">
-              <select class="filter-select" @change=${this._handleFilterChange}>
-                <option value="all">All Types</option>
-                <option value="movie">Movies</option>
-                <option value="series">Series</option>
-              </select>
-              <select class="filter-select" @change=${this._handleSortChange}>
-                <option value="recent">Most Recent</option>
-                <option value="title">Title A-Z</option>
-                <option value="progress">Progress</option>
-              </select>
-            </div>
-          ` : ''}
-        </div>
-
-        ${filteredItems.length > 0 ? html`
-          <div class="library-grid">
-            ${filteredItems.map(item => this._renderItem(item))}
+            ${this.config.show_filters ? html`
+              <div class="filter-row" role="group" aria-label="Filter options">
+                <select 
+                  class="filter-select" 
+                  @change=${this._handleFilterChange}
+                  aria-label="Filter by type"
+                >
+                  <option value="all">All Types</option>
+                  <option value="movie">Movies</option>
+                  <option value="series">Series</option>
+                </select>
+                <select 
+                  class="filter-select" 
+                  @change=${this._handleSortChange}
+                  aria-label="Sort by"
+                >
+                  <option value="recent">Most Recent</option>
+                  <option value="title">Title A-Z</option>
+                  <option value="progress">Progress</option>
+                </select>
+              </div>
+            ` : ''}
           </div>
-        ` : html`
-          <div class="empty-state">
-            <ha-icon icon="mdi:movie-open-outline"></ha-icon>
-            <div>No items found</div>
-          </div>
-        `}
 
-        ${this._selectedItem ? this._renderDetailOverlay() : ''}
-      </ha-card>
-    `;
+          ${filteredItems.length > 0 ? html`
+            <div class="library-grid" role="list" aria-label="Library items">
+              ${filteredItems.map(item => this._renderItem(item))}
+            </div>
+          ` : html`
+            <div class="empty-state" role="status">
+              <ha-icon icon="mdi:movie-open-outline"></ha-icon>
+              <div>No items found</div>
+            </div>
+          `}
+
+          ${this._selectedItem ? this._renderDetailOverlay() : ''}
+        </ha-card>
+      `;
+    } catch (error) {
+      console.error('Stremio Library Card render error:', error);
+      return html`
+        <ha-card>
+          <div class="card-content" style="padding: 16px; color: var(--error-color);">
+            <ha-icon icon="mdi:alert"></ha-icon>
+            Error rendering card: ${error.message}
+          </div>
+        </ha-card>
+      `;
+    }
   }
 
   _renderItem(item) {
@@ -533,9 +565,16 @@ class StremioLibraryCard extends LitElement {
     const progress = item.progress_percent || 0;
 
     return html`
-      <div class="library-item" @click=${() => this._handleItemClick(item)}>
+      <div 
+        class="library-item" 
+        role="listitem"
+        tabindex="0"
+        @click=${() => this._handleItemClick(item)}
+        @keydown=${(e) => e.key === 'Enter' && this._handleItemClick(item)}
+        aria-label="${title}${progress > 0 ? `, ${progress.toFixed(0)}% watched` : ''}"
+      >
         ${item.poster ? html`
-          <img class="item-poster" src="${item.poster}" alt="${title}" loading="lazy" />
+          <img class="item-poster" src="${item.poster}" alt="" loading="lazy" />
         ` : html`
           <div class="item-poster-placeholder">
             <ha-icon icon="mdi:movie-outline"></ha-icon>
@@ -543,7 +582,7 @@ class StremioLibraryCard extends LitElement {
         `}
         <div class="item-title" title="${title}">${title}</div>
         ${progress > 0 ? html`
-          <div class="item-progress">
+          <div class="item-progress" role="progressbar" aria-valuenow="${progress}" aria-valuemin="0" aria-valuemax="100">
             <div class="item-progress-fill" style="width: ${progress}%"></div>
           </div>
         ` : ''}

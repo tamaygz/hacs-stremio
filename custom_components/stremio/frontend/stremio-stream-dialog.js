@@ -363,13 +363,24 @@ class StremioStreamDialog extends LitElement {
 
   render() {
     return html`
-      <div class="overlay ${this.open ? 'open' : ''}" @click=${this._handleOverlayClick}>
+      <div 
+        class="overlay ${this.open ? 'open' : ''}" 
+        @click=${this._handleOverlayClick}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="stream-dialog-title"
+        aria-hidden="${!this.open}"
+      >
         <div class="dialog">
           <div class="dialog-header">
-            <h3>
+            <h3 id="stream-dialog-title">
               ${this.mediaItem?.title || 'Available Streams'}
             </h3>
-            <button class="close-btn" @click=${this._close}>
+            <button 
+              class="close-btn" 
+              @click=${this._close}
+              aria-label="Close dialog"
+            >
               <ha-icon icon="mdi:close"></ha-icon>
             </button>
           </div>
