@@ -815,12 +815,14 @@ class StremioMediaDetailsCardEditor extends LitElement {
     return {
       hass: { type: Object },
       config: { type: Object },
+      _stremioEntities: { type: Array },
       _expandedSections: { type: Object },
     };
   }
 
   constructor() {
     super();
+    this._stremioEntities = [];
     this._expandedSections = {
       entity: true,
       display: false,
@@ -903,11 +905,87 @@ class StremioMediaDetailsCardEditor extends LitElement {
       ha-textfield {
         width: 100%;
       }
+
+      .entity-buttons {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-bottom: 12px;
+      }
+
+      .entity-btn {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 12px 16px;
+        background: var(--secondary-background-color);
+        border: 1px solid var(--divider-color);
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 14px;
+        color: var(--primary-text-color);
+        transition: all 0.2s ease;
+      }
+
+      .entity-btn:hover {
+        background: var(--primary-background-color);
+        border-color: var(--primary-color);
+      }
+
+      .entity-btn.selected {
+        background: var(--primary-color);
+        border-color: var(--primary-color);
+        color: var(--text-primary-color);
+      }
+
+      .entity-btn span {
+        flex: 1;
+        text-align: left;
+      }
+
+      .no-entities {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 12px;
+        background: var(--warning-color, #ffc107);
+        border-radius: 8px;
+        color: var(--primary-text-color);
+        margin-bottom: 12px;
+      }
     `;
   }
 
   setConfig(config) {
     this.config = config;
+  }
+
+  updated(changedProps) {
+    if (changedProps.has('hass') && this.hass) {
+      this._updateEntities();
+    }
+  }
+
+  _updateEntities() {
+    // Find Stremio media player entities
+    this._stremioEntities = Object.keys(this.hass.states)
+      .filter(entityId => 
+        entityId.startsWith('media_player.') && 
+        entityId.toLowerCase().includes('stremio')
+      )
+      .map(entityId => ({
+        entity_id: entityId,
+        friendly_name: this.hass.states[entityId].attributes.friendly_name || entityId,
+      }));
+  }
+
+  _selectEntity(entityId) {
+    this.config = { ...this.config, entity: entityId };
+    this.dispatchEvent(new CustomEvent('config-changed', {
+      bubbles: true,
+      composed: true,
+      detail: { config: this.config },
+    }));
   }
 
   _toggleSection(section) {
@@ -933,17 +1011,36 @@ class StremioMediaDetailsCardEditor extends LitElement {
           </div>
           ${this._expandedSections.entity ? html`
             <div class="section-content">
-              <p class="helper-text">Select the Stremio media player to show details for.</p>
+              ${this._stremioEntities?.length > 0 ? html`
+                <div class="entity-buttons">
+                  ${this._stremioEntities.map(entity => html`
+                    <button 
+                      class="entity-btn ${this.config.entity === entity.entity_id ? 'selected' : ''}"
+                      @click=${() => this._selectEntity(entity.entity_id)}
+                    >
+                      <ha-icon icon="mdi:movie-outline"></ha-icon>
+                      <span>${entity.friendly_name}</span>
+                    </button>
+                  `)}
+                </div>
+              ` : html`
+                <div class="no-entities">
+                  <ha-icon icon="mdi:alert-circle-outline"></ha-icon>
+                  <span>No Stremio media players found.</span>
+                </div>
+              `}
+              
               <ha-entity-picker
                 .hass=${this.hass}
-                .value=${this.config.entity}
+                .value=${this.config.entity || ''}
                 .configValue=${'entity'}
-                label="Media Player Entity"
+                label="Or select manually"
                 .includeDomains=${['media_player']}
                 @value-changed=${this._valueChanged}
+                allow-custom-entity
               ></ha-entity-picker>
             </div>
-          ` : ''}
+          ` : ''}}
         </div>
 
         <!-- Display Section -->

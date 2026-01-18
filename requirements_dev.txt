@@ -1,7 +1,7 @@
 # Development Dependencies for Stremio HACS Integration
 
 # Home Assistant Core (for testing)
-homeassistant>=2024.1.0
+homeassistant>=2026.1.0
 
 # Runtime Dependencies (from manifest.json)
 # Note: Stremio API integration is implemented natively using aiohttp
