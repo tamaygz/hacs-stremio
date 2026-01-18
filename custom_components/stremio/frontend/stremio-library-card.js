@@ -1301,6 +1301,8 @@ class StremioLibraryCardEditor extends LitElement {
 
   constructor() {
     super();
+    this._stremioEntities = [];
+    this._appleTvEntities = [];
     this._expandedSections = {
       entity: true,
       display: false,
@@ -1312,6 +1314,10 @@ class StremioLibraryCardEditor extends LitElement {
 
   setConfig(config) {
     this._config = config;
+    // Refresh entity caches if hass is already available so the editor renders immediately
+    if (this.hass) {
+      this._updateEntities();
+    }
   }
 
   updated(changedProps) {
@@ -1336,15 +1342,23 @@ class StremioLibraryCardEditor extends LitElement {
     this._appleTvEntities = Object.keys(this.hass.states)
       .filter(entityId => {
         const state = this.hass.states[entityId];
-        return entityId.startsWith('media_player.') && 
-          (state.attributes.app_name?.toLowerCase().includes('apple tv') ||
-           entityId.toLowerCase().includes('apple_tv') ||
-           entityId.toLowerCase().includes('appletv'));
+        if (!entityId.startsWith('media_player.')) return false;
+
+        const id = entityId.toLowerCase();
+        const name = (state.attributes.friendly_name || '').toLowerCase();
+        const app = (state.attributes.app_name || '').toLowerCase();
+        const manufacturer = (state.attributes.manufacturer || '').toLowerCase();
+        const model = (state.attributes.model || '').toLowerCase();
+
+        return id.includes('apple_tv') || id.includes('appletv') ||
+          name.includes('apple tv') || app.includes('apple tv') ||
+          manufacturer.includes('apple') || model.includes('apple tv');
       })
       .map(entityId => ({
         entity_id: entityId,
         friendly_name: this.hass.states[entityId].attributes.friendly_name || entityId,
-      }));
+      }))
+      .sort((a, b) => a.friendly_name.localeCompare(b.friendly_name));
   }
 
   _toggleSection(section) {
@@ -1576,6 +1590,10 @@ class StremioLibraryCardEditor extends LitElement {
           ${this._expandedSections.device ? html`
             <div class="section-content">
               <p class="helper-text">Select an Apple TV to enable handover functionality.</p>
+
+              ${(!this._appleTvEntities || this._appleTvEntities.length === 0) ? html`
+                <p class="helper-text warning">No Apple TV media players detected. You can still pick any media_player below.</p>
+              ` : ''}
               
               ${this._appleTvEntities?.length > 0 ? html`
                 <div class="entity-buttons">
@@ -1643,6 +1661,9 @@ class StremioLibraryCardEditor extends LitElement {
         if (target.type === 'number') {
           value = Number(value);
         }
+      } else if (ev.detail && ev.detail.value !== undefined) {
+        // Fallback for components that emit value in the detail (e.g., ha-entity-picker)
+        value = ev.detail.value;
       }
       this._updateConfig(target.configValue, value);
     }
@@ -1771,6 +1792,10 @@ class StremioLibraryCardEditor extends LitElement {
         color: var(--secondary-text-color);
         font-size: 0.9em;
         margin: 0;
+      }
+
+      .helper-text.warning {
+        color: var(--warning-color, #ff9800);
       }
 
       ha-entity-picker,
