@@ -200,6 +200,108 @@ class StremioPlayerCard extends LitElement {
       .status-badge.idle {
         background: var(--secondary-text-color);
       }
+
+      /* Backdrop effect styles */
+      .backdrop-container {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        overflow: hidden;
+        z-index: 0;
+      }
+
+      .backdrop-image {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        filter: blur(20px) brightness(0.4);
+        transform: scale(1.1);
+      }
+
+      .backdrop-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(
+          to bottom,
+          rgba(var(--rgb-card-background-color, 255, 255, 255), 0.3) 0%,
+          rgba(var(--rgb-card-background-color, 255, 255, 255), 0.8) 100%
+        );
+      }
+
+      ha-card.has-backdrop .card-content {
+        position: relative;
+        z-index: 1;
+      }
+
+      ha-card.has-backdrop .status-badge {
+        z-index: 2;
+      }
+
+      /* Compact mode styles */
+      ha-card.compact .card-content {
+        padding: 12px;
+      }
+
+      ha-card.compact .poster {
+        width: 80px;
+        height: 120px;
+      }
+
+      ha-card.compact .poster-placeholder {
+        width: 80px;
+        height: 120px;
+      }
+
+      ha-card.compact .poster-placeholder ha-icon {
+        --mdc-icon-size: 32px;
+      }
+
+      ha-card.compact .player-container {
+        gap: 12px;
+      }
+
+      ha-card.compact .title {
+        font-size: 1em;
+      }
+
+      ha-card.compact .subtitle {
+        font-size: 0.8em;
+        margin-bottom: 4px;
+      }
+
+      ha-card.compact .progress-text {
+        font-size: 0.7em;
+      }
+
+      ha-card.compact .actions {
+        margin-top: 8px;
+        gap: 4px;
+      }
+
+      ha-card.compact .action-button {
+        padding: 6px 12px;
+        font-size: 0.8em;
+      }
+
+      ha-card.compact .state-idle {
+        padding: 16px 12px;
+      }
+
+      ha-card.compact .state-idle ha-icon {
+        --mdc-icon-size: 32px;
+      }
+
+      ha-card.compact .status-badge {
+        top: 8px;
+        right: 8px;
+        padding: 2px 6px;
+        font-size: 0.7em;
+      }
     `;
   }
 
@@ -383,9 +485,24 @@ class StremioPlayerCard extends LitElement {
 
       const isPlaying = this._mediaInfo?.state === 'playing';
       const hasMedia = this._mediaInfo && this._mediaInfo.state !== 'idle' && this._mediaInfo.state !== 'unavailable';
+      
+      // Build card classes based on config
+      const cardClasses = [];
+      if (this.config.show_backdrop && hasMedia && this._mediaInfo?.poster) {
+        cardClasses.push('has-backdrop');
+      }
+      if (this.config.compact_mode) {
+        cardClasses.push('compact');
+      }
 
       return html`
-        <ha-card>
+        <ha-card class="${cardClasses.join(' ')}">
+          ${this.config.show_backdrop && hasMedia && this._mediaInfo?.poster ? html`
+            <div class="backdrop-container">
+              <img class="backdrop-image" src="${this._mediaInfo.poster}" alt="" />
+              <div class="backdrop-overlay"></div>
+            </div>
+          ` : ''}
           ${hasMedia ? html`
             <span class="status-badge" role="status" aria-live="polite">${isPlaying ? 'Playing' : 'Paused'}</span>
           ` : html`
@@ -473,6 +590,16 @@ class StremioPlayerCard extends LitElement {
                 <ha-icon icon="mdi:open-in-new"></ha-icon>
                 Open in Stremio
               </button>
+              ${this.config.show_browse_button ? html`
+                <button 
+                  class="action-button secondary" 
+                  @click="${() => this._openBrowse()}"
+                  aria-label="Browse Stremio catalog"
+                >
+                  <ha-icon icon="mdi:compass"></ha-icon>
+                  Browse
+                </button>
+              ` : ''}
             </div>
           ` : ''}
         </div>
