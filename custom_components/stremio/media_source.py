@@ -142,6 +142,27 @@ class StremioMediaSource(MediaSource):
         if identifier == ROOT_IDENTIFIER or not identifier:
             return self._build_root_browse()
 
+        # Handle copyurl: identifiers - fire event with URL for clipboard
+        if identifier.startswith("copyurl:"):
+            stream_url = identifier[8:]  # Remove "copyurl:" prefix
+            _LOGGER.info("Stream URL requested for copy: %s", stream_url)
+            # Fire an event with the URL so automations/frontend can handle it
+            self.hass.bus.async_fire(
+                "stremio_stream_url",
+                {"url": stream_url, "action": "copy"},
+            )
+            # Return a simple browse result showing the URL was copied
+            return BrowseMediaSource(
+                domain=DOMAIN,
+                identifier=identifier,
+                media_class=MediaClass.URL,
+                media_content_type="",
+                title=f"URL: {stream_url}",
+                can_play=False,
+                can_expand=False,
+                children=[],
+            )
+
         # Handle different browse sections
         if identifier == LIBRARY_IDENTIFIER:
             return await self._build_library_browse()
@@ -416,7 +437,7 @@ class StremioMediaSource(MediaSource):
         if not coordinator:
             raise BrowseError("Stremio coordinator not available")
 
-        # Find series in library
+        # Find series in library for basic info
         library_items = coordinator.data.get("library", [])
         series_item = next(
             (
@@ -432,19 +453,29 @@ class StremioMediaSource(MediaSource):
 
         title = series_item.get("title") or series_item.get("name") or "Unknown Series"
         poster = series_item.get("poster")
-        seasons = series_item.get("seasons", [])
+
+        # Fetch detailed metadata from Cinemeta to get accurate season/episode info
+        client = coordinator.client
+        metadata = await client.async_get_series_metadata(media_id)
+
+        seasons = []
+        if metadata:
+            seasons = metadata.get("seasons", [])
+            # Update poster if available from metadata
+            if not poster and metadata.get("poster"):
+                poster = metadata.get("poster")
 
         # If no season specified, show season list
         if season is None:
             children = []
-            # If we have season data, use the actual season numbers
             if seasons:
                 for season_data in seasons:
-                    season_num = season_data.get(
-                        "number", seasons.index(season_data) + 1
-                    )
+                    season_num = season_data.get("number", 1)
+                    episode_count = len(season_data.get("episodes", []))
                     season_id = f"{SERIES_IDENTIFIER}/{media_id}/{season_num}"
                     season_title = season_data.get("title", f"Season {season_num}")
+                    if episode_count > 0:
+                        season_title = f"{season_title} ({episode_count} episodes)"
                     children.append(
                         BrowseMediaSource(
                             domain=DOMAIN,
@@ -458,21 +489,20 @@ class StremioMediaSource(MediaSource):
                         )
                     )
             else:
-                # No season data, create placeholders
-                for season_num in range(1, 10):
-                    season_id = f"{SERIES_IDENTIFIER}/{media_id}/{season_num}"
-                    children.append(
-                        BrowseMediaSource(
-                            domain=DOMAIN,
-                            identifier=season_id,
-                            media_class=MediaClass.SEASON,
-                            media_content_type=MediaType.SEASON,
-                            title=f"Season {season_num}",
-                            can_play=False,
-                            can_expand=True,
-                            thumbnail=poster,
-                        )
+                # No season data available, show message
+                _LOGGER.warning("No season data available for series %s", media_id)
+                children.append(
+                    BrowseMediaSource(
+                        domain=DOMAIN,
+                        identifier=f"{SERIES_IDENTIFIER}/{media_id}/1",
+                        media_class=MediaClass.SEASON,
+                        media_content_type=MediaType.SEASON,
+                        title="Season 1 (metadata unavailable)",
+                        can_play=False,
+                        can_expand=True,
+                        thumbnail=poster,
                     )
+                )
 
             return BrowseMediaSource(
                 domain=DOMAIN,
@@ -486,20 +516,18 @@ class StremioMediaSource(MediaSource):
                 children=children,
             )
 
-        # Find the season data by number, not by index
+        # Find the season data by number
         season_data = next(
             (s for s in seasons if s.get("number") == season),
-            # Fallback to index-based lookup if no number field
-            seasons[season - 1] if seasons and season <= len(seasons) else {},
+            {},
         )
 
         # If episode specified, show episode detail with streams
         if episode is not None:
             episode_list = season_data.get("episodes", [])
-            ep_data = (
-                episode_list[episode - 1]
-                if episode_list and episode <= len(episode_list)
-                else {}
+            ep_data = next(
+                (e for e in episode_list if e.get("number") == episode),
+                {},
             )
             ep_title = ep_data.get("title") or f"Episode {episode}"
             ep_thumbnail = ep_data.get("thumbnail") or poster
@@ -537,7 +565,8 @@ class StremioMediaSource(MediaSource):
         episodes = []
         episode_list = season_data.get("episodes", [])
 
-        for ep_num, ep_data in enumerate(episode_list, 1):
+        for ep_data in episode_list:
+            ep_num = ep_data.get("number", 0)
             ep_title = ep_data.get("title") or f"Episode {ep_num}"
             ep_identifier = f"{SERIES_IDENTIFIER}/{media_id}/{season}/{ep_num}"
             ep_thumbnail = ep_data.get("thumbnail") or poster
@@ -548,29 +577,30 @@ class StremioMediaSource(MediaSource):
                     identifier=ep_identifier,
                     media_class=MediaClass.EPISODE,
                     media_content_type=MediaType.EPISODE,
-                    title=ep_title,
+                    title=f"E{ep_num}: {ep_title}",
                     can_play=False,
                     can_expand=True,
                     thumbnail=ep_thumbnail,
                 )
             )
 
-        # If no episodes in data, create placeholders
+        # If no episodes in data, show a message
         if not episodes:
-            for ep_num in range(1, 13):  # Default 12 episodes
-                ep_identifier = f"{SERIES_IDENTIFIER}/{media_id}/{season}/{ep_num}"
-                episodes.append(
-                    BrowseMediaSource(
-                        domain=DOMAIN,
-                        identifier=ep_identifier,
-                        media_class=MediaClass.EPISODE,
-                        media_content_type=MediaType.EPISODE,
-                        title=f"Episode {ep_num}",
-                        can_play=False,
-                        can_expand=True,
-                        thumbnail=poster,
-                    )
+            _LOGGER.warning(
+                "No episode data available for series %s season %s", media_id, season
+            )
+            episodes.append(
+                BrowseMediaSource(
+                    domain=DOMAIN,
+                    identifier=f"{SERIES_IDENTIFIER}/{media_id}/{season}/1",
+                    media_class=MediaClass.EPISODE,
+                    media_content_type=MediaType.EPISODE,
+                    title="Episode 1 (metadata unavailable)",
+                    can_play=False,
+                    can_expand=True,
+                    thumbnail=poster,
                 )
+            )
 
         return BrowseMediaSource(
             domain=DOMAIN,
@@ -738,6 +768,10 @@ class StremioMediaSource(MediaSource):
             stream_title = stream.get("title") or ""
             quality = stream.get("quality") or ""
             size = stream.get("size") or ""
+            addon_name = stream.get("addon") or ""
+
+            # Get the stream URL for display
+            stream_url = stream.get("url") or stream.get("externalUrl") or ""
 
             # Build descriptive label
             label_parts = [stream_name]
@@ -747,6 +781,8 @@ class StremioMediaSource(MediaSource):
                 label_parts.append(quality)
             if size:
                 label_parts.append(size)
+            if addon_name:
+                label_parts.append(f"[{addon_name}]")
             label = " - ".join(label_parts)
 
             # Create stream identifier for playback
@@ -756,18 +792,39 @@ class StremioMediaSource(MediaSource):
             else:
                 stream_identifier = f"{media_type}/{media_id}#{idx}"
 
+            # Add the main playable stream entry
             children.append(
                 BrowseMediaSource(
                     domain=DOMAIN,
                     identifier=stream_identifier,
                     media_class=MediaClass.VIDEO,
                     media_content_type=MediaType.VIDEO,
-                    title=label,
+                    title=f"▶️ {label}",
                     can_play=True,
                     can_expand=False,
                     thumbnail=poster,
                 )
             )
+
+            # Add a URL copy entry if URL is available
+            if stream_url:
+                # Truncate URL for display if too long
+                display_url = stream_url
+                if len(display_url) > 80:
+                    display_url = display_url[:77] + "..."
+
+                children.append(
+                    BrowseMediaSource(
+                        domain=DOMAIN,
+                        identifier=f"copyurl:{stream_url}",
+                        media_class=MediaClass.URL,
+                        media_content_type="",
+                        title=f"   📋 Copy URL: {display_url}",
+                        can_play=False,
+                        can_expand=False,
+                        thumbnail=None,
+                    )
+                )
 
         # If no streams found, show a message
         if not children:

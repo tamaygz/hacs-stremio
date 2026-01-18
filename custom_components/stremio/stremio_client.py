@@ -1073,6 +1073,108 @@ class StremioClient:
                 f"Failed to get addon collection: {err}"
             ) from err
 
+    async def async_get_series_metadata(self, media_id: str) -> dict[str, Any] | None:
+        """Fetch series metadata including seasons and episodes from Cinemeta.
+
+        Args:
+            media_id: IMDb ID of the series (e.g., "tt1234567")
+
+        Returns:
+            Dictionary with series metadata including videos (episodes), or None if not found
+        """
+        _LOGGER.debug("Fetching series metadata for %s", media_id)
+
+        # Cinemeta is the standard metadata addon for Stremio
+        cinemeta_url = f"https://v3-cinemeta.strem.io/meta/series/{media_id}.json"
+
+        try:
+            session = await self._get_session()
+
+            async with session.get(
+                cinemeta_url,
+                timeout=aiohttp.ClientTimeout(total=15),
+            ) as response:
+                if response.status != 200:
+                    _LOGGER.debug(
+                        "Cinemeta returned status %d for series %s",
+                        response.status,
+                        media_id,
+                    )
+                    return None
+
+                data = await response.json()
+                meta = data.get("meta", {})
+
+                if not meta:
+                    _LOGGER.debug("No metadata found for series %s", media_id)
+                    return None
+
+                # Process videos (episodes) into seasons structure
+                videos = meta.get("videos", [])
+                seasons_dict: dict[int, dict[str, Any]] = {}
+
+                for video in videos:
+                    season_num = video.get("season")
+                    episode_num = video.get("episode") or video.get("number")
+
+                    if season_num is None:
+                        continue
+
+                    if season_num not in seasons_dict:
+                        seasons_dict[season_num] = {
+                            "number": season_num,
+                            "title": f"Season {season_num}",
+                            "episodes": [],
+                        }
+
+                    seasons_dict[season_num]["episodes"].append(
+                        {
+                            "number": episode_num,
+                            "title": video.get("title")
+                            or video.get("name")
+                            or f"Episode {episode_num}",
+                            "overview": video.get("overview"),
+                            "thumbnail": video.get("thumbnail"),
+                            "released": video.get("released"),
+                            "id": video.get("id"),
+                        }
+                    )
+
+                # Sort seasons and episodes
+                seasons = []
+                for season_num in sorted(seasons_dict.keys()):
+                    season_data = seasons_dict[season_num]
+                    # Sort episodes by number
+                    season_data["episodes"] = sorted(
+                        season_data["episodes"],
+                        key=lambda e: e.get("number", 0) or 0,
+                    )
+                    seasons.append(season_data)
+
+                result = {
+                    "id": meta.get("id"),
+                    "imdb_id": meta.get("imdb_id") or media_id,
+                    "title": meta.get("name"),
+                    "poster": meta.get("poster"),
+                    "background": meta.get("background"),
+                    "description": meta.get("description"),
+                    "year": meta.get("year"),
+                    "genres": meta.get("genres", []),
+                    "seasons": seasons,
+                    "season_count": len(seasons),
+                }
+
+                _LOGGER.debug(
+                    "Fetched metadata for %s: %d seasons",
+                    media_id,
+                    len(seasons),
+                )
+                return result
+
+        except Exception as err:
+            _LOGGER.debug("Error fetching series metadata for %s: %s", media_id, err)
+            return None
+
 
 class StremioAuthError(HomeAssistantError):
     """Error to indicate authentication failure."""
