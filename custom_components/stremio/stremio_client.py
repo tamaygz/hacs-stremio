@@ -421,14 +421,13 @@ class StremioClient:
         season: int | None = None,
         episode: int | None = None,
     ) -> list[dict[str, Any]]:
-        """Get available streams for content.
+        """Get available streams for content from user's installed addons.
 
-        Note: Stream fetching requires querying user's installed addons.
-        Each addon provides streams via the Stremio addon protocol:
-        - Addon manifest at /manifest.json
-        - Streams at /stream/{type}/{videoID}.json
-
-        This is a complex operation that requires addon integration.
+        Stream fetching queries user's installed addons via the Stremio addon protocol:
+        - Get addon collection via addonCollectionGet
+        - Filter addons providing "stream" resource for the content type
+        - Query each addon at /stream/{type}/{videoID}.json
+        - Aggregate and return all streams
 
         Args:
             media_id: Content identifier (e.g., IMDb ID like "tt1234567")
@@ -437,7 +436,12 @@ class StremioClient:
             episode: Episode number for series
 
         Returns:
-            List of stream dictionaries
+            List of stream dictionaries with keys like:
+            - name: Stream source name
+            - title: Stream description
+            - url: Direct URL (if available)
+            - infoHash: Torrent info hash (if torrent)
+            - quality: Stream quality
 
         Raises:
             StremioAuthError: Authentication failed
@@ -455,29 +459,193 @@ class StremioClient:
                 video_id = media_id
 
             _LOGGER.info(
-                "Stream fetching requested for %s (type: %s, video_id: %s)",
+                "Fetching streams for %s (type: %s, video_id: %s)",
                 media_id,
                 media_type,
                 video_id,
             )
 
-            # TODO: Implement addon-based stream fetching
-            # This would require:
-            # 1. Get user's addon collection via addonCollectionGet
-            # 2. For each addon that provides "stream" resource:
-            #    - Query /stream/{type}/{video_id}.json
-            # 3. Aggregate and return all streams
-            #
-            # For now, return empty list with info logging
-            _LOGGER.warning(
-                "Stream fetching via addons not yet implemented. "
-                "Use the handover service with a direct stream URL instead."
-            )
-            return []
+            # Get user's addon collection
+            addons = await self.async_get_addon_collection()
 
+            # Filter addons that provide stream resource for this content type
+            stream_addons = self._filter_stream_addons(addons, media_type, media_id)
+            _LOGGER.debug(
+                "Found %d addons providing streams for %s",
+                len(stream_addons),
+                media_type,
+            )
+
+            if not stream_addons:
+                _LOGGER.info("No stream addons found for %s %s", media_type, media_id)
+                return []
+
+            # Query each addon for streams (in parallel)
+            all_streams = await self._fetch_streams_from_addons(
+                stream_addons, media_type, video_id
+            )
+
+            _LOGGER.info(
+                "Found %d total streams for %s from %d addons",
+                len(all_streams),
+                video_id,
+                len(stream_addons),
+            )
+
+            return all_streams
+
+        except (StremioAuthError, StremioConnectionError):
+            raise
         except Exception as err:
             _LOGGER.exception("Failed to get streams for %s", media_id)
             raise StremioConnectionError(f"Failed to get streams: {err}") from err
+
+    def _filter_stream_addons(
+        self,
+        addons: list[dict[str, Any]],
+        media_type: str,
+        media_id: str,
+    ) -> list[dict[str, Any]]:
+        """Filter addons that provide streams for the given content type.
+
+        Args:
+            addons: List of addon manifests from user's collection
+            media_type: Content type (movie, series)
+            media_id: Content ID (for prefix matching)
+
+        Returns:
+            List of addons that can provide streams
+        """
+        stream_addons = []
+
+        for addon in addons:
+            manifest = addon.get("manifest", {})
+            transport_url = addon.get("transportUrl", "")
+
+            if not transport_url:
+                continue
+
+            # Check if addon provides stream resource
+            resources = manifest.get("resources", [])
+            provides_stream = False
+            types_match = False
+            prefix_match = True  # Default to true if no prefix defined
+
+            for resource in resources:
+                if isinstance(resource, str):
+                    if resource == "stream":
+                        provides_stream = True
+                        # Use manifest-level types
+                        types = manifest.get("types", [])
+                        types_match = media_type in types or not types
+                        # Check id prefix
+                        prefixes = manifest.get("idPrefixes", [])
+                        if prefixes:
+                            prefix_match = any(media_id.startswith(p) for p in prefixes)
+                elif isinstance(resource, dict):
+                    if resource.get("name") == "stream":
+                        provides_stream = True
+                        # Use resource-specific types or fallback to manifest
+                        types = resource.get("types", manifest.get("types", []))
+                        types_match = media_type in types or not types
+                        # Check id prefix
+                        prefixes = resource.get(
+                            "idPrefixes", manifest.get("idPrefixes", [])
+                        )
+                        if prefixes:
+                            prefix_match = any(media_id.startswith(p) for p in prefixes)
+
+            if provides_stream and types_match and prefix_match:
+                stream_addons.append(
+                    {
+                        "name": manifest.get("name", "Unknown Addon"),
+                        "id": manifest.get("id", ""),
+                        "transport_url": transport_url,
+                    }
+                )
+                _LOGGER.debug(
+                    "Addon '%s' can provide streams for %s",
+                    manifest.get("name"),
+                    media_type,
+                )
+
+        return stream_addons
+
+    async def _fetch_streams_from_addons(
+        self,
+        addons: list[dict[str, Any]],
+        media_type: str,
+        video_id: str,
+    ) -> list[dict[str, Any]]:
+        """Fetch streams from multiple addons.
+
+        Args:
+            addons: List of filtered addons with transport URLs
+            media_type: Content type
+            video_id: Video ID (imdb_id or imdb_id:season:episode)
+
+        Returns:
+            Aggregated list of streams from all addons
+        """
+        import asyncio
+
+        all_streams: list[dict[str, Any]] = []
+        session = await self._get_session()
+
+        async def fetch_from_addon(addon: dict[str, Any]) -> list[dict[str, Any]]:
+            """Fetch streams from a single addon."""
+            transport_url = addon["transport_url"]
+            addon_name = addon["name"]
+
+            # Build stream URL: {base_url}/stream/{type}/{video_id}.json
+            # Remove manifest.json from URL if present
+            base_url = transport_url.replace("/manifest.json", "")
+            stream_url = f"{base_url}/stream/{media_type}/{video_id}.json"
+
+            try:
+                _LOGGER.debug("Fetching streams from %s: %s", addon_name, stream_url)
+
+                async with session.get(
+                    stream_url,
+                    timeout=aiohttp.ClientTimeout(total=10),
+                ) as response:
+                    if response.status != 200:
+                        _LOGGER.debug(
+                            "Addon %s returned status %d for streams",
+                            addon_name,
+                            response.status,
+                        )
+                        return []
+
+                    data = await response.json()
+                    streams = data.get("streams", [])
+
+                    # Add addon name to each stream for identification
+                    for stream in streams:
+                        if "addon" not in stream:
+                            stream["addon"] = addon_name
+
+                    _LOGGER.debug(
+                        "Addon %s returned %d streams", addon_name, len(streams)
+                    )
+                    return streams
+
+            except asyncio.TimeoutError:
+                _LOGGER.debug("Timeout fetching streams from %s", addon_name)
+                return []
+            except Exception as err:
+                _LOGGER.debug("Error fetching streams from %s: %s", addon_name, err)
+                return []
+
+        # Fetch from all addons in parallel
+        tasks = [fetch_from_addon(addon) for addon in addons]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        for result in results:
+            if isinstance(result, list):
+                all_streams.extend(result)
+
+        return all_streams
 
     async def async_add_to_library(
         self, media_id: str, media_type: str = "movie"
