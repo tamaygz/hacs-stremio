@@ -25,6 +25,7 @@ from .const import (
     EVENT_PLAYBACK_STARTED,
     SERVICE_ADD_TO_LIBRARY,
     SERVICE_BROWSE_CATALOG,
+    SERVICE_GET_SERIES_METADATA,
     SERVICE_GET_STREAMS,
     SERVICE_HANDOVER_TO_APPLE_TV,
     SERVICE_REFRESH_LIBRARY,
@@ -70,6 +71,12 @@ GET_STREAMS_SCHEMA = vol.Schema(
         vol.Required(ATTR_MEDIA_TYPE): vol.In(["movie", "series"]),
         vol.Optional(ATTR_SEASON): vol.Coerce(int),  # type: ignore[arg-type]
         vol.Optional(ATTR_EPISODE): vol.Coerce(int),  # type: ignore[arg-type]
+    }
+)
+
+GET_SERIES_METADATA_SCHEMA = vol.Schema(
+    {
+        vol.Required(ATTR_MEDIA_ID): cv.string,
     }
 )
 
