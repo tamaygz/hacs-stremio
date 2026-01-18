@@ -71,8 +71,9 @@ After setup, the following entities are created:
 
 ### Binary Sensors
 
-- `binary_sensor.stremio_is_playing` - On when media is playing
-- `binary_sensor.stremio_has_new_content` - On when new content detected
+- `binary_sensor.stremio_is_watching` - On when media is currently being watched
+- `binary_sensor.stremio_has_continue_watching` - On when there are items to continue watching
+- `binary_sensor.stremio_has_new_episodes` - On when any series has unwatched episodes
 
 ### Media Player
 

@@ -259,8 +259,9 @@ Stremio API reports playback change
 
 ### `binary_sensor.py`
 - Boolean state sensors
-- **Binary Sensors**: is_playing, has_new_content
+- **Binary Sensors**: is_watching, has_continue_watching, has_new_episodes
 - Simple on/off based on coordinator data
+- `has_new_episodes` - On when any series in continue watching has unwatched episodes
 
 ### `media_player.py`
 - **`StremioMediaPlayer`**: Full media player entity
