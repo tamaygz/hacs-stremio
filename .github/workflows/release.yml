@@ -4,8 +4,8 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Version to release (e.g., 0.1.1)"
-        required: true
+        description: "Version to release (e.g., 0.1.1). Leave empty to auto-bump patch version."
+        required: false
         type: string
 
 permissions:
@@ -24,12 +24,97 @@ jobs:
         with:
           python-version: "3.13"
 
+      - name: Determine version
+        id: version
+        shell: bash
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            # Use the provided version
+            VERSION="${{ inputs.version }}"
+            echo "Using provided version: $VERSION"
+          else
+            # Auto-bump patch version from manifest.json using Python for robust JSON parsing
+            VERSION=$(python3 << 'EOF'
+          import json
+          import sys
+          
+          try:
+              with open('custom_components/stremio/manifest.json', 'r') as f:
+                  manifest = json.load(f)
+              
+              current_version = manifest.get('version', '0.0.0')
+              print(f"Current version in manifest: {current_version}", file=sys.stderr)
+              
+              # Split version into major.minor.patch
+              parts = current_version.split('.')
+              if len(parts) != 3:
+                  print(f"Error: Version must be in format MAJOR.MINOR.PATCH, got: {current_version}", file=sys.stderr)
+                  sys.exit(1)
+              
+              major, minor, patch = parts
+              
+              # Validate parts are integers
+              try:
+                  major_int = int(major)
+                  minor_int = int(minor)
+                  patch_int = int(patch)
+              except ValueError:
+                  print(f"Error: Version parts must be integers, got: {current_version}", file=sys.stderr)
+                  sys.exit(1)
+              
+              # Bump patch version
+              new_version = f"{major_int}.{minor_int}.{patch_int + 1}"
+              print(f"Auto-bumped version: {new_version}", file=sys.stderr)
+              print(new_version)
+          except Exception as e:
+              print(f"Error processing version: {e}", file=sys.stderr)
+              sys.exit(1)
+          EOF
+          )
+          fi
+          
+          # Validate VERSION was successfully set
+          if [ -z "$VERSION" ]; then
+            echo "Error: VERSION is empty. Failing workflow." >&2
+            exit 1
+          fi
+          
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Final version to release: $VERSION"
+
       - name: Update version in manifest
         run: |
-          VERSION="${{ inputs.version }}"
+          VERSION="${{ steps.version.outputs.version }}"
           echo "Setting version to: $VERSION"
           sed -i "s|\"version\": \".*\"|\"version\": \"$VERSION\"|" custom_components/stremio/manifest.json
           cat custom_components/stremio/manifest.json
+
+      - name: Check if release already exists
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          if git ls-remote --tags origin | grep -q "refs/tags/v${VERSION}$"; then
+            echo "Error: Release tag v${VERSION} already exists. Please use a different version or delete the existing tag."
+            exit 1
+          fi
+          echo "Release tag v${VERSION} does not exist. Proceeding..."
+
+      - name: Commit version update
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add custom_components/stremio/manifest.json
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "chore: bump version to ${{ steps.version.outputs.version }}"
+            # Pull with rebase to avoid non-fast-forward push failures
+            git pull --rebase origin "${{ github.ref_name }}" || { 
+              echo "Error: Rebase failed. This may indicate a concurrent workflow run or manual changes."
+              echo "Please resolve conflicts manually or try running the workflow again."
+              exit 1
+            }
+            git push
+          fi
 
       - name: Create release zip
         run: |
@@ -37,16 +122,27 @@ jobs:
           zip -r ../stremio.zip stremio
 
       - name: Create GitHub Release
+        id: create_release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: v${{ inputs.version }}
-          name: Release v${{ inputs.version }}
+          tag_name: v${{ steps.version.outputs.version }}
+          name: Release v${{ steps.version.outputs.version }}
           files: stremio.zip
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Handle release failure
+        if: failure() && steps.create_release.outcome == 'failure'
+        run: |
+          echo "⚠️ Release creation failed!"
+          echo "The version in manifest.json has been updated to ${{ steps.version.outputs.version }}"
+          echo "Please investigate the release creation failure and either:"
+          echo "  1. Manually create the release for v${{ steps.version.outputs.version }}"
+          echo "  2. Manually revert the version in manifest.json and re-run the workflow"
+          exit 1
+
       - name: Summary
         run: |
-          echo "✅ Release v${{ inputs.version }} created successfully"
+          echo "✅ Release v${{ steps.version.outputs.version }} created successfully"
           echo "HACS will automatically detect the new release"
