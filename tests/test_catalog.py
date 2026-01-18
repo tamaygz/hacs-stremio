@@ -1,6 +1,6 @@
 """Tests for Stremio catalog functionality."""
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 from custom_components.stremio.stremio_client import StremioClient, StremioConnectionError
 
@@ -141,8 +141,8 @@ async def test_async_get_catalog_empty_response():
 
 
 @pytest.mark.asyncio
-async def test_async_get_catalog_error():
-    """Test catalog fetch error handling."""
+async def test_async_get_catalog_http_error():
+    """Test catalog fetch with HTTP error status."""
     client = StremioClient("test@example.com", "fake_auth_key")
     
     with patch.object(client, '_get_session') as mock_session:
@@ -153,8 +153,21 @@ async def test_async_get_catalog_error():
         
         result = await client.async_get_catalog(media_type="movie")
         
-        # Should return empty list on error, not raise
+        # HTTP errors return empty list with warning logged
         assert result == []
+
+
+@pytest.mark.asyncio
+async def test_async_get_catalog_network_error():
+    """Test catalog fetch with network exception."""
+    client = StremioClient("test@example.com", "fake_auth_key")
+    
+    with patch.object(client, '_get_session') as mock_session:
+        mock_session.return_value.__aenter__.return_value.get.side_effect = Exception("Network error")
+        
+        # Network errors raise StremioConnectionError
+        with pytest.raises(StremioConnectionError):
+            await client.async_get_catalog(media_type="movie")
 
 
 @pytest.mark.asyncio

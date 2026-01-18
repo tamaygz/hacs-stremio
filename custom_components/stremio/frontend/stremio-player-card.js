@@ -313,12 +313,37 @@ class StremioPlayerCard extends LitElement {
 
     // Alternative: Navigate to media browser
     if (this._hass) {
-      this._hass.callService('browser_mod', 'navigate', {
-        path: '/media-browser/media-source%3A%2F%2Fstremio%2Fcatalogs',
-      }).catch(() => {
-        // Fallback if browser_mod not available
-        // Event was already fired above for alternative handling
-      });
+      const hass = this._hass;
+      
+      // Check if browser_mod.navigate service is available
+      const hasBrowserMod =
+        hass.services &&
+        hass.services.browser_mod &&
+        hass.services.browser_mod.navigate;
+
+      if (hasBrowserMod) {
+        hass.callService('browser_mod', 'navigate', {
+          path: '/media-browser/media-source%3A%2F%2Fstremio%2Fcatalogs',
+        }).catch((error) => {
+          console.warn('Stremio Player: browser_mod navigation failed:', error);
+          // Try to show notification about manual access
+          if (hass.services && hass.services.persistent_notification && hass.services.persistent_notification.create) {
+            hass.callService('persistent_notification', 'create', {
+              title: 'Stremio Player',
+              message: 'Could not automatically open the catalog browser. Access it via Media Browser in the sidebar.',
+            }).catch(err => console.error('Failed to create notification:', err));
+          }
+        });
+      } else {
+        // browser_mod not available, provide user feedback
+        console.warn('Stremio Player: browser_mod is not available for navigation.');
+        if (hass.services && hass.services.persistent_notification && hass.services.persistent_notification.create) {
+          hass.callService('persistent_notification', 'create', {
+            title: 'Stremio Player',
+            message: 'The browser_mod integration is required for automatic navigation. Please install it or access the catalog via Media Browser in the sidebar.',
+          }).catch(err => console.error('Failed to create notification:', err));
+        }
+      }
     }
   }
 

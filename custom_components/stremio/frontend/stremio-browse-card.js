@@ -388,14 +388,52 @@ class StremioBrowseCard extends LitElement {
 
   _openMediaBrowser(item) {
     // Navigate to media browser for this item
-    if (item.media_content_id) {
-      const contentId = item.media_content_id;
-      // Don't double-encode - media_content_id is already the raw identifier
-      const encodedPath = `/media-browser/media-source%3A%2F%2Fstremio%2F${contentId}`;
-      this._hass.callService('browser_mod', 'navigate', {
-        path: encodedPath,
-      });
+    if (!item || !item.media_content_id) {
+      return;
     }
+
+    if (!this._hass) {
+      console.error('Stremio Browse Card: Unable to open media browser - hass instance is unavailable.');
+      return;
+    }
+
+    const hass = this._hass;
+
+    // Check if browser_mod.navigate service is available
+    const hasBrowserMod =
+      hass.services &&
+      hass.services.browser_mod &&
+      hass.services.browser_mod.navigate;
+
+    if (!hasBrowserMod) {
+      // Provide user feedback if browser_mod is not available
+      console.warn('Stremio Browse Card: browser_mod.navigate service is not available.');
+      // Try to show a notification if persistent_notification service is available
+      if (hass.services && hass.services.persistent_notification && hass.services.persistent_notification.create) {
+        hass.callService('persistent_notification', 'create', {
+          title: 'Stremio Browse',
+          message: 'The browser_mod integration is required to navigate the media browser. Please install it or access the media browser manually.',
+        }).catch(err => console.error('Failed to create notification:', err));
+      }
+      return;
+    }
+
+    const contentId = item.media_content_id;
+    // Don't double-encode - media_content_id is already the raw identifier
+    const encodedPath = `/media-browser/media-source%3A%2F%2Fstremio%2F${contentId}`;
+    
+    hass.callService('browser_mod', 'navigate', {
+      path: encodedPath,
+    }).catch((error) => {
+      console.error('Stremio Browse Card: Failed to navigate to media browser:', error);
+      // Try to show notification about failure
+      if (hass.services && hass.services.persistent_notification && hass.services.persistent_notification.create) {
+        hass.callService('persistent_notification', 'create', {
+          title: 'Stremio Browse',
+          message: 'Failed to open the media browser. Please try accessing it manually from the sidebar.',
+        }).catch(err => console.error('Failed to create notification:', err));
+      }
+    });
   }
 
   _addToLibrary(item) {
@@ -421,12 +459,16 @@ class StremioBrowseCard extends LitElement {
             <div class="control-row">
               <button 
                 class="control-button ${this._viewMode === 'popular' ? 'active' : ''}"
+                aria-label="Show popular content"
+                aria-pressed="${this._viewMode === 'popular'}"
                 @click=${() => this._handleViewChange('popular')}
               >
                 🔥 Popular
               </button>
               <button 
                 class="control-button ${this._viewMode === 'new' ? 'active' : ''}"
+                aria-label="Show new content"
+                aria-pressed="${this._viewMode === 'new'}"
                 @click=${() => this._handleViewChange('new')}
               >
                 🆕 New
@@ -438,12 +480,16 @@ class StremioBrowseCard extends LitElement {
             <div class="control-row">
               <button 
                 class="control-button ${this._mediaType === 'movie' ? 'active' : ''}"
+                aria-label="Show movies"
+                aria-pressed="${this._mediaType === 'movie'}"
                 @click=${() => this._handleTypeChange('movie')}
               >
                 🎬 Movies
               </button>
               <button 
                 class="control-button ${this._mediaType === 'series' ? 'active' : ''}"
+                aria-label="Show TV shows"
+                aria-pressed="${this._mediaType === 'series'}"
                 @click=${() => this._handleTypeChange('series')}
               >
                 📺 TV Shows
@@ -456,6 +502,7 @@ class StremioBrowseCard extends LitElement {
               <select 
                 class="control-button"
                 style="width: 100%; cursor: pointer;"
+                aria-label="Filter by genre"
                 @change=${this._handleGenreChange}
                 .value=${this._selectedGenre || 'all'}
               >
@@ -479,7 +526,19 @@ class StremioBrowseCard extends LitElement {
         ` : html`
           <div class="catalog-grid" style="grid-template-columns: repeat(auto-fill, minmax(${100 + (this.config.columns - 4) * 20}px, 1fr))">
             ${this._catalogItems.map(item => html`
-              <div class="catalog-item" @click=${() => this._handleItemClick(item)}>
+              <div 
+                class="catalog-item" 
+                role="button"
+                tabindex="0"
+                aria-label="${item.title}"
+                @click=${() => this._handleItemClick(item)}
+                @keydown=${(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    this._handleItemClick(item);
+                  }
+                }}
+              >
                 ${item.thumbnail ? html`
                   <img 
                     class="catalog-poster" 
@@ -499,7 +558,7 @@ class StremioBrowseCard extends LitElement {
         ${this._selectedItem ? html`
           <div class="modal-overlay" @click=${this._closeDetail}>
             <div class="item-detail" @click=${(e) => e.stopPropagation()}>
-              <button class="close-button" @click=${this._closeDetail}>✕</button>
+              <button class="close-button" aria-label="Close" @click=${this._closeDetail}>✕</button>
               <div class="detail-header">
                 ${this._selectedItem.thumbnail ? html`
                   <img class="detail-poster" src="${this._selectedItem.thumbnail}" alt="${this._selectedItem.title}" />
@@ -510,10 +569,18 @@ class StremioBrowseCard extends LitElement {
                 </div>
               </div>
               <div class="detail-actions">
-                <button class="detail-button primary" @click=${() => this._openMediaBrowser(this._selectedItem)}>
+                <button 
+                  class="detail-button primary" 
+                  aria-label="View details for ${this._selectedItem.title}"
+                  @click=${() => this._openMediaBrowser(this._selectedItem)}
+                >
                   View Details
                 </button>
-                <button class="detail-button secondary" @click=${() => this._addToLibrary(this._selectedItem)}>
+                <button 
+                  class="detail-button secondary" 
+                  aria-label="Add ${this._selectedItem.title} to library"
+                  @click=${() => this._addToLibrary(this._selectedItem)}
+                >
                   + Library
                 </button>
               </div>

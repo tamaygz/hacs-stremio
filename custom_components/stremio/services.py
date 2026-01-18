@@ -488,7 +488,9 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         )
 
         try:
-            # Fetch catalog based on media type
+            # Fetch catalog based on media type and catalog type
+            # Note: Currently only "popular" is fully implemented
+            # "new" and "genre" catalog types can be added when API supports them
             if media_type == "movie":
                 catalog_items = await client.async_get_popular_movies(
                     genre=genre, skip=skip, limit=limit

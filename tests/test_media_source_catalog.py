@@ -1,13 +1,12 @@
 """Tests for Stremio media source catalog browsing."""
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 from homeassistant.components.media_player import MediaClass, MediaType
 from custom_components.stremio.media_source import (
     StremioMediaSource,
     CATALOGS_IDENTIFIER,
     POPULAR_MOVIES_IDENTIFIER,
-    POPULAR_SERIES_IDENTIFIER,
     MOVIE_GENRES_IDENTIFIER,
     SERIES_GENRES_IDENTIFIER,
 )
