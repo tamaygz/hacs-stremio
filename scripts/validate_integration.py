@@ -69,7 +69,7 @@ def main() -> int:
         fail_msg("manifest.json not found")
     else:
         try:
-            with open(manifest_path) as f:
+            with open(manifest_path, encoding='utf-8') as f:
                 manifest = json.load(f)
 
             if "domain" in manifest:
@@ -119,7 +119,7 @@ def main() -> int:
         fail_msg("hacs.json not found (required for HACS)")
     else:
         try:
-            with open(hacs_json_path) as f:
+            with open(hacs_json_path, encoding='utf-8') as f:
                 hacs_json = json.load(f)
 
             pass_msg("hacs.json is valid JSON")
@@ -159,7 +159,7 @@ def main() -> int:
         en_json = translations_dir / "en.json"
         if en_json.exists():
             try:
-                with open(en_json) as f:
+                with open(en_json, encoding='utf-8') as f:
                     json.load(f)
                 pass_msg("translations/en.json is valid")
             except json.JSONDecodeError as e:
@@ -181,7 +181,7 @@ def main() -> int:
         pass_msg("services.yaml exists")
         try:
             import yaml
-            with open(services_yaml) as f:
+            with open(services_yaml, encoding='utf-8') as f:
                 yaml.safe_load(f)
             pass_msg("services.yaml is valid YAML")
         except ImportError:
@@ -221,7 +221,7 @@ def main() -> int:
     # Check for print statements
     has_print = False
     for pyfile in integration_dir.glob("*.py"):
-        with open(pyfile) as f:
+        with open(pyfile, encoding='utf-8') as f:
             content = f.read()
             if "print(" in content and "# noqa" not in content:
                 # Simple check - could be improved
@@ -236,7 +236,7 @@ def main() -> int:
     # Check for proper async
     init_file = integration_dir / "__init__.py"
     if init_file.exists():
-        with open(init_file) as f:
+        with open(init_file, encoding='utf-8') as f:
             content = f.read()
             if "async def async_setup" in content:
                 pass_msg("__init__.py uses async setup functions")

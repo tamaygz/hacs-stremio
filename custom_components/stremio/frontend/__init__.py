@@ -168,10 +168,10 @@ class JSModuleRegistration:
 
     def _get_version(self, url: str) -> str:
         """Extract version from URL query parameter.
-        
+
         Args:
             url: URL with potential version query param
-            
+
         Returns:
             Version string or "0" if not found
         """

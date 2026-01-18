@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from homeassistant import config_entries
 from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
+from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import AbortFlow, FlowResultType
 
 from custom_components.stremio.config_flow import ConfigFlow, OptionsFlowHandler
@@ -16,10 +17,10 @@ from .conftest import MOCK_CONFIG_ENTRY, MOCK_USER_DATA
 
 
 @pytest.mark.asyncio
-async def test_form_user_step(mock_hass):
+async def test_form_user_step(hass: HomeAssistant):
     """Test the initial user form is shown."""
     flow = ConfigFlow()
-    flow.hass = mock_hass
+    flow.hass = hass
 
     result = await flow.async_step_user()
 
@@ -29,10 +30,10 @@ async def test_form_user_step(mock_hass):
 
 
 @pytest.mark.asyncio
-async def test_form_user_step_success(mock_hass):
+async def test_form_user_step_success(hass: HomeAssistant):
     """Test successful user authentication."""
     flow = ConfigFlow()
-    flow.hass = mock_hass
+    flow.hass = hass
     flow.context = {}
 
     # Create mock client
@@ -58,12 +59,12 @@ async def test_form_user_step_success(mock_hass):
 
 
 @pytest.mark.asyncio
-async def test_form_user_step_invalid_auth(mock_hass):
+async def test_form_user_step_invalid_auth(hass: HomeAssistant):
     """Test form submission with invalid credentials."""
     from custom_components.stremio.stremio_client import StremioAuthError
 
     flow = ConfigFlow()
-    flow.hass = mock_hass
+    flow.hass = hass
 
     # Create mock client that fails authentication
     mock_client = AsyncMock()
@@ -83,12 +84,12 @@ async def test_form_user_step_invalid_auth(mock_hass):
 
 
 @pytest.mark.asyncio
-async def test_form_user_step_connection_error(mock_hass):
+async def test_form_user_step_connection_error(hass: HomeAssistant):
     """Test form submission with connection error."""
     from custom_components.stremio.stremio_client import StremioConnectionError
 
     flow = ConfigFlow()
-    flow.hass = mock_hass
+    flow.hass = hass
 
     # Create mock client that fails with connection error
     mock_client = AsyncMock()
@@ -108,10 +109,10 @@ async def test_form_user_step_connection_error(mock_hass):
 
 
 @pytest.mark.asyncio
-async def test_form_user_step_no_auth_key(mock_hass):
+async def test_form_user_step_no_auth_key(hass: HomeAssistant):
     """Test form submission when no auth key is returned."""
     flow = ConfigFlow()
-    flow.hass = mock_hass
+    flow.hass = hass
 
     # Create mock client that returns no auth key
     mock_client = AsyncMock()
@@ -130,10 +131,10 @@ async def test_form_user_step_no_auth_key(mock_hass):
 
 
 @pytest.mark.asyncio
-async def test_options_flow_init(mock_hass, mock_config_entry):
+async def test_options_flow_init(hass: HomeAssistant, mock_config_entry):
     """Test options flow initialization."""
     options_flow = OptionsFlowHandler(mock_config_entry)
-    options_flow.hass = mock_hass
+    options_flow.hass = hass
 
     result = await options_flow.async_step_init()
 
@@ -142,10 +143,10 @@ async def test_options_flow_init(mock_hass, mock_config_entry):
 
 
 @pytest.mark.asyncio
-async def test_options_flow_update(mock_hass, mock_config_entry):
+async def test_options_flow_update(hass: HomeAssistant, mock_config_entry):
     """Test updating options."""
     options_flow = OptionsFlowHandler(mock_config_entry)
-    options_flow.hass = mock_hass
+    options_flow.hass = hass
 
     new_options = {
         "player_scan_interval": 60,
@@ -161,7 +162,7 @@ async def test_options_flow_update(mock_hass, mock_config_entry):
 
 
 @pytest.mark.asyncio
-async def test_duplicate_entry(mock_hass):
+async def test_duplicate_entry(hass: HomeAssistant):
     """Test that duplicate entries are not allowed."""
     # Create mock client
     mock_client = AsyncMock()
@@ -172,7 +173,7 @@ async def test_duplicate_entry(mock_hass):
     mock_client.async_close = AsyncMock()
 
     flow = ConfigFlow()
-    flow.hass = mock_hass
+    flow.hass = hass
     flow.context = {}
 
     with patch(
