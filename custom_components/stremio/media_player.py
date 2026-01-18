@@ -370,6 +370,25 @@ class StremioMediaPlayer(
         Returns:
             Tuple of (stream_url, title) or (None, None) if not found
         """
+        stream_url, title, _ = await self._resolve_and_build_media_info(identifier)
+        return stream_url, title
+
+    async def _resolve_and_build_media_info(
+        self, identifier: str
+    ) -> tuple[str | None, str | None, dict[str, Any]]:
+        """Resolve a media source identifier to a stream URL and build media info.
+
+        This method parses the identifier, extracts media metadata, resolves the
+        stream URL, and enriches the media info with data from the library.
+
+        Args:
+            identifier: Format: {type}/{imdb_id}[/{season}/{episode}][#{stream_index}]
+
+        Returns:
+            Tuple of (stream_url, title, media_info) or (None, None, {}) if not found
+        """
+        media_info: dict[str, Any] = {}
+
         # Extract stream index if present
         stream_index: int = 0
         if "#" in identifier:
@@ -384,26 +403,105 @@ class StremioMediaPlayer(
         parts = identifier.split("/")
         if len(parts) < 2:
             _LOGGER.warning("Invalid identifier format: %s", identifier)
-            return None, None
+            return None, None, {}
 
         media_type = parts[0]
-        media_id = parts[1]
+        imdb_id = parts[1]
         season = int(parts[2]) if len(parts) > 2 else None
         episode = int(parts[3]) if len(parts) > 3 else None
+
+        # Build initial media_info from parsed identifier
+        media_info = {
+            "type": media_type,
+            "imdb_id": imdb_id,
+            "media_id": imdb_id,
+        }
+
+        if season is not None:
+            media_info["season"] = season
+        if episode is not None:
+            media_info["episode"] = episode
 
         _LOGGER.debug(
             "Resolving media: type=%s, id=%s, S%sE%s, stream_index=%d",
             media_type,
-            media_id,
+            imdb_id,
             season,
             episode,
             stream_index,
         )
 
+        # Enrich media_info with library data before fetching streams
+        if self.coordinator.data:
+            # Check library for matching item
+            library = self.coordinator.data.get("library", [])
+            for item in library:
+                if item.get("imdb_id") == imdb_id:
+                    media_info["title"] = item.get("title")
+                    media_info["poster"] = item.get("poster")
+                    media_info["year"] = item.get("year")
+                    media_info["genres"] = item.get("genres", [])
+                    _LOGGER.debug(
+                        "Enriched media_info with library data: title=%s",
+                        media_info.get("title"),
+                    )
+                    break
+
+            # Check continue watching for matching item with progress
+            continue_watching = self.coordinator.data.get("continue_watching", [])
+            for item in continue_watching:
+                if item.get("imdb_id") == imdb_id:
+                    # For series, also match season/episode
+                    if media_type == "series":
+                        if (
+                            item.get("season") == season
+                            and item.get("episode") == episode
+                        ):
+                            media_info["title"] = media_info.get(
+                                "title"
+                            ) or item.get("title")
+                            media_info["poster"] = media_info.get(
+                                "poster"
+                            ) or item.get("poster")
+                            media_info["year"] = media_info.get("year") or item.get(
+                                "year"
+                            )
+                            media_info["episode_title"] = item.get("episode_title")
+                            media_info["progress"] = item.get("progress", 0)
+                            media_info["duration"] = item.get("duration", 0)
+                            media_info["time_offset"] = item.get("progress", 0)
+                            media_info["progress_percent"] = item.get(
+                                "progress_percent", 0
+                            )
+                            _LOGGER.debug(
+                                "Enriched series with continue watching data: "
+                                "episode_title=%s, progress=%s",
+                                media_info.get("episode_title"),
+                                media_info.get("progress_percent"),
+                            )
+                            break
+                    else:
+                        media_info["title"] = media_info.get("title") or item.get(
+                            "title"
+                        )
+                        media_info["poster"] = media_info.get("poster") or item.get(
+                            "poster"
+                        )
+                        media_info["year"] = media_info.get("year") or item.get("year")
+                        media_info["progress"] = item.get("progress", 0)
+                        media_info["duration"] = item.get("duration", 0)
+                        media_info["time_offset"] = item.get("progress", 0)
+                        media_info["progress_percent"] = item.get("progress_percent", 0)
+                        _LOGGER.debug(
+                            "Enriched movie with continue watching data: progress=%s",
+                            media_info.get("progress_percent"),
+                        )
+                        break
+
         # Get streams from API
         try:
             streams = await self._client.async_get_streams(
-                media_id=media_id,
+                media_id=imdb_id,
                 media_type=media_type,
                 season=season,
                 episode=episode,
@@ -411,7 +509,7 @@ class StremioMediaPlayer(
 
             if not streams:
                 _LOGGER.warning("No streams found for %s", identifier)
-                return None, None
+                return None, None, media_info
 
             # Get the requested stream by index
             if 0 <= stream_index < len(streams):
@@ -427,19 +525,26 @@ class StremioMediaPlayer(
             stream_url = selected_stream.get("url") or selected_stream.get(
                 "externalUrl"
             )
-            title = selected_stream.get("title") or selected_stream.get("name")
+            stream_title = selected_stream.get("title") or selected_stream.get("name")
+
+            # Add stream-specific info to media_info
+            media_info["stream_name"] = selected_stream.get("name")
+            media_info["stream_title"] = stream_title
+            media_info["stream_quality"] = selected_stream.get("quality")
+            media_info["stream_addon"] = selected_stream.get("addon")
 
             _LOGGER.debug(
-                "Resolved stream: url=%s, title=%s",
+                "Resolved stream: url=%s, title=%s, media_info=%s",
                 stream_url[:100] if stream_url else None,
-                title,
+                stream_title,
+                {k: v for k, v in media_info.items() if k != "poster"},
             )
 
-            return stream_url, title
+            return stream_url, stream_title, media_info
 
         except StremioConnectionError as err:
             _LOGGER.error("Failed to get streams for %s: %s", identifier, err)
-            return None, None
+            return None, None, media_info
 
     async def _build_media_info_from_identifier(
         self, media_id: str, title: str | None, stream_url: str | None
@@ -450,6 +555,9 @@ class StremioMediaPlayer(
         media-source:// URI or direct identifier) and combines it with
         any available metadata to create a complete media info dict.
 
+        Note: This method is deprecated in favor of _resolve_and_build_media_info
+        which builds media info during resolution.
+
         Args:
             media_id: The media content identifier
             title: Optional title from stream resolution
@@ -458,76 +566,23 @@ class StremioMediaPlayer(
         Returns:
             Dictionary with media details for coordinator
         """
-        media_info: dict[str, Any] = {
-            "title": title,
-            "stream_url": stream_url,
-        }
+        # For direct URLs, return minimal info
+        if media_id.startswith(("http://", "https://")):
+            return {
+                "title": title,
+                "stream_url": stream_url,
+            }
 
-        # Parse the media_id to extract type, imdb_id, season, episode
+        # Parse the identifier and get enriched media info
         identifier = media_id
         if media_id.startswith("media-source://stremio/"):
             identifier = media_id.replace("media-source://stremio/", "")
 
-        # Remove stream index if present
-        if "#" in identifier:
-            identifier = identifier.rsplit("#", 1)[0]
+        _, _, media_info = await self._resolve_and_build_media_info(identifier)
 
-        # Parse: type/imdb_id or type/imdb_id/season/episode
-        parts = identifier.split("/")
-        if len(parts) >= 2:
-            media_info["type"] = parts[0]
-            media_info["imdb_id"] = parts[1]
-            if len(parts) >= 4:
-                try:
-                    media_info["season"] = int(parts[2])
-                    media_info["episode"] = int(parts[3])
-                except ValueError:
-                    pass
+        # Override title if provided
+        if title:
+            media_info["title"] = title
+        media_info["stream_url"] = stream_url
 
-        # Try to enrich with library data if available
-        if self.coordinator.data and media_info.get("imdb_id"):
-            imdb_id = media_info["imdb_id"]
-
-            # Check library for matching item
-            library = self.coordinator.data.get("library", [])
-            for item in library:
-                if item.get("imdb_id") == imdb_id:
-                    media_info["title"] = media_info.get("title") or item.get("title")
-                    media_info["poster"] = item.get("poster")
-                    media_info["year"] = item.get("year")
-                    media_info["type"] = media_info.get("type") or item.get("type")
-                    break
-
-            # Check continue watching for matching item with progress
-            continue_watching = self.coordinator.data.get("continue_watching", [])
-            for item in continue_watching:
-                if item.get("imdb_id") == imdb_id:
-                    # For series, also match season/episode
-                    if media_info.get("type") == "series":
-                        if (
-                            item.get("season") == media_info.get("season")
-                            and item.get("episode") == media_info.get("episode")
-                        ):
-                            media_info["title"] = media_info.get("title") or item.get(
-                                "title"
-                            )
-                            media_info["poster"] = item.get("poster")
-                            media_info["year"] = item.get("year")
-                            media_info["episode_title"] = item.get("episode_title")
-                            media_info["progress"] = item.get("progress", 0)
-                            media_info["duration"] = item.get("duration", 0)
-                            media_info["time_offset"] = item.get("progress", 0)
-                            break
-                    else:
-                        media_info["title"] = media_info.get("title") or item.get(
-                            "title"
-                        )
-                        media_info["poster"] = item.get("poster")
-                        media_info["year"] = item.get("year")
-                        media_info["progress"] = item.get("progress", 0)
-                        media_info["duration"] = item.get("duration", 0)
-                        media_info["time_offset"] = item.get("progress", 0)
-                        break
-
-        _LOGGER.debug("Built media info from identifier: %s", media_info)
         return media_info
