@@ -105,7 +105,8 @@
           "apple_tv_entity_id": "Apple TV entity ID (for Direct method)",
           "show_copy_url": "Show 'Copy URL' in media browser",
           "default_catalog_source": "Default catalog source",
-          "addon_stream_order": "Stream addon order",
+          "addon_stream_order": "Stream addon priority order",
+          "reset_addon_order": "Reset to default addon order",
           "stream_quality_preference": "Stream quality preference"
         },
         "data_description": {
@@ -117,7 +118,8 @@
           "apple_tv_entity_id": "The media_player entity ID for Direct handover (e.g., 'media_player.apple_tv_living_room')",
           "show_copy_url": "Show 'Copy URL' option when browsing streams in the media browser. Disable to reduce clutter.",
           "default_catalog_source": "The addon to use for fetching metadata (e.g., 'cinemeta', 'tmdb'). Leave as 'cinemeta' for default.",
-          "addon_stream_order": "Enter addon names (one per line) in your preferred order. Streams from addons listed first will appear at the top. Leave empty to use Stremio's default order.",
+          "addon_stream_order": "Select addons in your preferred order. Streams from addons listed first will appear at the top. Leave empty to use Stremio's default order.",
+          "reset_addon_order": "Check this box to clear the custom addon order and use Stremio's default order.",
           "stream_quality_preference": "Preferred stream quality. Matching streams will be shown first. Select 'any' to show all streams without filtering."
         }
       },

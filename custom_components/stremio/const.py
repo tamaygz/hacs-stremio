@@ -44,6 +44,7 @@ CONF_SHOW_COPY_URL: Final = "show_copy_url"
 CONF_DEFAULT_CATALOG_SOURCE: Final = "default_catalog_source"
 CONF_ADDON_STREAM_ORDER: Final = "addon_stream_order"
 CONF_STREAM_QUALITY_PREFERENCE: Final = "stream_quality_preference"
+CONF_RESET_ADDON_ORDER: Final = "reset_addon_order"
 
 # Options defaults
 DEFAULT_PLAYER_SCAN_INTERVAL: Final = 30  # seconds

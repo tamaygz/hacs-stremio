@@ -38,6 +38,9 @@ class StremioBrowseCard extends LitElement {
       _catalogItems: { type: Array },
       _loading: { type: Boolean },
       _selectedItem: { type: Object },
+      _similarItems: { type: Array },
+      _similarSourceItem: { type: Object },
+      _loadingSimilar: { type: Boolean },
     };
   }
 
@@ -175,6 +178,69 @@ class StremioBrowseCard extends LitElement {
         -webkit-line-clamp: 2;
         -webkit-box-orient: vertical;
         overflow: hidden;
+      }
+
+      .item-title {
+        padding: 8px 8px 2px;
+        font-size: 0.85em;
+        color: var(--primary-text-color);
+        text-align: center;
+        background: var(--card-background-color);
+        line-height: 1.2;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+      }
+
+      .item-year {
+        padding: 0 8px 8px;
+        font-size: 0.75em;
+        color: var(--secondary-text-color);
+        text-align: center;
+        background: var(--card-background-color);
+      }
+
+      .item-poster-container {
+        width: 100%;
+        aspect-ratio: var(--poster-aspect-ratio, 2/3);
+        position: relative;
+        overflow: hidden;
+        border-radius: 8px 8px 0 0;
+        background: var(--secondary-background-color);
+        flex-shrink: 0;
+      }
+
+      .item-poster {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        position: absolute;
+        top: 0;
+        left: 0;
+      }
+
+      .item-poster-placeholder {
+        width: 100%;
+        height: 100%;
+        position: absolute;
+        top: 0;
+        left: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--secondary-background-color);
+      }
+
+      .item-poster-placeholder ha-icon {
+        --mdc-icon-size: 32px;
+        color: var(--secondary-text-color);
+      }
+
+      .count-badge {
+        font-size: 0.7em;
+        font-weight: normal;
+        color: var(--secondary-text-color);
       }
 
       .media-type-badge {
@@ -344,6 +410,9 @@ class StremioBrowseCard extends LitElement {
     this._catalogItems = [];
     this._loading = false;
     this._selectedItem = null;
+    this._similarItems = null;
+    this._similarSourceItem = null;
+    this._loadingSimilar = false;
     this._genres = [
       'Action', 'Adventure', 'Animation', 'Biography', 'Comedy', 'Crime',
       'Documentary', 'Drama', 'Family', 'Fantasy', 'History', 'Horror',
@@ -765,7 +834,7 @@ class StremioBrowseCard extends LitElement {
       return;
     }
 
-    this._showToast('Finding similar content...');
+    this._loadingSimilar = true;
 
     this._hass.callWS({
       type: 'call_service',
@@ -773,12 +842,13 @@ class StremioBrowseCard extends LitElement {
       service: 'get_similar_content',
       service_data: {
         media_id: mediaId,
-        limit: 10,
+        limit: 20,
       },
       return_response: true,
     })
       .then((response) => {
         console.log('[Browse Card] Similar content response:', response);
+        this._loadingSimilar = false;
         
         let similarItems = null;
         if (response?.response?.similar) {
@@ -789,7 +859,9 @@ class StremioBrowseCard extends LitElement {
         
         if (similarItems && similarItems.length > 0) {
           console.log('[Browse Card] Found', similarItems.length, 'similar items');
-          this._showSimilarDialog(item, similarItems);
+          this._similarSourceItem = item;
+          this._similarItems = similarItems;
+          this._selectedItem = null; // Close detail view to show similar grid
         } else {
           console.log('[Browse Card] No similar content found');
           this._showToast('No similar content found');
@@ -797,30 +869,66 @@ class StremioBrowseCard extends LitElement {
       })
       .catch((error) => {
         console.error('[Browse Card] Failed to get similar content:', error);
+        this._loadingSimilar = false;
         this._showToast(`Failed to get similar content: ${error.message}`, 'error');
       });
   }
 
-  _showSimilarDialog(sourceItem, similarItems) {
-    // Fire an event for integration with other cards
-    this.dispatchEvent(
-      new CustomEvent('stremio-similar-content', {
-        bubbles: true,
-        composed: true,
-        detail: {
-          sourceItem,
-          similarItems,
-        },
-      })
-    );
+  /**
+   * Close the similar items view and return to the catalog.
+   */
+  _closeSimilarView() {
+    this._similarItems = null;
+    this._similarSourceItem = null;
+  }
 
-    // Use the global similar dialog if available
-    if (window.StremioSimilarDialog) {
-      window.StremioSimilarDialog.show(this._hass, sourceItem, similarItems);
-    } else {
-      const titles = similarItems.slice(0, 5).map(i => i.title || i.name).join(', ');
-      this._showToast(`Similar: ${titles}...`);
-    }
+  /**
+   * Handle click on a similar item - show its detail view.
+   */
+  _handleSimilarItemClick(item) {
+    // Clear similar view and show detail for this item
+    this._similarItems = null;
+    this._similarSourceItem = null;
+    this._selectedItem = item;
+  }
+
+  /**
+   * Render a similar item in the grid.
+   */
+  _renderSimilarItem(item) {
+    const title = item.title || item.name || 'Unknown';
+    const year = item.year || item.releaseInfo || '';
+
+    return html`
+      <div 
+        class="catalog-item" 
+        role="listitem"
+        tabindex="0"
+        @click=${() => this._handleSimilarItemClick(item)}
+        @keydown=${(e) => e.key === 'Enter' && this._handleSimilarItemClick(item)}
+        aria-label="${title}${year ? ` (${year})` : ''}"
+        style="--poster-aspect-ratio: ${this.config.poster_aspect_ratio || '2/3'}"
+      >
+        <div class="item-poster-container">
+          ${item.poster ? html`
+            <img class="item-poster" src="${item.poster}" alt="" loading="lazy" />
+          ` : html`
+            <div class="item-poster-placeholder">
+              <ha-icon icon="mdi:movie-outline"></ha-icon>
+            </div>
+          `}
+        </div>
+        ${item.type ? html`
+          <span class="media-type-badge ${item.type}">${item.type === 'series' ? 'TV' : 'Movie'}</span>
+        ` : ''}
+        ${this.config.show_title !== false ? html`
+          <div class="item-title" title="${title}">${title}</div>
+        ` : ''}
+        ${year ? html`
+          <div class="item-year">${year}</div>
+        ` : ''}
+      </div>
+    `;
   }
 
   /**
@@ -855,6 +963,33 @@ class StremioBrowseCard extends LitElement {
   }
 
   render() {
+    // If showing similar items, show that view
+    if (this._similarItems && this._similarItems.length > 0) {
+      const sourceTitle = this._similarSourceItem?.title || this._similarSourceItem?.name || 'Unknown';
+      return html`
+        <ha-card>
+          <div class="header">
+            <button class="back-button" @click=${this._closeSimilarView} aria-label="Back to browse">
+              <ha-icon icon="mdi:arrow-left"></ha-icon>
+              Back to Browse
+            </button>
+            <h2 class="header-title" style="margin-top: 12px;">
+              Similar to "${sourceTitle}"
+              <span class="count-badge">(${this._similarItems.length})</span>
+            </h2>
+          </div>
+          <div 
+            class="catalog-grid ${this.config.horizontal_scroll ? 'horizontal' : ''}" 
+            role="list" 
+            aria-label="Similar items"
+            style="${this.config.card_height > 0 ? `max-height: ${this.config.card_height}px` : ''}; --grid-columns: ${this.config.columns || 5}; --poster-aspect-ratio: ${this.config.poster_aspect_ratio || '2/3'}"
+          >
+            ${this._similarItems.map(item => this._renderSimilarItem(item))}
+          </div>
+        </ha-card>
+      `;
+    }
+
     // If an item is selected, show detail view instead of grid
     if (this._selectedItem) {
       return html`
@@ -1027,14 +1162,20 @@ class StremioBrowseCard extends LitElement {
           </div>
         </div>
 
-        ${mediaType === 'series' ? html`
-          <div class="detail-actions">
+        <div class="detail-actions">
+          ${mediaType === 'series' ? html`
             <button class="detail-button tertiary" @click=${() => this._showEpisodePicker(item, 'detail')}>
               <ha-icon icon="mdi:playlist-play"></ha-icon>
               ${hasSelectedEpisode ? 'Change Episode' : 'Select Episode'}
             </button>
-          </div>
-        ` : ''}
+          ` : ''}
+          ${this.config.show_similar_button !== false ? html`
+            <button class="detail-button tertiary" @click=${() => this._getSimilarContent(item)} ?disabled=${this._loadingSimilar}>
+              <ha-icon icon="mdi:movie-search"></ha-icon>
+              ${this._loadingSimilar ? 'Loading...' : 'Find Similar'}
+            </button>
+          ` : ''}
+        </div>
 
         <div class="detail-actions">
           <button class="detail-button primary" @click=${() => this._openInStremio(item)}>
@@ -1053,15 +1194,6 @@ class StremioBrowseCard extends LitElement {
             Add to Library
           </button>
         </div>
-
-        ${this.config.show_similar_button !== false ? html`
-          <div class="detail-actions">
-            <button class="detail-button tertiary" @click=${() => this._getSimilarContent(item)}>
-              <ha-icon icon="mdi:movie-search"></ha-icon>
-              Find Similar
-            </button>
-          </div>
-        ` : ''}
       </div>
     `;
   }

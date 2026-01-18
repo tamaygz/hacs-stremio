@@ -34,6 +34,9 @@ class StremioLibraryCard extends LitElement {
       _sortBy: { type: String },
       _libraryItems: { type: Array },
       _selectedItem: { type: Object },
+      _similarItems: { type: Array },
+      _similarSourceItem: { type: Object },
+      _loadingSimilar: { type: Boolean },
     };
   }
 
@@ -184,6 +187,12 @@ class StremioLibraryCard extends LitElement {
         text-overflow: ellipsis;
         white-space: nowrap;
         color: var(--primary-text-color);
+      }
+
+      .item-year {
+        font-size: 0.7em;
+        color: var(--secondary-text-color);
+        margin-top: 2px;
       }
 
       .media-type-badge {
@@ -388,6 +397,9 @@ class StremioLibraryCard extends LitElement {
     this._sortBy = 'recent';
     this._libraryItems = [];
     this._selectedItem = null;
+    this._similarItems = null;
+    this._similarSourceItem = null;
+    this._loadingSimilar = false;
     this._viewMode = 'library'; // 'library' or 'catalog'
   }
 
@@ -484,6 +496,9 @@ class StremioLibraryCard extends LitElement {
     if (changedProps.has('_sortBy')) return true;
     if (changedProps.has('_libraryItems')) return true;
     if (changedProps.has('_selectedItem')) return true;
+    if (changedProps.has('_similarItems')) return true;
+    if (changedProps.has('_similarSourceItem')) return true;
+    if (changedProps.has('_loadingSimilar')) return true;
     return false;
   }
 
@@ -863,6 +878,33 @@ class StremioLibraryCard extends LitElement {
     try {
       const filteredItems = this._getFilteredItems();
 
+      // If showing similar items, show that view
+      if (this._similarItems && this._similarItems.length > 0) {
+        const sourceTitle = this._similarSourceItem?.title || this._similarSourceItem?.name || 'Unknown';
+        return html`
+          <ha-card>
+            <div class="header">
+              <button class="back-button" @click=${this._closeSimilarView} aria-label="Back to library">
+                <ha-icon icon="mdi:arrow-left"></ha-icon>
+                Back to Library
+              </button>
+              <h2 class="header-title" style="margin-top: 12px;">
+                Similar to "${sourceTitle}"
+                <span class="count-badge" aria-label="${this._similarItems.length} items">(${this._similarItems.length})</span>
+              </h2>
+            </div>
+            <div 
+              class="library-grid ${this.config.horizontal_scroll ? 'horizontal' : ''}" 
+              role="list" 
+              aria-label="Similar items"
+              style="${this.config.card_height > 0 ? `max-height: ${this.config.card_height}px` : ''}; --grid-columns: ${this.config.columns || 4}; --poster-aspect-ratio: ${this.config.poster_aspect_ratio || '2/3'}"
+            >
+              ${this._similarItems.map(item => this._renderSimilarItem(item))}
+            </div>
+          </ha-card>
+        `;
+      }
+
       // If an item is selected, show detail view instead of grid
       if (this._selectedItem) {
         return html`
@@ -988,14 +1030,20 @@ class StremioLibraryCard extends LitElement {
           </div>
         </div>
 
-        ${item.type === 'series' ? html`
-          <div class="detail-actions">
+        <div class="detail-actions">
+          ${item.type === 'series' ? html`
             <button class="detail-button tertiary" @click=${() => this._showEpisodePicker(item, 'detail')}>
               <ha-icon icon="mdi:playlist-play"></ha-icon>
               ${hasSelectedEpisode ? 'Change Episode' : 'Select Episode'}
             </button>
-          </div>
-        ` : ''}
+          ` : ''}
+          ${this.config.show_similar_button !== false ? html`
+            <button class="detail-button tertiary" @click=${() => this._getSimilarContent(item)} ?disabled=${this._loadingSimilar}>
+              <ha-icon icon="mdi:movie-search"></ha-icon>
+              ${this._loadingSimilar ? 'Loading...' : 'Find Similar'}
+            </button>
+          ` : ''}
+        </div>
 
         <div class="detail-actions">
           <button class="detail-button primary" @click=${() => this._openInStremio(item)}>
@@ -1007,15 +1055,6 @@ class StremioLibraryCard extends LitElement {
             Get Streams
           </button>
         </div>
-
-        ${this.config.show_similar_button !== false ? html`
-          <div class="detail-actions">
-            <button class="detail-button tertiary" @click=${() => this._getSimilarContent(item)}>
-              <ha-icon icon="mdi:movie-search"></ha-icon>
-              Find Similar
-            </button>
-          </div>
-        ` : ''}
       </div>
     `;
   }
@@ -1040,7 +1079,7 @@ class StremioLibraryCard extends LitElement {
   }
 
   /**
-   * Get similar content for the item and display in a dialog.
+   * Get similar content for the item and display in the card.
    */
   _getSimilarContent(item) {
     const mediaId = item.imdb_id || item.id;
@@ -1049,7 +1088,7 @@ class StremioLibraryCard extends LitElement {
       return;
     }
 
-    this._showToast('Finding similar content...');
+    this._loadingSimilar = true;
 
     this._hass.callWS({
       type: 'call_service',
@@ -1057,12 +1096,13 @@ class StremioLibraryCard extends LitElement {
       service: 'get_similar_content',
       service_data: {
         media_id: mediaId,
-        limit: 10,
+        limit: 20,
       },
       return_response: true,
     })
       .then((response) => {
         console.log('[Library Card] Similar content response:', response);
+        this._loadingSimilar = false;
         
         let similarItems = null;
         if (response?.response?.similar) {
@@ -1073,7 +1113,9 @@ class StremioLibraryCard extends LitElement {
         
         if (similarItems && similarItems.length > 0) {
           console.log('[Library Card] Found', similarItems.length, 'similar items');
-          this._showSimilarDialog(item, similarItems);
+          this._similarSourceItem = item;
+          this._similarItems = similarItems;
+          this._selectedItem = null; // Close detail view to show similar grid
         } else {
           console.log('[Library Card] No similar content found');
           this._showToast('No similar content found');
@@ -1081,34 +1123,66 @@ class StremioLibraryCard extends LitElement {
       })
       .catch((error) => {
         console.error('[Library Card] Failed to get similar content:', error);
+        this._loadingSimilar = false;
         this._showToast(`Failed to get similar content: ${error.message}`, 'error');
       });
   }
 
   /**
-   * Show a dialog with similar content items.
+   * Close the similar items view and return to the library.
    */
-  _showSimilarDialog(sourceItem, similarItems) {
-    // Fire an event for integration with other cards or create a simple modal
-    this.dispatchEvent(
-      new CustomEvent('stremio-similar-content', {
-        bubbles: true,
-        composed: true,
-        detail: {
-          sourceItem,
-          similarItems,
-        },
-      })
-    );
+  _closeSimilarView() {
+    this._similarItems = null;
+    this._similarSourceItem = null;
+  }
 
-    // Also use the global similar dialog if available
-    if (window.StremioSimilarDialog) {
-      window.StremioSimilarDialog.show(this._hass, sourceItem, similarItems);
-    } else {
-      // Fallback: Create a simple alert with titles (can be improved later)
-      const titles = similarItems.slice(0, 5).map(i => i.title || i.name).join(', ');
-      this._showToast(`Similar: ${titles}...`);
-    }
+  /**
+   * Handle click on a similar item - show its detail view.
+   */
+  _handleSimilarItemClick(item) {
+    // Clear similar view and show detail for this item
+    this._similarItems = null;
+    this._similarSourceItem = null;
+    this._selectedItem = item;
+  }
+
+  /**
+   * Render a similar item in the grid.
+   */
+  _renderSimilarItem(item) {
+    const title = item.title || item.name || 'Unknown';
+    const year = item.year || item.releaseInfo || '';
+
+    return html`
+      <div 
+        class="library-item" 
+        role="listitem"
+        tabindex="0"
+        @click=${() => this._handleSimilarItemClick(item)}
+        @keydown=${(e) => e.key === 'Enter' && this._handleSimilarItemClick(item)}
+        aria-label="${title}${year ? ` (${year})` : ''}"
+        style="--poster-aspect-ratio: ${this.config.poster_aspect_ratio || '2/3'}"
+      >
+        <div class="item-poster-container">
+          ${item.poster ? html`
+            <img class="item-poster" src="${item.poster}" alt="" loading="lazy" />
+          ` : html`
+            <div class="item-poster-placeholder">
+              <ha-icon icon="mdi:movie-outline"></ha-icon>
+            </div>
+          `}
+        </div>
+        ${item.type ? html`
+          <span class="media-type-badge ${item.type}">${item.type === 'series' ? 'TV' : 'Movie'}</span>
+        ` : ''}
+        ${this.config.show_title !== false ? html`
+          <div class="item-title" title="${title}">${title}</div>
+        ` : ''}
+        ${year ? html`
+          <div class="item-year">${year}</div>
+        ` : ''}
+      </div>
+    `;
   }
 
   _renderItem(item) {

@@ -27,6 +27,7 @@ from .const import (
     CONF_LIBRARY_SCAN_INTERVAL,
     CONF_PLAYER_SCAN_INTERVAL,
     CONF_POLLING_GATE_ENTITIES,
+    CONF_RESET_ADDON_ORDER,
     CONF_SHOW_COPY_URL,
     CONF_STREAM_QUALITY_PREFERENCE,
     DEFAULT_ADDON_STREAM_ORDER,
@@ -177,6 +178,73 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         self._atv_config: Any = None
         self._pairing: Any = None
         self._pending_options: dict[str, Any] = {}
+        # Available addons fetched from API
+        self._available_addons: list[dict[str, Any]] = []
+        self._addon_names: list[str] = []
+
+    async def _fetch_available_addons(self) -> None:
+        """Fetch available addons from the Stremio API."""
+        try:
+            # Access the client from hass.data
+            entry_data = self.hass.data.get(DOMAIN, {}).get(
+                self._config_entry.entry_id, {}
+            )
+            client = entry_data.get("client")
+
+            if client:
+                # Get addon collection from client
+                addon_collection = await client.async_get_addon_collection()
+                if addon_collection:
+                    self._available_addons = addon_collection
+                    # Extract addon names (use transportName or manifest.name)
+                    self._addon_names = []
+                    for addon in addon_collection:
+                        manifest = addon.get("manifest", {})
+                        name = addon.get("transportName") or manifest.get("name", "")
+                        if name:
+                            self._addon_names.append(name)
+                    _LOGGER.debug(
+                        "Fetched %d addons: %s",
+                        len(self._addon_names),
+                        self._addon_names,
+                    )
+        except Exception as err:
+            _LOGGER.warning("Failed to fetch addons: %s", err)
+            self._available_addons = []
+            self._addon_names = []
+
+    def _build_addon_selector_options(
+        self,
+    ) -> list[selector.SelectOptionDict]:
+        """Build options list for the addon selector."""
+        options: list[selector.SelectOptionDict] = []
+        seen: set[str] = set()
+
+        for addon in self._available_addons:
+            manifest = addon.get("manifest", {})
+            addon_id = manifest.get("id", "")
+            name = addon.get("transportName") or manifest.get("name", "")
+            version = manifest.get("version", "")
+            description = manifest.get("description", "")
+
+            # Skip duplicates and empty names
+            if not name or name in seen:
+                continue
+            seen.add(name)
+
+            # Build display label
+            label = name
+            if version:
+                label = f"{name} (v{version})"
+
+            options.append(
+                selector.SelectOptionDict(
+                    value=name,
+                    label=label,
+                )
+            )
+
+        return options
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
@@ -184,15 +252,22 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         """Manage the options - step 1: basic settings."""
         errors: dict[str, str] = {}
 
+        # Fetch available addons if not already loaded
+        if not self._available_addons:
+            await self._fetch_available_addons()
+
         if user_input is not None:
             # Store the options for later
             self._pending_options = user_input
 
-            # Handle empty text fields that may be omitted from user_input
-            # TextSelector with multiline=True doesn't include empty values in user_input
-            # We need to explicitly set them to empty string if they were cleared
-            if CONF_ADDON_STREAM_ORDER not in user_input:
-                self._pending_options[CONF_ADDON_STREAM_ORDER] = ""
+            # Handle reset addon order checkbox
+            reset_order = user_input.pop(CONF_RESET_ADDON_ORDER, False)
+            if reset_order:
+                self._pending_options[CONF_ADDON_STREAM_ORDER] = []
+            else:
+                # Handle empty selection which may be omitted from user_input
+                if CONF_ADDON_STREAM_ORDER not in user_input:
+                    self._pending_options[CONF_ADDON_STREAM_ORDER] = []
 
             # Check if we need to configure Apple TV
             enable_handover = user_input.get(
@@ -209,6 +284,19 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
 
             # No Apple TV config needed, save options
             return self._create_options_entry()
+
+        # Build addon options for the selector
+        addon_options = self._build_addon_selector_options()
+
+        # Get current addon order preference
+        current_order = self._config_entry.options.get(
+            CONF_ADDON_STREAM_ORDER, DEFAULT_ADDON_STREAM_ORDER
+        )
+        # Handle legacy string format (convert to list if needed)
+        if isinstance(current_order, str):
+            current_order = [
+                name.strip() for name in current_order.split("\n") if name.strip()
+            ]
 
         return self.async_show_form(
             step_id="init",
@@ -280,14 +368,19 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                     ): str,
                     vol.Optional(
                         CONF_ADDON_STREAM_ORDER,
-                        default=self._config_entry.options.get(
-                            CONF_ADDON_STREAM_ORDER, DEFAULT_ADDON_STREAM_ORDER
-                        ),
-                    ): selector.TextSelector(
-                        selector.TextSelectorConfig(
-                            multiline=True,
+                        default=current_order,
+                    ): selector.SelectSelector(
+                        selector.SelectSelectorConfig(
+                            options=addon_options,
+                            multiple=True,
+                            mode=selector.SelectSelectorMode.LIST,
+                            sort=False,  # Preserve user's selection order
                         ),
                     ),
+                    vol.Optional(
+                        CONF_RESET_ADDON_ORDER,
+                        default=False,
+                    ): bool,
                     vol.Optional(
                         CONF_STREAM_QUALITY_PREFERENCE,
                         default=self._config_entry.options.get(
