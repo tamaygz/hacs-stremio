@@ -9,6 +9,7 @@ from typing import Any
 
 from homeassistant.components.button import ButtonEntity, ButtonEntityDescription
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -55,12 +56,14 @@ BUTTON_TYPES: tuple[StremioButtonEntityDescription, ...] = (
         key="force_refresh",
         name="Force Refresh",
         icon="mdi:refresh",
+        entity_category=EntityCategory.DIAGNOSTIC,
         press_fn=_force_refresh,
     ),
     StremioButtonEntityDescription(
         key="refresh_library",
         name="Refresh Library",
         icon="mdi:library-shelves",
+        entity_category=EntityCategory.DIAGNOSTIC,
         press_fn=_refresh_library,
     ),
 )
