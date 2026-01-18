@@ -32,17 +32,44 @@ jobs:
             VERSION="${{ inputs.version }}"
             echo "Using provided version: $VERSION"
           else
-            # Auto-bump patch version from manifest.json
-            CURRENT_VERSION=$(grep -oP '"version":\s*"\K[^"]+' custom_components/stremio/manifest.json)
-            echo "Current version in manifest: $CURRENT_VERSION"
-            
-            # Split version into major.minor.patch
-            IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
-            
-            # Bump patch version
-            PATCH=$((PATCH + 1))
-            VERSION="${MAJOR}.${MINOR}.${PATCH}"
-            echo "Auto-bumped version: $VERSION"
+            # Auto-bump patch version from manifest.json using Python for robust JSON parsing
+            VERSION=$(python3 << 'EOF'
+          import json
+          import sys
+          
+          try:
+              with open('custom_components/stremio/manifest.json', 'r') as f:
+                  manifest = json.load(f)
+              
+              current_version = manifest.get('version', '0.0.0')
+              print(f"Current version in manifest: {current_version}", file=sys.stderr)
+              
+              # Split version into major.minor.patch
+              parts = current_version.split('.')
+              if len(parts) != 3:
+                  print(f"Error: Version must be in format MAJOR.MINOR.PATCH, got: {current_version}", file=sys.stderr)
+                  sys.exit(1)
+              
+              major, minor, patch = parts
+              
+              # Validate parts are integers
+              try:
+                  major_int = int(major)
+                  minor_int = int(minor)
+                  patch_int = int(patch)
+              except ValueError:
+                  print(f"Error: Version parts must be integers, got: {current_version}", file=sys.stderr)
+                  sys.exit(1)
+              
+              # Bump patch version
+              new_version = f"{major_int}.{minor_int}.{patch_int + 1}"
+              print(f"Auto-bumped version: {new_version}", file=sys.stderr)
+              print(new_version)
+          except Exception as e:
+              print(f"Error processing version: {e}", file=sys.stderr)
+              sys.exit(1)
+          EOF
+          )
           fi
           
           echo "version=$VERSION" >> $GITHUB_OUTPUT
@@ -60,8 +87,12 @@ jobs:
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           git add custom_components/stremio/manifest.json
-          git commit -m "chore: bump version to ${{ steps.version.outputs.version }}"
-          git push
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "chore: bump version to ${{ steps.version.outputs.version }}"
+            git push
+          fi
 
       - name: Create release zip
         run: |
