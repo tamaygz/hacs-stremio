@@ -431,39 +431,25 @@ class StremioPlayerCard extends LitElement {
       })
     );
 
-    // Alternative: Navigate to media browser
-    if (this._hass) {
-      const hass = this._hass;
-      
-      // Check if browser_mod.navigate service is available
-      const hasBrowserMod =
-        hass.services &&
-        hass.services.browser_mod &&
-        hass.services.browser_mod.navigate;
-
-      if (hasBrowserMod) {
-        hass.callService('browser_mod', 'navigate', {
-          path: '/media-browser/media-source%3A%2F%2Fstremio%2Fcatalogs',
-        }).catch((error) => {
-          console.warn('Stremio Player: browser_mod navigation failed:', error);
-          // Try to show notification about manual access
-          if (hass.services && hass.services.persistent_notification && hass.services.persistent_notification.create) {
-            hass.callService('persistent_notification', 'create', {
-              title: 'Stremio Player',
-              message: 'Could not automatically open the catalog browser. Access it via Media Browser in the sidebar.',
-            }).catch(err => console.error('Failed to create notification:', err));
-          }
-        });
-      } else {
-        // browser_mod not available, provide user feedback
-        console.warn('Stremio Player: browser_mod is not available for navigation.');
-        if (hass.services && hass.services.persistent_notification && hass.services.persistent_notification.create) {
-          hass.callService('persistent_notification', 'create', {
-            title: 'Stremio Player',
-            message: 'The browser_mod integration is required for automatic navigation. Please install it or access the catalog via Media Browser in the sidebar.',
-          }).catch(err => console.error('Failed to create notification:', err));
-        }
-      }
+    // Navigate to media browser using HA's built-in navigation
+    const mediaPath = '/media-browser/media-source%3A%2F%2Fstremio%2Fcatalogs';
+    
+    // Try using Home Assistant's history API (works in HA frontend)
+    try {
+      // Use history.pushState for navigation within HA
+      history.pushState(null, '', mediaPath);
+      // Dispatch popstate event to trigger HA router
+      window.dispatchEvent(new PopStateEvent('popstate'));
+      return;
+    } catch (e) {
+      console.warn('Stremio Player: history navigation failed:', e);
+    }
+    
+    // Fallback: Direct location change
+    try {
+      window.location.href = mediaPath;
+    } catch (e) {
+      console.warn('Stremio Player: direct navigation failed:', e);
     }
   }
 

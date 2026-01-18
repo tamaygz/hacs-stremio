@@ -405,6 +405,7 @@ class StremioContinueWatchingCard extends LitElement {
     this._similarItems = null;
     this._similarSourceItem = null;
     this._loadingSimilar = false;
+    this._cameFromSimilarView = false; // Track if detail view was opened from similar view
     
     // Bind methods that are used as event handlers
     this._closeSimilarView = this._closeSimilarView.bind(this);
@@ -629,6 +630,16 @@ class StremioContinueWatchingCard extends LitElement {
 
   _closeDetail() {
     console.log('[Continue Watching Card] _closeDetail called');
+    
+    // If we came from similar view, restore it instead of going to main list
+    if (this._cameFromSimilarView && this._previousSimilarItems) {
+      this._similarItems = this._previousSimilarItems;
+      this._similarSourceItem = this._previousSimilarSourceItem;
+      this._previousSimilarItems = null;
+      this._previousSimilarSourceItem = null;
+      this._cameFromSimilarView = false;
+    }
+    
     this._selectedItem = null;
     this.requestUpdate();
     
@@ -1131,6 +1142,9 @@ class StremioContinueWatchingCard extends LitElement {
     console.log('[Continue Watching Card] _closeSimilarView called');
     this._similarItems = null;
     this._similarSourceItem = null;
+    this._previousSimilarItems = null;
+    this._previousSimilarSourceItem = null;
+    this._cameFromSimilarView = false;
     this.requestUpdate();
   }
 
@@ -1138,6 +1152,12 @@ class StremioContinueWatchingCard extends LitElement {
    * Handle click on a similar item - show its detail view.
    */
   _handleSimilarItemClick(item) {
+    // Remember we came from similar view for back navigation
+    this._cameFromSimilarView = true;
+    // Store the similar items so we can restore them on back
+    this._previousSimilarItems = this._similarItems;
+    this._previousSimilarSourceItem = this._similarSourceItem;
+    
     // Clear similar view and show detail for this item
     this._similarItems = null;
     this._similarSourceItem = null;
