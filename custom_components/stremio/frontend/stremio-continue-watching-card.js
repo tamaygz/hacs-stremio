@@ -579,7 +579,7 @@ class StremioContinueWatchingCard extends LitElement {
               <h3>${title}</h3>
               <p>${item.type === 'series' ? 'TV Series' : 'Movie'}</p>
               ${item.year ? html`<p>Year: ${item.year}</p>` : ''}
-              ${item.progress_percent ? html`<p>Progress: ${item.progress_percent.toFixed(0)}%</p>` : ''}
+              ${item.progress_percent && typeof item.progress_percent === 'number' ? html`<p>Progress: ${item.progress_percent.toFixed(0)}%</p>` : ''}
             </div>
           </div>
 
