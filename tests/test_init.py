@@ -2,15 +2,15 @@
 
 from __future__ import annotations
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 
-from custom_components.stremio.const import DOMAIN, CONF_AUTH_KEY
+from custom_components.stremio.const import CONF_AUTH_KEY, DOMAIN
 
 
 @pytest.mark.asyncio
@@ -29,6 +29,9 @@ async def test_async_setup_entry_success(mock_hass, mock_config_entry):
     mock_hass.config_entries = MagicMock()
     mock_hass.config_entries.async_forward_entry_setups = AsyncMock()
 
+    # Create mock session
+    mock_session = MagicMock()
+
     with patch(
         "custom_components.stremio.StremioClient",
         return_value=mock_client,
@@ -38,6 +41,9 @@ async def test_async_setup_entry_success(mock_hass, mock_config_entry):
     ), patch(
         "custom_components.stremio.async_setup_services",
         new_callable=AsyncMock,
+    ), patch(
+        "custom_components.stremio.async_get_clientsession",
+        return_value=mock_session,
     ):
         from custom_components.stremio import async_setup_entry
 
@@ -60,9 +66,15 @@ async def test_async_setup_entry_auth_failure(mock_hass, mock_config_entry):
     )
     mock_client.async_close = AsyncMock()
 
+    # Create mock session
+    mock_session = MagicMock()
+
     with patch(
         "custom_components.stremio.StremioClient",
         return_value=mock_client,
+    ), patch(
+        "custom_components.stremio.async_get_clientsession",
+        return_value=mock_session,
     ):
         from custom_components.stremio import async_setup_entry
 
@@ -82,9 +94,15 @@ async def test_async_setup_entry_connection_failure(mock_hass, mock_config_entry
     )
     mock_client.async_close = AsyncMock()
 
+    # Create mock session
+    mock_session = MagicMock()
+
     with patch(
         "custom_components.stremio.StremioClient",
         return_value=mock_client,
+    ), patch(
+        "custom_components.stremio.async_get_clientsession",
+        return_value=mock_session,
     ):
         from custom_components.stremio import async_setup_entry
 
