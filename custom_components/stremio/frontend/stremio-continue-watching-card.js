@@ -120,12 +120,6 @@ class StremioContinueWatchingCard extends LitElement {
         cursor: pointer;
         transition: transform 0.2s ease;
         position: relative;
-        display: flex;
-        flex-direction: column;
-        /* Ensure all items have same internal heights */
-        --item-title-height: 20px;
-        --item-progress-height: 4px;
-        --item-progress-text-height: 16px;
       }
 
       .item:hover {

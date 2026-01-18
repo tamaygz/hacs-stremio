@@ -134,11 +134,6 @@ class StremioLibraryCard extends LitElement {
         cursor: pointer;
         transition: transform 0.2s ease;
         position: relative;
-        display: flex;
-        flex-direction: column;
-        /* Ensure all items have same internal heights */
-        --item-title-height: 20px;
-        --item-year-height: 16px;
       }
 
       .library-item:hover {
