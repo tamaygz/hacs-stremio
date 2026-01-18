@@ -26,28 +26,21 @@ from .conftest import MOCK_LIBRARY_ITEMS, MOCK_STREAMS
 
 
 @pytest.fixture
-def mock_service_hass(mock_hass, mock_coordinator):
+def mock_service_hass(hass: HomeAssistant, mock_coordinator):
     """Set up mock hass with coordinator for services."""
     mock_client = AsyncMock()
     mock_client.async_get_streams = AsyncMock(return_value=MOCK_STREAMS)
     mock_client.async_add_to_library = AsyncMock(return_value=True)
     mock_client.async_remove_from_library = AsyncMock(return_value=True)
 
-    mock_hass.data[DOMAIN] = {
+    hass.data[DOMAIN] = {
         "test_entry": {
             "coordinator": mock_coordinator,
             "client": mock_client,
         }
     }
-    mock_hass.bus = MagicMock()
-    mock_hass.bus.async_fire = MagicMock()
 
-    # Mock services
-    mock_hass.services = MagicMock()
-    mock_hass.services.async_register = MagicMock()
-    mock_hass.services.async_remove = MagicMock()
-
-    return mock_hass
+    return hass
 
 
 class TestSearchLibraryService:
@@ -280,29 +273,37 @@ class TestServiceRegistration:
 
     @pytest.mark.asyncio
     async def test_services_registered(
-        self, mock_hass, mock_config_entry, mock_coordinator
+        self, hass: HomeAssistant, mock_config_entry, mock_coordinator
     ):
         """Test that all services are registered on setup."""
         mock_client = AsyncMock()
-        mock_hass.data[DOMAIN] = {
+        hass.data[DOMAIN] = {
             mock_config_entry.entry_id: {
                 "coordinator": mock_coordinator,
                 "client": mock_client,
             }
         }
-        mock_hass.services.async_register = MagicMock()
 
-        await async_setup_services(mock_hass)
+        await async_setup_services(hass)
 
-        # Verify 6 services were registered
-        assert mock_hass.services.async_register.call_count == 6
+        # Verify services were registered
+        assert hass.services.has_service(DOMAIN, SERVICE_SEARCH_LIBRARY)
+        assert hass.services.has_service(DOMAIN, SERVICE_GET_STREAMS)
+        assert hass.services.has_service(DOMAIN, SERVICE_ADD_TO_LIBRARY)
+        assert hass.services.has_service(DOMAIN, SERVICE_REMOVE_FROM_LIBRARY)
+        assert hass.services.has_service(DOMAIN, SERVICE_REFRESH_LIBRARY)
+        assert hass.services.has_service(DOMAIN, SERVICE_HANDOVER_TO_APPLE_TV)
 
     @pytest.mark.asyncio
-    async def test_services_unregistered(self, mock_hass):
+    async def test_services_unregistered(self, hass: HomeAssistant):
         """Test that all services are unregistered on unload."""
-        mock_hass.services.async_remove = MagicMock()
+        # First setup services
+        hass.data[DOMAIN] = {"test_entry": {"coordinator": MagicMock(), "client": AsyncMock()}}
+        await async_setup_services(hass)
 
-        await async_unload_services(mock_hass)
+        # Then unload
+        await async_unload_services(hass)
 
-        # Verify 6 services were removed
-        assert mock_hass.services.async_remove.call_count == 6
+        # Verify services were removed
+        assert not hass.services.has_service(DOMAIN, SERVICE_SEARCH_LIBRARY)
+        assert not hass.services.has_service(DOMAIN, SERVICE_GET_STREAMS)
