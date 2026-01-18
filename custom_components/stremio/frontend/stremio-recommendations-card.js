@@ -160,7 +160,6 @@ class StremioRecommendationsCard extends LitElement {
         transition: transform 0.2s ease;
         position: relative;
         min-width: 0; /* Allow grid item to shrink smaller than content */
-        overflow: hidden; /* Contain long titles */
       }
 
       .item:hover {
