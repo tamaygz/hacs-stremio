@@ -5,8 +5,6 @@
  * 
  * @customElement stremio-continue-watching-card
  * @extends LitElement
- * @version 0.3.2
- * @cacheBust 20260118b
  */
 
 // Safe LitElement access - wait for HA frontend to be ready
@@ -862,6 +860,7 @@ class StremioContinueWatchingCardEditor extends LitElement {
     return {
       hass: { type: Object },
       _config: { type: Object },
+      _stremioEntities: { type: Array },
     };
   }
 
@@ -869,29 +868,65 @@ class StremioContinueWatchingCardEditor extends LitElement {
     this._config = config;
   }
 
+  updated(changedProps) {
+    if (changedProps.has('hass') && this.hass) {
+      this._updateStremioEntities();
+    }
+  }
+
+  _updateStremioEntities() {
+    // Find all Stremio continue_watching sensors
+    this._stremioEntities = Object.keys(this.hass.states)
+      .filter(entityId => 
+        entityId.includes('stremio') && 
+        entityId.includes('continue_watching')
+      )
+      .map(entityId => ({
+        entity_id: entityId,
+        friendly_name: this.hass.states[entityId].attributes.friendly_name || entityId,
+      }));
+  }
+
   render() {
     if (!this.hass || !this._config) {
       return html``;
     }
 
-    // Get all continue watching sensors
-    const continueWatchingSensors = Object.keys(this.hass.states).filter(
-      (entityId) => entityId.match(/^sensor\..*_continue_watching_count$/)
-    );
-
     return html`
       <div class="card-config">
-        <ha-entity-picker
-          .hass=${this.hass}
-          .value=${this._config.entity || 'sensor.stremio_continue_watching_count'}
-          .configValue=${'entity'}
-          .includeDomains=${['sensor']}
-          .entityFilter=${(entity) => entity.entity_id.includes('continue_watching')}
-          label="Continue Watching Sensor or Device Name"
-          helper="Enter full entity ID (e.g., sensor.stremio_post_tamaygunduz_de_continue_watching_count) or just device identifier (e.g., tamaygunduz)"
-          allow-custom-entity
-          @value-changed=${this._valueChanged}
-        ></ha-entity-picker>
+        <div class="entity-section">
+          <label class="section-label">Continue Watching Sensor</label>
+          
+          ${this._stremioEntities?.length > 0 ? html`
+            <div class="entity-buttons">
+              ${this._stremioEntities.map(entity => html`
+                <button 
+                  class="entity-btn ${this._config.entity === entity.entity_id ? 'selected' : ''}"
+                  @click=${() => this._selectEntity(entity.entity_id)}
+                >
+                  <ha-icon icon="mdi:play-pause"></ha-icon>
+                  <span>${entity.friendly_name}</span>
+                </button>
+              `)}
+            </div>
+          ` : html`
+            <div class="no-entities">
+              <ha-icon icon="mdi:alert-circle-outline"></ha-icon>
+              <span>No Stremio continue watching sensors found. Make sure the integration is configured.</span>
+            </div>
+          `}
+          
+          <ha-entity-picker
+            .hass=${this.hass}
+            .value=${this._config.entity || ''}
+            .configValue=${'entity'}
+            .includeDomains=${['sensor']}
+            .includeEntities=${this._stremioEntities?.map(e => e.entity_id) || []}
+            label="Or select manually"
+            allow-custom-entity
+            @value-changed=${this._valueChanged}
+          ></ha-entity-picker>
+        </div>
 
         <ha-textfield
           label="Title"
@@ -931,6 +966,15 @@ class StremioContinueWatchingCardEditor extends LitElement {
     `;
   }
 
+  _selectEntity(entityId) {
+    this._config = { ...this._config, entity: entityId };
+    this.dispatchEvent(new CustomEvent('config-changed', {
+      detail: { config: this._config },
+      bubbles: true,
+      composed: true,
+    }));
+  }
+
   _valueChanged(ev) {
     if (!this._config || !this.hass) {
       return;
@@ -968,6 +1012,68 @@ class StremioContinueWatchingCardEditor extends LitElement {
         flex-direction: column;
         gap: 16px;
         padding: 16px;
+      }
+
+      .entity-section {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .section-label {
+        font-weight: 500;
+        color: var(--primary-text-color);
+        font-size: 0.9em;
+      }
+
+      .entity-buttons {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .entity-btn {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        border: 1px solid var(--divider-color);
+        border-radius: 8px;
+        background: var(--card-background-color);
+        color: var(--primary-text-color);
+        cursor: pointer;
+        font-size: 0.9em;
+        transition: all 0.2s ease;
+      }
+
+      .entity-btn:hover {
+        background: var(--secondary-background-color);
+        border-color: var(--primary-color);
+      }
+
+      .entity-btn.selected {
+        background: var(--primary-color);
+        color: var(--text-primary-color);
+        border-color: var(--primary-color);
+      }
+
+      .entity-btn ha-icon {
+        --mdc-icon-size: 18px;
+      }
+
+      .no-entities {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 12px;
+        background: var(--warning-color, #ff9800);
+        color: white;
+        border-radius: 8px;
+        font-size: 0.9em;
+      }
+
+      .no-entities ha-icon {
+        --mdc-icon-size: 20px;
       }
 
       ha-entity-picker {
