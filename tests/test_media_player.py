@@ -143,32 +143,32 @@ class TestStremioMediaPlayer:
 
     @pytest.mark.asyncio
     async def test_unique_id(
-        self, mock_hass, mock_media_coordinator, mock_config_entry
+        self, hass: HomeAssistant, mock_media_coordinator, mock_config_entry
     ):
         """Test unique ID property."""
         player = StremioMediaPlayer(mock_media_coordinator, mock_config_entry)
-        player.hass = mock_hass
+        player.hass = hass
 
         assert player.unique_id == f"{mock_config_entry.entry_id}_media_player"
 
     @pytest.mark.asyncio
     async def test_supported_features(
-        self, mock_hass, mock_media_coordinator, mock_config_entry
+        self, hass: HomeAssistant, mock_media_coordinator, mock_config_entry
     ):
         """Test supported features."""
         player = StremioMediaPlayer(mock_media_coordinator, mock_config_entry)
-        player.hass = mock_hass
+        player.hass = hass
 
         # Should have browse media and play media features
         assert player.supported_features is not None
 
     @pytest.mark.asyncio
     async def test_extra_state_attributes(
-        self, mock_hass, mock_media_coordinator, mock_config_entry
+        self, hass: HomeAssistant, mock_media_coordinator, mock_config_entry
     ):
         """Test extra state attributes."""
         player = StremioMediaPlayer(mock_media_coordinator, mock_config_entry)
-        player.hass = mock_hass
+        player.hass = hass
 
         attrs = player.extra_state_attributes
 
@@ -179,13 +179,13 @@ class TestStremioMediaPlayer:
 
     @pytest.mark.asyncio
     async def test_extra_state_attributes_empty_when_idle(
-        self, mock_hass, mock_coordinator, mock_config_entry
+        self, hass: HomeAssistant, mock_coordinator, mock_config_entry
     ):
         """Test extra state attributes are empty when idle."""
         mock_coordinator.data = {"current_watching": None}
 
         player = StremioMediaPlayer(mock_coordinator, mock_config_entry)
-        player.hass = mock_hass
+        player.hass = hass
 
         attrs = player.extra_state_attributes
 
@@ -197,10 +197,10 @@ class TestMediaPlayerSetup:
 
     @pytest.mark.asyncio
     async def test_async_setup_entry(
-        self, mock_hass, mock_config_entry, mock_coordinator
+        self, hass: HomeAssistant, mock_config_entry, mock_coordinator
     ):
         """Test media player platform setup."""
-        mock_hass.data[DOMAIN] = {
+        hass.data[DOMAIN] = {
             mock_config_entry.entry_id: {
                 "coordinator": mock_coordinator,
             }
@@ -208,7 +208,7 @@ class TestMediaPlayerSetup:
 
         async_add_entities = MagicMock()
 
-        await async_setup_entry(mock_hass, mock_config_entry, async_add_entities)
+        await async_setup_entry(hass, mock_config_entry, async_add_entities)
 
         # Should add one media player entity
         async_add_entities.assert_called_once()
@@ -222,18 +222,18 @@ class TestMediaPlayerBrowse:
 
     @pytest.mark.asyncio
     async def test_async_browse_media_root(
-        self, mock_hass, mock_media_coordinator, mock_config_entry
+        self, hass: HomeAssistant, mock_media_coordinator, mock_config_entry
     ):
         """Test browsing media at root level."""
         # Set up hass.data with coordinator
-        mock_hass.data[DOMAIN] = {
+        hass.data[DOMAIN] = {
             mock_config_entry.entry_id: {
                 "coordinator": mock_media_coordinator,
             }
         }
 
         player = StremioMediaPlayer(mock_media_coordinator, mock_config_entry)
-        player.hass = mock_hass
+        player.hass = hass
 
         # Browse root level
         result = await player.async_browse_media()
@@ -248,18 +248,18 @@ class TestMediaPlayerBrowse:
 
     @pytest.mark.asyncio
     async def test_async_browse_media_library(
-        self, mock_hass, mock_media_coordinator, mock_config_entry
+        self, hass: HomeAssistant, mock_media_coordinator, mock_config_entry
     ):
         """Test browsing library section."""
         # Set up hass.data with coordinator
-        mock_hass.data[DOMAIN] = {
+        hass.data[DOMAIN] = {
             mock_config_entry.entry_id: {
                 "coordinator": mock_media_coordinator,
             }
         }
 
         player = StremioMediaPlayer(mock_media_coordinator, mock_config_entry)
-        player.hass = mock_hass
+        player.hass = hass
 
         # Browse library
         result = await player.async_browse_media(media_content_id="library")
