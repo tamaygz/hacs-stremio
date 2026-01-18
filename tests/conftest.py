@@ -128,19 +128,30 @@ MOCK_CONTINUE_WATCHING = [
 
 MOCK_STREAMS = [
     {
-        "name": "Torrent",
-        "title": "1080p BluRay",
+        "name": "Torrentio",
+        "title": "1080p BluRay x264",
         "url": "http://example.com/stream1.mp4",
         "quality": "1080p",
         "size": "2.5 GB",
         "seeds": 150,
+        "addon": "Torrentio",
     },
     {
-        "name": "HTTP",
+        "name": "Torrentio",
+        "title": "4K HDR BluRay",
+        "url": "http://example.com/stream4k.mp4",
+        "quality": "4k",
+        "size": "15 GB",
+        "seeds": 50,
+        "addon": "Torrentio",
+    },
+    {
+        "name": "CinemetaStreams",
         "title": "720p WEB-DL",
         "externalUrl": "http://example.com/stream2.mp4",
         "quality": "720p",
         "size": "1.2 GB",
+        "addon": "CinemetaStreams",
     },
 ]
 
@@ -210,6 +221,10 @@ def mock_config_entry(hass: HomeAssistant):
             "library_update_interval": 300,
             "enable_apple_tv_handover": False,
             "handover_method": "auto",
+            "show_copy_url": True,
+            "default_catalog_source": "cinemeta",
+            "addon_stream_order": "",
+            "stream_quality_preference": "any",
         },
         unique_id="test@example.com",
         title="Stremio - test@example.com",

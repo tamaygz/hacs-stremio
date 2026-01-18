@@ -153,6 +153,10 @@ async def test_options_flow_update(hass: HomeAssistant, mock_config_entry):
         "library_scan_interval": 600,
         "enable_apple_tv_handover": True,
         "handover_method": "airplay",
+        "show_copy_url": True,
+        "default_catalog_source": "cinemeta",
+        "addon_stream_order": "Torrentio\nCinemetaStreams",
+        "stream_quality_preference": "1080p",
     }
 
     result = await options_flow.async_step_init(new_options)

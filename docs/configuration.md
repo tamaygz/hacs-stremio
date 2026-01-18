@@ -16,16 +16,54 @@ Access via: Settings → Devices & Services → Stremio → Configure
 - **Library Sync Interval**: How often to sync library data (1-60 minutes)
   - Default: 5 minutes
 
-#### Features
+#### Polling Gate
+
+- **Polling Gate Entities**: Select media players or other entities that control polling
+  - When all selected entities are off/idle, polling is reduced to once per 24 hours
+  - Leave empty to always poll at normal intervals
+  - Useful for reducing API calls when not actively watching
+
+#### Streaming Preferences
+
+- **Default Catalog Source**: The addon to use for fetching metadata
+  - Default: `cinemeta` (Stremio's default metadata addon)
+  - Options: `cinemeta`, `tmdb`
+
+- **Stream Addon Order**: Enter addon names (one per line) in your preferred order
+  - Streams from addons listed first will appear at the top
+  - Leave empty to use Stremio's default order
+  - Example:
+    ```
+    Torrentio
+    CinemetaStreams
+    OpenSubtitles
+    ```
+
+- **Stream Quality Preference**: Preferred stream quality
+  - Options: `any`, `4k`, `1080p`, `720p`, `480p`
+  - Matching streams will be shown first
+  - Non-matching streams are still available (sorted after matches)
+
+#### Media Browser
+
+- **Show Copy URL**: Show 'Copy URL' option when browsing streams
+  - Default: Enabled
+  - Disable to reduce clutter in the media browser
+
+#### Apple TV Handover
 
 - **Enable Apple TV Handover**: Allow streaming to Apple TV devices
   - Default: Disabled
   - Requires Apple TV integration
 
 - **Apple TV Handover Method**:
-  - Auto: Automatically select best method
-  - AirPlay: Native AirPlay streaming
-  - VLC: Use VLC app on Apple TV
+  - `auto`: Automatically select best method (recommended)
+  - `airplay`: Native AirPlay streaming (requires pyatv)
+  - `direct`: Direct URL handover (may work for HLS streams)
+  - Note: VLC deep links do NOT work on tvOS!
+
+- **Apple TV Entity ID**: The media_player entity for direct handover
+  - Example: `media_player.apple_tv_living_room`
 
 ## YAML Configuration
 
