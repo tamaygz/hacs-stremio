@@ -31,7 +31,6 @@ except ImportError:
 from ..const import INTEGRATION_VERSION, JSMODULES, URL_BASE
 
 if TYPE_CHECKING:
-    from homeassistant.components.lovelace import LovelaceData
     from homeassistant.components.lovelace.resources import ResourceStorageCollection
 
 _LOGGER = logging.getLogger(__name__)
