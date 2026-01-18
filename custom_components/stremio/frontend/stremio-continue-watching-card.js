@@ -480,6 +480,9 @@ class StremioContinueWatchingCard extends LitElement {
     if (changedProps.has('_selectedItem')) return true;
     if (changedProps.has('_filterType')) return true;
     if (changedProps.has('_sortBy')) return true;
+    if (changedProps.has('_similarItems')) return true;
+    if (changedProps.has('_similarSourceItem')) return true;
+    if (changedProps.has('_loadingSimilar')) return true;
     return false;
   }
 
@@ -641,7 +644,7 @@ class StremioContinueWatchingCard extends LitElement {
     }
     
     this._selectedItem = null;
-    this.requestUpdate();
+    // No need for requestUpdate() - reactive properties handle this
     
     // Fire event for external listeners
     this.dispatchEvent(
@@ -1145,7 +1148,7 @@ class StremioContinueWatchingCard extends LitElement {
     this._previousSimilarItems = null;
     this._previousSimilarSourceItem = null;
     this._cameFromSimilarView = false;
-    this.requestUpdate();
+    // No need for requestUpdate() - reactive properties handle this
   }
 
   /**
