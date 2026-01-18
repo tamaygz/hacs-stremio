@@ -258,6 +258,39 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         except StremioConnectionError as err:
             raise HomeAssistantError(f"Failed to get streams: {err}") from err
 
+    async def handle_get_series_metadata(call: ServiceCall) -> ServiceResponse:  # type: ignore[return-value]
+        """Handle get_series_metadata service call.
+        
+        Fetch series metadata including seasons and episodes from Cinemeta.
+        Returns structured data for the episode picker UI.
+        """
+        _, client, _ = _get_entry_data(hass)
+
+        media_id = call.data[ATTR_MEDIA_ID]
+
+        _LOGGER.debug("Getting series metadata: media_id=%s", media_id)
+
+        try:
+            metadata = await client.async_get_series_metadata(media_id)
+
+            if not metadata:
+                return {
+                    "success": False,
+                    "error": "No metadata found for series",
+                    "media_id": media_id,
+                }
+
+            return {
+                "success": True,
+                "metadata": metadata,
+            }
+
+        except StremioConnectionError as err:
+            raise HomeAssistantError(f"Failed to get series metadata: {err}") from err
+        except Exception as err:
+            _LOGGER.exception("Error fetching series metadata: %s", err)
+            raise HomeAssistantError(f"Failed to get series metadata: {err}") from err
+
     async def handle_add_to_library(call: ServiceCall) -> None:
         """Handle add_to_library service call."""
         coordinator, client, _ = _get_entry_data(hass)
@@ -532,6 +565,14 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         SERVICE_GET_STREAMS,
         handle_get_streams,
         schema=GET_STREAMS_SCHEMA,
+        supports_response=SupportsResponse.OPTIONAL,
+    )
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_GET_SERIES_METADATA,
+        handle_get_series_metadata,
+        schema=GET_SERIES_METADATA_SCHEMA,
         supports_response=SupportsResponse.OPTIONAL,
     )
 
