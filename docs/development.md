@@ -7,7 +7,7 @@ This guide covers setting up a development environment for the Stremio HACS Inte
 - **Docker** (for devcontainer, recommended)
 - **VS Code** with [Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers)
 - **Git**
-- **Python 3.11+** (for local development without Docker)
+- **Python 3.12+** (for local development without Docker)
 
 ---
 
@@ -16,12 +16,14 @@ This guide covers setting up a development environment for the Stremio HACS Inte
 The fastest way to get started is using VS Code's Dev Containers:
 
 1. **Clone the repository:**
+
    ```bash
    git clone https://github.com/tamaygz/hacs-stremio.git
    cd hacs-stremio
    ```
 
 2. **Open in VS Code:**
+
    ```bash
    code .
    ```
@@ -36,6 +38,7 @@ The fastest way to get started is using VS Code's Dev Containers:
    - HACS downloads automatically
 
 5. **Start Home Assistant:**
+
    ```bash
    ./scripts/start_homeassistant.sh
    ```
@@ -52,16 +55,18 @@ The fastest way to get started is using VS Code's Dev Containers:
 For development without Docker:
 
 1. **Clone and enter the repository:**
+
    ```bash
    git clone https://github.com/tamaygz/hacs-stremio.git
    cd hacs-stremio
    ```
 
 2. **Run the setup script:**
+
    ```bash
    ./scripts/setup_dev_environment.sh
    ```
-   
+
    This script:
    - Creates a Python virtual environment
    - Installs all dependencies
@@ -70,6 +75,7 @@ For development without Docker:
    - Installs pre-commit hooks
 
 3. **Start Home Assistant:**
+
    ```bash
    ./scripts/start_homeassistant.sh
    ```
@@ -160,6 +166,7 @@ The project includes debug configurations in `.vscode/launch.json`:
 3. **Pytest: All Tests**: Debug all tests
 
 To debug:
+
 1. Set breakpoints in your code
 2. Press F5 or select a debug configuration
 3. Step through code with F10/F11
@@ -239,6 +246,7 @@ hacs-stremio/
 ### "Module not found" errors
 
 Make sure you're using the virtual environment:
+
 ```bash
 source .venv/bin/activate  # Linux/macOS
 .venv\Scripts\activate     # Windows
@@ -267,6 +275,7 @@ kill <PID>
 ### Tests failing with import errors
 
 Ensure you have all dependencies:
+
 ```bash
 pip install -r requirements_dev.txt
 pip install homeassistant

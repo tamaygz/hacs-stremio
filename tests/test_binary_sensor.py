@@ -141,6 +141,149 @@ class TestHasContinueWatchingBinarySensor:
         assert attrs["count"] == len(MOCK_CONTINUE_WATCHING)
 
 
+class TestHasNewEpisodesBinarySensor:
+    """Tests for the has_new_episodes binary sensor."""
+
+    @pytest.fixture
+    def new_episodes_sensor(self, mock_coordinator, mock_config_entry):
+        """Create has_new_episodes sensor for testing."""
+        description = next(
+            d for d in BINARY_SENSOR_TYPES if d.key == "has_new_episodes"
+        )
+        sensor = StremioBinarySensor(mock_coordinator, mock_config_entry, description)
+        return sensor
+
+    @pytest.mark.asyncio
+    async def test_is_on_when_has_series_in_continue_watching(
+        self, hass: HomeAssistant, mock_coordinator, new_episodes_sensor
+    ):
+        """Test sensor is on when there are series with unwatched episodes."""
+        mock_coordinator.data = {
+            "continue_watching": [
+                {
+                    "id": "series:tt1234567",
+                    "imdb_id": "tt1234567",
+                    "title": "Test Series",
+                    "type": "series",
+                    "season": 1,
+                    "episode": 3,
+                    "progress": 1200,
+                    "duration": 3600,
+                },
+            ],
+        }
+        new_episodes_sensor.hass = hass
+
+        assert new_episodes_sensor.is_on is True
+
+    @pytest.mark.asyncio
+    async def test_is_off_when_no_series_in_continue_watching(
+        self, hass: HomeAssistant, mock_coordinator, new_episodes_sensor
+    ):
+        """Test sensor is off when no series in continue watching."""
+        mock_coordinator.data = {
+            "continue_watching": [
+                {
+                    "id": "movie:tt7654321",
+                    "imdb_id": "tt7654321",
+                    "title": "Test Movie",
+                    "type": "movie",
+                    "progress": 1200,
+                    "duration": 7200,
+                },
+            ],
+        }
+        new_episodes_sensor.hass = hass
+
+        assert new_episodes_sensor.is_on is False
+
+    @pytest.mark.asyncio
+    async def test_is_off_when_continue_watching_empty(
+        self, hass: HomeAssistant, mock_coordinator, new_episodes_sensor
+    ):
+        """Test sensor is off when continue watching is empty."""
+        mock_coordinator.data = {
+            "continue_watching": [],
+        }
+        new_episodes_sensor.hass = hass
+
+        assert new_episodes_sensor.is_on is False
+
+    @pytest.mark.asyncio
+    async def test_extra_state_attributes(
+        self, hass: HomeAssistant, mock_coordinator, new_episodes_sensor
+    ):
+        """Test extra state attributes contain series list."""
+        mock_coordinator.data = {
+            "continue_watching": [
+                {
+                    "id": "series:tt1234567",
+                    "imdb_id": "tt1234567",
+                    "title": "Test Series",
+                    "type": "series",
+                    "season": 2,
+                    "episode": 5,
+                },
+                {
+                    "id": "series:tt2345678",
+                    "imdb_id": "tt2345678",
+                    "title": "Another Series",
+                    "type": "series",
+                    "season": 1,
+                    "episode": 1,
+                },
+                {
+                    "id": "movie:tt7654321",
+                    "imdb_id": "tt7654321",
+                    "title": "Test Movie",
+                    "type": "movie",
+                },
+            ],
+        }
+        new_episodes_sensor.hass = hass
+
+        attrs = new_episodes_sensor.extra_state_attributes
+
+        assert attrs is not None
+        assert "count" in attrs
+        assert attrs["count"] == 2  # Only series count
+        assert "series" in attrs
+        assert len(attrs["series"]) == 2
+        assert attrs["series"][0]["title"] == "Test Series"
+        assert attrs["series"][1]["title"] == "Another Series"
+
+    @pytest.mark.asyncio
+    async def test_deduplicates_series(
+        self, hass: HomeAssistant, mock_coordinator, new_episodes_sensor
+    ):
+        """Test that duplicate series are not counted twice."""
+        mock_coordinator.data = {
+            "continue_watching": [
+                {
+                    "id": "series:tt1234567",
+                    "imdb_id": "tt1234567",
+                    "title": "Test Series",
+                    "type": "series",
+                    "season": 2,
+                    "episode": 5,
+                },
+                {
+                    "id": "series:tt1234567",
+                    "imdb_id": "tt1234567",
+                    "title": "Test Series",
+                    "type": "series",
+                    "season": 2,
+                    "episode": 4,
+                },
+            ],
+        }
+        new_episodes_sensor.hass = hass
+
+        attrs = new_episodes_sensor.extra_state_attributes
+
+        assert attrs["count"] == 1  # Same series, only counted once
+
+
 class TestBinarySensorSetup:
     """Tests for binary sensor platform setup."""
 

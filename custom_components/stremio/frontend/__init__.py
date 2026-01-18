@@ -3,6 +3,11 @@
 This module handles automatic registration of custom Lovelace cards
 with Home Assistant's frontend system, eliminating the need for
 manual resource configuration.
+
+Cache busting is achieved by:
+1. Adding version query parameter to resource URLs (?v=X.Y.Z)
+2. Using INTEGRATION_VERSION from manifest.json as the source of truth
+3. Automatically updating Lovelace resources when version changes
 """
 
 from __future__ import annotations
@@ -23,10 +28,10 @@ except ImportError:
     HAS_STATIC_PATH_CONFIG = False
     StaticPathConfig = None  # type: ignore[assignment, misc]
 
-from ..const import JSMODULES, URL_BASE
+from ..const import INTEGRATION_VERSION, JSMODULES, URL_BASE
 
 if TYPE_CHECKING:
-    from homeassistant.components.lovelace import LovelaceData
+    from homeassistant.components.lovelace.resources import ResourceStorageCollection
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -47,30 +52,38 @@ class JSModuleRegistration:
             hass: Home Assistant instance
         """
         self.hass = hass
-        self._lovelace_data: LovelaceData | dict[str, Any] | None = self.hass.data.get(
-            "lovelace"
+        self._lovelace_data: Any = self.hass.data.get("lovelace")
+        _LOGGER.debug(
+            "Lovelace data type: %s, value: %s",
+            type(self._lovelace_data).__name__,
+            self._lovelace_data,
         )
 
     @property
-    def lovelace(self) -> LovelaceData | None:
-        """Get the Lovelace data object.
+    def lovelace_resources(self) -> ResourceStorageCollection | None:
+        """Get the Lovelace resources collection.
 
         Returns:
-            LovelaceData object or None if not available/compatible
+            ResourceStorageCollection or None if not available
         """
         if self._lovelace_data is None:
+            _LOGGER.debug("Lovelace data is None")
             return None
 
-        # Handle different HA versions - lovelace data might be a dict or object
+        # Modern HA (2024+): lovelace data has a resources attribute
+        if hasattr(self._lovelace_data, "resources"):
+            _LOGGER.debug("Found resources attribute on lovelace data")
+            return self._lovelace_data.resources  # type: ignore[return-value]
+
+        # Try to access resources from dict-based structure
         if isinstance(self._lovelace_data, dict):
-            # In some versions, the actual data is nested
-            if "dashboards" in self._lovelace_data:
-                # Try to get the default dashboard's data
-                return None  # Dict-based storage, can't use automatic registration
-            return None
+            resources = self._lovelace_data.get("resources")
+            if resources is not None:
+                _LOGGER.debug("Found resources in lovelace dict")
+                return resources  # type: ignore[return-value]
 
-        # It's a proper LovelaceData object
-        return self._lovelace_data  # type: ignore[return-value]
+        _LOGGER.debug("Could not find lovelace resources")
+        return None
 
     @property
     def lovelace_mode(self) -> str | None:
@@ -82,13 +95,13 @@ class JSModuleRegistration:
         if self._lovelace_data is None:
             return None
 
-        # Handle dict-based storage (older HA versions or different config)
-        if isinstance(self._lovelace_data, dict):
-            return self._lovelace_data.get("mode")
-
         # Handle object-based storage (modern HA)
         if hasattr(self._lovelace_data, "mode"):
             return self._lovelace_data.mode  # type: ignore[union-attr]
+
+        # Handle dict-based storage (older HA versions or different config)
+        if isinstance(self._lovelace_data, dict):
+            return self._lovelace_data.get("mode")
 
         return None
 
@@ -98,18 +111,36 @@ class JSModuleRegistration:
 
         # Only register modules if Lovelace is in storage mode
         mode = self.lovelace_mode
-        if mode == "storage" and self.lovelace is not None:
+        resources = self.lovelace_resources
+
+        _LOGGER.debug(
+            "Lovelace mode: %s, resources available: %s",
+            mode,
+            resources is not None,
+        )
+
+        if mode == "storage" and resources is not None:
             await self._async_wait_for_lovelace_resources()
         else:
             _LOGGER.info(
-                "Lovelace mode is '%s'. Add resources manually if needed: %s/*.js",
+                "Lovelace mode is '%s'. Add resources manually if needed: %s/*.js?v=%s",
                 mode or "unknown",
                 URL_BASE,
+                INTEGRATION_VERSION,
             )
 
     async def _async_register_path(self) -> None:
-        """Register the static HTTP path for serving JS files."""
+        """Register the static HTTP path for serving JS files.
+
+        Note: Cache busting is achieved through version query params on resource URLs.
+        The static path serves files without caching by default in HA dev mode.
+        """
         frontend_path = Path(__file__).parent
+        _LOGGER.info(
+            "Registering Stremio frontend v%s from %s",
+            INTEGRATION_VERSION,
+            frontend_path,
+        )
 
         # Try modern method first (HA 2024.6+)
         if HAS_STATIC_PATH_CONFIG and StaticPathConfig is not None:
@@ -139,11 +170,26 @@ class JSModuleRegistration:
 
     async def _async_wait_for_lovelace_resources(self) -> None:
         """Wait for Lovelace resources to load before registering modules."""
-        if not self.lovelace:
+        resources = self.lovelace_resources
+        if resources is None:
+            _LOGGER.debug("Lovelace resources not available")
             return
 
         async def _check_loaded(_now: Any) -> None:
-            if self.lovelace and self.lovelace.resources.loaded:
+            resources = self.lovelace_resources
+            if resources is None:
+                _LOGGER.debug("Lovelace resources became unavailable")
+                return
+
+            # Check if resources are loaded - handle both attribute and method
+            loaded = False
+            if hasattr(resources, "loaded"):
+                loaded = resources.loaded
+            else:
+                # Assume loaded if no loaded attribute
+                loaded = True
+
+            if loaded:
                 await self._async_register_modules()
             else:
                 _LOGGER.debug("Lovelace resources not loaded, retrying in 5s")
@@ -153,53 +199,100 @@ class JSModuleRegistration:
 
     async def _async_register_modules(self) -> None:
         """Register or update JavaScript modules in Lovelace resources."""
-        if not self.lovelace:
+        resources = self.lovelace_resources
+        if resources is None:
+            _LOGGER.debug("Lovelace resources not available for module registration")
             return
 
-        _LOGGER.debug("Installing Stremio JavaScript modules")
+        _LOGGER.info("Installing Stremio JavaScript modules v%s", INTEGRATION_VERSION)
 
         # Get existing resources from this integration
-        existing_resources = [
-            r
-            for r in self.lovelace.resources.async_items()
-            if r["url"].startswith(URL_BASE)
-        ]
+        try:
+            existing_resources = [
+                r for r in resources.async_items() if r["url"].startswith(URL_BASE)
+            ]
+            _LOGGER.debug(
+                "Found %d existing Stremio resources: %s",
+                len(existing_resources),
+                [r["url"] for r in existing_resources],
+            )
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.error("Failed to get existing resources: %s", err)
+            return
 
         for module in JSMODULES:
             url = f"{URL_BASE}/{module['filename']}"
             registered = False
 
             for resource in existing_resources:
-                if self._get_path(resource["url"]) == url:
+                resource_path = self._get_path(resource["url"])
+                if resource_path == url:
                     registered = True
-                    # Check if update needed
-                    if self._get_version(resource["url"]) != module["version"]:
+                    current_version = self._get_version(resource["url"])
+                    target_version = module["version"]
+
+                    _LOGGER.debug(
+                        "Found existing resource %s: current=%s, target=%s",
+                        module["name"],
+                        current_version,
+                        target_version,
+                    )
+
+                    # Update if version differs
+                    if current_version != target_version:
                         _LOGGER.info(
-                            "Updating %s to version %s",
+                            "Updating %s from v%s to v%s",
                             module["name"],
-                            module["version"],
+                            current_version,
+                            target_version,
                         )
-                        await self.lovelace.resources.async_update_item(
-                            resource["id"],
-                            {
-                                "res_type": "module",
-                                "url": f"{url}?v={module['version']}",
-                            },
+                        try:
+                            await resources.async_update_item(
+                                resource["id"],
+                                {
+                                    "res_type": "module",
+                                    "url": f"{url}?v={target_version}",
+                                },
+                            )
+                            _LOGGER.info(
+                                "Successfully updated %s to v%s",
+                                module["name"],
+                                target_version,
+                            )
+                        except Exception as err:  # noqa: BLE001
+                            _LOGGER.error(
+                                "Failed to update resource %s: %s", module["name"], err
+                            )
+                    else:
+                        _LOGGER.debug(
+                            "%s already at v%s, no update needed",
+                            module["name"],
+                            target_version,
                         )
                     break
 
             if not registered:
                 _LOGGER.info(
-                    "Registering %s version %s",
+                    "Registering new resource: %s v%s",
                     module["name"],
                     module["version"],
                 )
-                await self.lovelace.resources.async_create_item(
-                    {
-                        "res_type": "module",
-                        "url": f"{url}?v={module['version']}",
-                    }
-                )
+                try:
+                    await resources.async_create_item(
+                        {
+                            "res_type": "module",
+                            "url": f"{url}?v={module['version']}",
+                        }
+                    )
+                    _LOGGER.info(
+                        "Successfully registered %s v%s",
+                        module["name"],
+                        module["version"],
+                    )
+                except Exception as err:  # noqa: BLE001
+                    _LOGGER.error(
+                        "Failed to register resource %s: %s", module["name"], err
+                    )
 
     def _get_path(self, url: str) -> str:
         """Extract path without query parameters.
@@ -228,16 +321,20 @@ class JSModuleRegistration:
 
     async def async_unregister(self) -> None:
         """Remove Lovelace resources from this integration."""
-        if self.lovelace is None or self.lovelace_mode != "storage":
+        resources = self.lovelace_resources
+        if resources is None or self.lovelace_mode != "storage":
             return
 
         for module in JSMODULES:
             url = f"{URL_BASE}/{module['filename']}"
-            resources = [
-                r
-                for r in self.lovelace.resources.async_items()
-                if r["url"].startswith(url)
-            ]
-            for resource in resources:
-                await self.lovelace.resources.async_delete_item(resource["id"])
-                _LOGGER.info("Unregistered resource: %s", module["name"])
+            try:
+                resource_list = [
+                    r for r in resources.async_items() if r["url"].startswith(url)
+                ]
+                for resource in resource_list:
+                    await resources.async_delete_item(resource["id"])
+                    _LOGGER.info("Unregistered resource: %s", module["name"])
+            except Exception as err:  # noqa: BLE001
+                _LOGGER.error(
+                    "Failed to unregister resource %s: %s", module["name"], err
+                )

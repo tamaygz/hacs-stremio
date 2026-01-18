@@ -16,16 +16,24 @@ from homeassistant.helpers import config_validation as cv
 
 from .apple_tv_handover import HandoverError, HandoverManager
 from .const import (
+    CONF_ADDON_STREAM_ORDER,
     CONF_APPLE_TV_CREDENTIALS,
     CONF_APPLE_TV_IDENTIFIER,
     CONF_HANDOVER_METHOD,
+    CONF_STREAM_QUALITY_PREFERENCE,
     DEFAULT_HANDOVER_METHOD,
+    DEFAULT_STREAM_QUALITY_PREFERENCE,
     DOMAIN,
     EVENT_NEW_CONTENT,
     EVENT_PLAYBACK_STARTED,
     SERVICE_ADD_TO_LIBRARY,
     SERVICE_BROWSE_CATALOG,
+    SERVICE_GET_ADDONS,
+    SERVICE_GET_RECOMMENDATIONS,
+    SERVICE_GET_SERIES_METADATA,
+    SERVICE_GET_SIMILAR_CONTENT,
     SERVICE_GET_STREAMS,
+    SERVICE_GET_UPCOMING_EPISODES,
     SERVICE_HANDOVER_TO_APPLE_TV,
     SERVICE_REFRESH_LIBRARY,
     SERVICE_REMOVE_FROM_LIBRARY,
@@ -50,6 +58,7 @@ ATTR_METHOD = "method"
 ATTR_GENRE = "genre"
 ATTR_SKIP = "skip"
 ATTR_CATALOG_TYPE = "catalog_type"
+ATTR_DAYS_AHEAD = "days_ahead"
 
 # Service schemas
 SEARCH_LIBRARY_SCHEMA = vol.Schema(
@@ -70,6 +79,12 @@ GET_STREAMS_SCHEMA = vol.Schema(
         vol.Required(ATTR_MEDIA_TYPE): vol.In(["movie", "series"]),
         vol.Optional(ATTR_SEASON): vol.Coerce(int),  # type: ignore[arg-type]
         vol.Optional(ATTR_EPISODE): vol.Coerce(int),  # type: ignore[arg-type]
+    }
+)
+
+GET_SERIES_METADATA_SCHEMA = vol.Schema(
+    {
+        vol.Required(ATTR_MEDIA_ID): cv.string,
     }
 )
 
@@ -110,6 +125,35 @@ BROWSE_CATALOG_SCHEMA = vol.Schema(
         ),
     }
 )
+
+GET_UPCOMING_EPISODES_SCHEMA = vol.Schema(
+    {
+        vol.Optional(ATTR_DAYS_AHEAD, default=7): vol.All(
+            vol.Coerce(int), vol.Range(min=1, max=30)  # type: ignore[arg-type]
+        ),
+    }
+)
+
+GET_RECOMMENDATIONS_SCHEMA = vol.Schema(
+    {
+        vol.Optional(ATTR_MEDIA_TYPE): vol.In(["movie", "series"]),
+        vol.Optional(ATTR_LIMIT, default=20): vol.All(
+            vol.Coerce(int), vol.Range(min=1, max=50)  # type: ignore[arg-type]
+        ),
+    }
+)
+
+GET_SIMILAR_CONTENT_SCHEMA = vol.Schema(
+    {
+        vol.Required(ATTR_MEDIA_ID): cv.string,
+        vol.Optional(ATTR_LIMIT, default=10): vol.All(
+            vol.Coerce(int), vol.Range(min=1, max=30)  # type: ignore[arg-type]
+        ),
+    }
+)
+
+# Get addons has no required parameters
+GET_ADDONS_SCHEMA = vol.Schema({})
 
 
 def _get_entry_data(
@@ -212,7 +256,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
 
     async def handle_get_streams(call: ServiceCall) -> ServiceResponse:  # type: ignore[return-value]
         """Handle get_streams service call."""
-        _, client, _ = _get_entry_data(hass)
+        _, client, entry_id = _get_entry_data(hass)
 
         media_id = call.data[ATTR_MEDIA_ID]
         media_type = call.data[ATTR_MEDIA_TYPE]
@@ -235,12 +279,35 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             episode,
         )
 
+        # Get user preferences from config entry options
+        entry = hass.config_entries.async_get_entry(entry_id)
+        addon_order = None
+        quality_preference = DEFAULT_STREAM_QUALITY_PREFERENCE
+        if entry:
+            addon_order_raw = entry.options.get(CONF_ADDON_STREAM_ORDER)
+            if addon_order_raw:
+                # Handle both list (from new selector) and string (legacy) formats
+                if isinstance(addon_order_raw, list):
+                    addon_order = addon_order_raw
+                else:
+                    # Parse multiline text to list (legacy format)
+                    addon_order = [
+                        line.strip()
+                        for line in addon_order_raw.split("\n")
+                        if line.strip()
+                    ]
+            quality_preference = entry.options.get(
+                CONF_STREAM_QUALITY_PREFERENCE, DEFAULT_STREAM_QUALITY_PREFERENCE
+            )
+
         try:
             streams = await client.async_get_streams(
                 media_id=media_id,
                 media_type=media_type,
                 season=season,
                 episode=episode,
+                addon_order=addon_order,
+                quality_preference=quality_preference,
             )
 
             return {
@@ -250,6 +317,39 @@ async def async_setup_services(hass: HomeAssistant) -> None:
 
         except StremioConnectionError as err:
             raise HomeAssistantError(f"Failed to get streams: {err}") from err
+
+    async def handle_get_series_metadata(call: ServiceCall) -> ServiceResponse:  # type: ignore[return-value]
+        """Handle get_series_metadata service call.
+
+        Fetch series metadata including seasons and episodes from Cinemeta.
+        Returns structured data for the episode picker UI.
+        """
+        _, client, _ = _get_entry_data(hass)
+
+        media_id = call.data[ATTR_MEDIA_ID]
+
+        _LOGGER.debug("Getting series metadata: media_id=%s", media_id)
+
+        try:
+            metadata = await client.async_get_series_metadata(media_id)
+
+            if not metadata:
+                return {
+                    "success": False,
+                    "error": "No metadata found for series",
+                    "media_id": media_id,
+                }
+
+            return {
+                "success": True,
+                "metadata": metadata,
+            }
+
+        except StremioConnectionError as err:
+            raise HomeAssistantError(f"Failed to get series metadata: {err}") from err
+        except Exception as err:
+            _LOGGER.exception("Error fetching series metadata: %s", err)
+            raise HomeAssistantError(f"Failed to get series metadata: {err}") from err
 
     async def handle_add_to_library(call: ServiceCall) -> None:
         """Handle add_to_library service call."""
@@ -466,7 +566,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
 
     async def handle_browse_catalog(call: ServiceCall) -> ServiceResponse:
         """Handle browse_catalog service call.
-        
+
         Browse the Stremio catalog for popular or new movies/series, optionally filtered by genre.
         Returns a list of catalog items with metadata.
         """
@@ -511,6 +611,156 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         except StremioConnectionError as err:
             raise HomeAssistantError(f"Failed to browse catalog: {err}") from err
 
+    async def handle_get_upcoming_episodes(call: ServiceCall) -> ServiceResponse:
+        """Handle get_upcoming_episodes service call.
+
+        Get air dates for upcoming episodes of series in the user's library.
+        Returns a list of upcoming episodes sorted by air date.
+        """
+        _, client, _ = _get_entry_data(hass)
+
+        days_ahead = call.data.get(ATTR_DAYS_AHEAD, 7)
+
+        _LOGGER.debug("Getting upcoming episodes for next %d days", days_ahead)
+
+        try:
+            upcoming = await client.async_get_upcoming_episodes(days_ahead=days_ahead)
+
+            return {
+                "episodes": upcoming,
+                "count": len(upcoming),
+                "days_ahead": days_ahead,
+            }
+
+        except StremioConnectionError as err:
+            raise HomeAssistantError(f"Failed to get upcoming episodes: {err}") from err
+
+    async def handle_get_recommendations(call: ServiceCall) -> ServiceResponse:
+        """Handle get_recommendations service call.
+
+        Get content recommendations based on the user's library.
+        Analyzes library genres and preferences to suggest new content.
+        """
+        _, client, _ = _get_entry_data(hass)
+
+        media_type = call.data.get(ATTR_MEDIA_TYPE)
+        limit = call.data.get(ATTR_LIMIT, 20)
+
+        _LOGGER.debug("Getting recommendations: type=%s, limit=%d", media_type, limit)
+
+        try:
+            recommendations = await client.async_get_recommendations(
+                media_type=media_type,
+                limit=limit,
+            )
+
+            return {
+                "recommendations": recommendations,
+                "count": len(recommendations),
+                "media_type": media_type,
+            }
+
+        except StremioConnectionError as err:
+            raise HomeAssistantError(f"Failed to get recommendations: {err}") from err
+
+    async def handle_get_similar_content(call: ServiceCall) -> ServiceResponse:
+        """Handle get_similar_content service call.
+
+        Get similar movies or shows based on a specific media item.
+        Uses genre and metadata matching to find related content.
+        """
+        _, client, _ = _get_entry_data(hass)
+
+        media_id = call.data[ATTR_MEDIA_ID]
+        limit = call.data.get(ATTR_LIMIT, 10)
+
+        _LOGGER.debug("Getting similar content for %s, limit=%d", media_id, limit)
+
+        try:
+            similar = await client.async_get_similar_content(
+                media_id=media_id,
+                limit=limit,
+            )
+
+            return {
+                "similar": similar,
+                "count": len(similar),
+                "source_media_id": media_id,
+            }
+
+        except StremioConnectionError as err:
+            raise HomeAssistantError(f"Failed to get similar content: {err}") from err
+
+    async def handle_get_addons(call: ServiceCall) -> ServiceResponse:
+        """Handle get_addons service call.
+
+        Retrieves the user's configured Stremio addons with their details
+        including manifest information, transport URLs, and capabilities.
+        """
+        _, client, _ = _get_entry_data(hass)
+
+        _LOGGER.debug("Getting configured addons")
+
+        try:
+            addons = await client.async_get_addon_collection()
+
+            # Process addons to extract useful information
+            processed_addons = []
+            for addon in addons:
+                manifest = addon.get("manifest", {})
+                transport_url = addon.get("transportUrl", "")
+
+                # Extract resources (capabilities)
+                resources = manifest.get("resources", [])
+                capabilities = []
+                for resource in resources:
+                    if isinstance(resource, str):
+                        capabilities.append(resource)
+                    elif isinstance(resource, dict):
+                        capabilities.append(resource.get("name", ""))
+
+                # Extract types supported
+                types = manifest.get("types", [])
+
+                # Extract catalogs
+                catalogs = manifest.get("catalogs", [])
+                catalog_info = []
+                for catalog in catalogs:
+                    if isinstance(catalog, dict):
+                        catalog_info.append(
+                            {
+                                "type": catalog.get("type"),
+                                "id": catalog.get("id"),
+                                "name": catalog.get("name"),
+                            }
+                        )
+
+                processed_addon = {
+                    "id": manifest.get("id", ""),
+                    "name": manifest.get("name", "Unknown"),
+                    "version": manifest.get("version", ""),
+                    "description": manifest.get("description", ""),
+                    "logo": manifest.get("logo", ""),
+                    "background": manifest.get("background", ""),
+                    "transport_url": transport_url,
+                    "types": types,
+                    "resources": capabilities,
+                    "catalogs": catalog_info,
+                    "id_prefixes": manifest.get("idPrefixes", []),
+                    "behavior_hints": manifest.get("behaviorHints", {}),
+                }
+                processed_addons.append(processed_addon)
+
+            _LOGGER.info("Retrieved %d configured addons", len(processed_addons))
+
+            return {
+                "addons": processed_addons,
+                "count": len(processed_addons),
+            }
+
+        except StremioConnectionError as err:
+            raise HomeAssistantError(f"Failed to get addons: {err}") from err
+
     # Register services
     hass.services.async_register(
         DOMAIN,
@@ -525,6 +775,14 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         SERVICE_GET_STREAMS,
         handle_get_streams,
         schema=GET_STREAMS_SCHEMA,
+        supports_response=SupportsResponse.OPTIONAL,
+    )
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_GET_SERIES_METADATA,
+        handle_get_series_metadata,
+        schema=GET_SERIES_METADATA_SCHEMA,
         supports_response=SupportsResponse.OPTIONAL,
     )
 
@@ -563,6 +821,38 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         supports_response=SupportsResponse.OPTIONAL,
     )
 
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_GET_UPCOMING_EPISODES,
+        handle_get_upcoming_episodes,
+        schema=GET_UPCOMING_EPISODES_SCHEMA,
+        supports_response=SupportsResponse.OPTIONAL,
+    )
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_GET_RECOMMENDATIONS,
+        handle_get_recommendations,
+        schema=GET_RECOMMENDATIONS_SCHEMA,
+        supports_response=SupportsResponse.OPTIONAL,
+    )
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_GET_SIMILAR_CONTENT,
+        handle_get_similar_content,
+        schema=GET_SIMILAR_CONTENT_SCHEMA,
+        supports_response=SupportsResponse.OPTIONAL,
+    )
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_GET_ADDONS,
+        handle_get_addons,
+        schema=GET_ADDONS_SCHEMA,
+        supports_response=SupportsResponse.OPTIONAL,
+    )
+
 
 async def async_unload_services(hass: HomeAssistant) -> None:
     """Unload Stremio services.
@@ -572,8 +862,13 @@ async def async_unload_services(hass: HomeAssistant) -> None:
     """
     hass.services.async_remove(DOMAIN, SERVICE_SEARCH_LIBRARY)
     hass.services.async_remove(DOMAIN, SERVICE_GET_STREAMS)
+    hass.services.async_remove(DOMAIN, SERVICE_GET_SERIES_METADATA)
     hass.services.async_remove(DOMAIN, SERVICE_ADD_TO_LIBRARY)
     hass.services.async_remove(DOMAIN, SERVICE_REMOVE_FROM_LIBRARY)
     hass.services.async_remove(DOMAIN, SERVICE_REFRESH_LIBRARY)
     hass.services.async_remove(DOMAIN, SERVICE_HANDOVER_TO_APPLE_TV)
     hass.services.async_remove(DOMAIN, SERVICE_BROWSE_CATALOG)
+    hass.services.async_remove(DOMAIN, SERVICE_GET_UPCOMING_EPISODES)
+    hass.services.async_remove(DOMAIN, SERVICE_GET_RECOMMENDATIONS)
+    hass.services.async_remove(DOMAIN, SERVICE_GET_SIMILAR_CONTENT)
+    hass.services.async_remove(DOMAIN, SERVICE_GET_ADDONS)

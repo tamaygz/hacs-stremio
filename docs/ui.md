@@ -93,7 +93,12 @@ columns: 4
 - **Search**: Filter library by title as you type
 - **Filters**: Filter by type (Movies, Series)
 - **Sorting**: Sort by recent, title A-Z, or progress
-- **Click Actions**: Click any item for details and actions
+- **Inline Detail View**: Click any item for details and actions
+- **Quick Actions**:
+  - **Select/Change Episode**: For TV series (side-by-side with Find Similar)
+  - **Find Similar**: Discover similar content in a grid view within the card
+  - **Open in Stremio**: Play directly in Stremio
+  - **Get Streams**: View available streams for the selected media
 - **Lazy Loading**: Efficient loading for large libraries
 
 ---
@@ -146,7 +151,7 @@ This card is typically not added directly but is used by other cards when you cl
 
 ### 5. Stremio Browse Card
 
-Browse popular and new movies/TV shows from Stremio catalogs.
+Browse popular and new movies/TV shows from Stremio catalogs with inline details view.
 
 **Type:** `stremio-browse-card`
 
@@ -166,8 +171,13 @@ default_type: movie
 show_view_controls: true
 show_type_controls: true
 show_genre_filter: true
+show_title: true
+show_media_type_badge: false
+show_similar_button: true
 columns: 4
 max_items: 50
+card_height: 500
+poster_aspect_ratio: '2/3'
 ```
 
 #### Options
@@ -180,17 +190,152 @@ max_items: 50
 | `show_view_controls` | boolean | true | Show Popular/New toggle buttons |
 | `show_type_controls` | boolean | true | Show Movies/TV Shows toggle buttons |
 | `show_genre_filter` | boolean | true | Show genre filter dropdown |
+| `show_title` | boolean | true | Show title below poster |
+| `show_media_type_badge` | boolean | false | Show Movie/TV badge on poster |
+| `show_similar_button` | boolean | true | Show "Find Similar" button in detail view |
 | `columns` | number | 4 | Grid columns (desktop) |
 | `max_items` | number | 50 | Maximum items to display |
+| `card_height` | number | 500 | Max height in px (0 for auto) |
+| `poster_aspect_ratio` | string | "2/3" | Poster ratio ("2/3", "16/9", "1/1", "4/3") |
 
 #### Features
 
 - **View Modes**: Toggle between Popular and New content
 - **Media Types**: Switch between Movies and TV Shows
 - **Genre Filtering**: Filter content by genre (Action, Drama, Comedy, etc.)
-- **Click Actions**: Click any item for details and streaming options
+- **Inline Detail View**: Click any item to see details within the card (consistent with Library Card)
+- **Episode Picker**: For TV shows, select season/episode before viewing details
+- **Quick Actions**: 
+  - **Change Episode** / **Select Episode**: For TV shows (side-by-side with Find Similar)
+  - **Find Similar**: Discover similar content in a grid view within the card
+  - **Open in Stremio**: Play directly in Stremio
+  - **Get Streams**: View available streams for the selected media
+  - **Add to Library**: Add to your library
 - **Responsive**: Adapts to mobile and desktop screens
 - **Direct Integration**: Uses Stremio's catalog API via media browser
+
+---
+
+### 6. Stremio Continue Watching Card
+
+Display and resume content from your "Continue Watching" list with progress indicators.
+
+**Type:** `stremio-continue-watching-card`
+
+#### Basic Configuration
+
+```yaml
+type: custom:stremio-continue-watching-card
+```
+
+#### Full Configuration
+
+```yaml
+type: custom:stremio-continue-watching-card
+title: Continue Watching
+show_filters: true
+show_title: true
+show_progress_text: true
+show_media_type_badge: false
+show_similar_button: true
+max_items: 20
+columns: 4
+card_height: 0
+poster_aspect_ratio: '2/3'
+horizontal_scroll: false
+tap_action: details
+default_sort: recent
+```
+
+#### Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `title` | string | "Continue Watching" | Card title |
+| `show_filters` | boolean | true | Show type filter and sort options |
+| `show_title` | boolean | true | Show title below poster |
+| `show_progress_text` | boolean | true | Show progress percentage |
+| `show_media_type_badge` | boolean | false | Show Movie/TV badge on poster |
+| `show_similar_button` | boolean | true | Show "Find Similar" button in detail view |
+| `max_items` | number | 20 | Maximum items to display |
+| `columns` | number | 4 | Grid columns |
+| `card_height` | number | 0 | Fixed height in px (0 for auto) |
+| `poster_aspect_ratio` | string | "2/3" | Poster ratio ("2/3", "16/9", "1/1", "4/3") |
+| `horizontal_scroll` | boolean | false | Enable horizontal carousel mode |
+| `tap_action` | string | "details" | Action on tap ("details", "play", "streams") |
+| `default_sort` | string | "recent" | Default sort ("recent", "progress", "title") |
+
+#### Features
+
+- **Progress Tracking**: Visual progress bars for each item
+- **Quick Resume**: One-click resume in Stremio
+- **Episode Picker**: Select different episodes for TV series
+- **Quick Actions**:
+  - **Change Episode**: For TV series (side-by-side with Find Similar)
+  - **Find Similar**: Discover similar content in a grid view within the card
+  - **Resume in Stremio**: Resume playback
+  - **Get Streams**: View available streams for the selected media
+- **Responsive Layout**: Grid or horizontal carousel mode
+
+---
+
+### 7. Stremio Recommendations Card
+
+Get personalized content recommendations based on your library preferences.
+
+**Type:** `stremio-recommendations-card`
+
+#### Basic Configuration
+
+```yaml
+type: custom:stremio-recommendations-card
+```
+
+#### Full Configuration
+
+```yaml
+type: custom:stremio-recommendations-card
+title: Recommended For You
+show_filters: true
+show_title: true
+show_reason: true
+show_media_type_badge: false
+max_items: 20
+columns: 4
+card_height: 0
+poster_aspect_ratio: '2/3'
+horizontal_scroll: false
+tap_action: details
+default_filter: all
+refresh_interval: 3600
+```
+
+#### Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `title` | string | "Recommended For You" | Card title |
+| `show_filters` | boolean | true | Show All/Movies/Series filter buttons |
+| `show_title` | boolean | true | Show title below poster |
+| `show_reason` | boolean | true | Show recommendation reason overlay |
+| `show_media_type_badge` | boolean | false | Show Movie/TV badge on poster |
+| `max_items` | number | 20 | Maximum recommendations to display |
+| `columns` | number | 4 | Grid columns |
+| `card_height` | number | 0 | Fixed height in px (0 for auto) |
+| `poster_aspect_ratio` | string | "2/3" | Poster ratio ("2/3", "16/9", "1/1", "4/3") |
+| `horizontal_scroll` | boolean | false | Enable horizontal carousel mode |
+| `tap_action` | string | "details" | Action on tap ("details", "open_stremio", "streams") |
+| `default_filter` | string | "all" | Default filter ("all", "movie", "series") |
+| `refresh_interval` | number | 3600 | Seconds between auto-refreshes |
+
+#### Features
+
+- **Personalized**: Recommendations based on your library genres
+- **Reason Display**: Shows why each item was recommended
+- **Quick Actions**: Add to library, get streams, or open in Stremio
+- **Filter by Type**: Show only movies or TV series
+- **Manual Refresh**: Refresh button to get new recommendations
+- **Responsive Layout**: Grid or horizontal carousel mode
 
 ---
 
@@ -218,6 +363,12 @@ views:
             entity: media_player.stremio
           - type: custom:stremio-media-details-card
             entity: media_player.stremio
+      - type: custom:stremio-continue-watching-card
+        title: Continue Watching
+        horizontal_scroll: true
+        columns: 5
+      - type: custom:stremio-recommendations-card
+        title: Recommended For You
       - type: custom:stremio-browse-card
         title: Discover Content
         default_view: popular

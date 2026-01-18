@@ -1,0 +1,137 @@
+# New Episode Alert - Stremio Automation Example
+#
+# This automation notifies you when TV shows you're watching have new episodes.
+# It uses the stremio_new_episodes_detected event which fires when the integration
+# detects that a series in your continue watching list has advanced to a new episode.
+#
+# Prerequisites:
+# - Stremio integration configured
+# - Mobile app or notification service set up
+#
+# How it works:
+# The integration tracks the last known episode for each series. When a new episode
+# appears (e.g., you went from S02E05 to S02E06), this event is fired.
+
+# Basic notification automation
+alias: "Stremio: New Episode Alert"
+description: "Notify when shows in your continue watching have new episodes"
+mode: single
+
+trigger:
+  - platform: event
+    event_type: stremio_new_episodes_detected
+
+action:
+  # Send a notification for each series with new episodes
+  - repeat:
+      for_each: "{{ trigger.event.data.series }}"
+      sequence:
+        - service: notify.mobile_app_your_phone # Change to your notification service
+          data:
+            title: "📺 New Episode: {{ repeat.item.title }}"
+            message: >
+              S{{ '%02d' % repeat.item.new_season }}E{{ '%02d' % repeat.item.new_episode }}
+              {% if repeat.item.episode_title %} - {{ repeat.item.episode_title }}{% endif %}
+              is ready to watch!
+            data:
+              # Poster image for rich notifications
+              image: "{{ repeat.item.poster }}"
+              # Android notification channel
+              channel: stremio_episodes
+              importance: default
+              # iOS notification settings
+              push:
+                sound: default
+              # Actionable notification buttons
+              actions:
+                - action: "WATCH_{{ repeat.item.imdb_id }}"
+                  title: "Watch Now"
+                - action: DISMISS
+                  title: "Later"
+
+---
+# Alternative: Single notification listing all shows
+alias: "Stremio: New Episodes Summary"
+description: "Single notification summarizing all new episodes"
+mode: single
+
+trigger:
+  - platform: event
+    event_type: stremio_new_episodes_detected
+
+action:
+  - service: notify.mobile_app_your_phone
+    data:
+      title: "📺 {{ trigger.event.data.series_count }} Show(s) Have New Episodes"
+      message: >
+        {% for show in trigger.event.data.series %}
+        • {{ show.title }} - S{{ '%02d' % show.new_season }}E{{ '%02d' % show.new_episode }}
+        {% endfor %}
+      data:
+        image: "{{ trigger.event.data.series[0].poster }}"
+        actions:
+          - action: OPEN_STREMIO
+            title: "Open Stremio"
+
+---
+# Advanced: Filter for specific shows only
+alias: "Stremio: Breaking Bad Alert"
+description: "Alert only for specific shows"
+mode: single
+
+trigger:
+  - platform: event
+    event_type: stremio_new_episodes_detected
+
+condition:
+  # Only alert for specific shows (by IMDB ID or title)
+  - condition: template
+    value_template: >
+      {% set watched_shows = ['tt0903747', 'tt2861424'] %}
+      {% for show in trigger.event.data.series %}
+        {% if show.imdb_id in watched_shows %}
+          true
+        {% endif %}
+      {% endfor %}
+
+action:
+  - service: notify.mobile_app_your_phone
+    data:
+      title: "🔥 Must-Watch Episode Available!"
+      message: >
+        {% for show in trigger.event.data.series %}
+        {% if show.imdb_id in ['tt0903747', 'tt2861424'] %}
+        {{ show.title }} S{{ '%02d' % show.new_season }}E{{ '%02d' % show.new_episode }}
+        {% endif %}
+        {% endfor %}
+      data:
+        priority: high
+        ttl: 0
+
+---
+# Integration with TTS announcement
+alias: "Stremio: Announce New Episode"
+description: "Announce new episodes on a smart speaker"
+mode: single
+
+trigger:
+  - platform: event
+    event_type: stremio_new_episodes_detected
+
+condition:
+  # Only announce during reasonable hours
+  - condition: time
+    after: "09:00:00"
+    before: "22:00:00"
+
+action:
+  - service: tts.speak
+    target:
+      entity_id: tts.google_translate_say
+    data:
+      message: >
+        New episode available! 
+        {{ trigger.event.data.series[0].title }}, 
+        Season {{ trigger.event.data.series[0].new_season }}, 
+        Episode {{ trigger.event.data.series[0].new_episode }}
+      media_player_entity_id: media_player.living_room_speaker

@@ -20,6 +20,41 @@
     }
   },
   "entity": {
+    "binary_sensor": {
+      "is_watching": {
+        "name": "Is Watching",
+        "state_attributes": {
+          "title": {
+            "name": "Title"
+          },
+          "type": {
+            "name": "Content type"
+          },
+          "progress_percent": {
+            "name": "Progress"
+          }
+        }
+      },
+      "has_continue_watching": {
+        "name": "Has Continue Watching",
+        "state_attributes": {
+          "count": {
+            "name": "Count"
+          }
+        }
+      },
+      "has_new_episodes": {
+        "name": "Has New Episodes",
+        "state_attributes": {
+          "count": {
+            "name": "Count"
+          },
+          "series": {
+            "name": "Series"
+          }
+        }
+      }
+    },
     "media_player": {
       "stremio": {
         "name": "Stremio",
@@ -60,14 +95,19 @@
     "step": {
       "init": {
         "title": "Stremio Options",
-        "description": "Configure update intervals, polling behavior, and Apple TV handover settings.",
+        "description": "Configure update intervals, polling behavior, streaming preferences, and Apple TV handover settings.",
         "data": {
           "player_scan_interval": "Player state update interval (seconds)",
           "library_scan_interval": "Library sync interval (seconds)",
           "polling_gate_entities": "Polling gate entities",
           "enable_apple_tv_handover": "Enable Apple TV handover",
           "handover_method": "Handover method",
-          "apple_tv_entity_id": "Apple TV entity ID (for Direct method)"
+          "apple_tv_entity_id": "Apple TV entity ID (for Direct method)",
+          "show_copy_url": "Show 'Copy URL' in media browser",
+          "default_catalog_source": "Default catalog source",
+          "addon_stream_order": "Stream addon priority order",
+          "reset_addon_order": "Reset to default addon order",
+          "stream_quality_preference": "Stream quality preference"
         },
         "data_description": {
           "player_scan_interval": "How often to check for player state changes (10-300 seconds)",
@@ -75,7 +115,12 @@
           "polling_gate_entities": "Select media players or other entities that control polling. When all selected entities are off/idle, polling is reduced to once per 24 hours. Leave empty to always poll at normal intervals.",
           "enable_apple_tv_handover": "Allow sending content to Apple TV",
           "handover_method": "Method to use: 'auto' or 'airplay' (recommended), 'direct' (may work for HLS). Note: VLC does NOT work on tvOS!",
-          "apple_tv_entity_id": "The media_player entity ID for Direct handover (e.g., 'media_player.apple_tv_living_room')"
+          "apple_tv_entity_id": "The media_player entity ID for Direct handover (e.g., 'media_player.apple_tv_living_room')",
+          "show_copy_url": "Show 'Copy URL' option when browsing streams in the media browser. Disable to reduce clutter.",
+          "default_catalog_source": "The addon to use for fetching metadata (e.g., 'cinemeta', 'tmdb'). Leave as 'cinemeta' for default.",
+          "addon_stream_order": "Select addons in your preferred order. Streams from addons listed first will appear at the top. Leave empty to use Stremio's default order.",
+          "reset_addon_order": "Check this box to clear the custom addon order and use Stremio's default order.",
+          "stream_quality_preference": "Preferred stream quality. Matching streams will be shown first. Select 'any' to show all streams without filtering."
         }
       },
       "pyatv_missing": {

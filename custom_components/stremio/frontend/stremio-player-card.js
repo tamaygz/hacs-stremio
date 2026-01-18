@@ -5,6 +5,8 @@
  * 
  * @customElement stremio-player-card
  * @extends LitElement
+ * @version 0.3.1
+ * @cacheBust 20260118
  */
 
 // Safe LitElement access - wait for HA frontend to be ready
@@ -199,11 +201,20 @@ class StremioPlayerCard extends LitElement {
       throw new Error('Please define an entity');
     }
     this.config = {
+      // Display options
       name: 'Stremio Player',
       show_poster: true,
       show_progress: true,
       show_actions: true,
       show_browse_button: false,
+      show_backdrop: false, // Background blur effect
+      
+      // Layout options
+      compact_mode: false, // Smaller card layout
+      
+      // Device integration
+      apple_tv_entity: undefined, // For Apple TV handover
+      
       ...config,
     };
   }
@@ -492,6 +503,9 @@ class StremioPlayerCard extends LitElement {
       show_poster: true,
       show_progress: true,
       show_actions: true,
+      show_browse_button: false,
+      show_backdrop: false,
+      compact_mode: false,
     };
   }
 }
@@ -507,6 +521,20 @@ class StremioPlayerCardEditor extends LitElement {
     return {
       hass: { type: Object },
       _config: { type: Object },
+      _stremioEntities: { type: Array },
+      _appleTvEntities: { type: Array },
+      _expandedSections: { type: Object },
+    };
+  }
+
+  constructor() {
+    super();
+    this._stremioEntities = [];
+    this._appleTvEntities = [];
+    this._expandedSections = {
+      entity: true,
+      display: false,
+      device: false,
     };
   }
 
@@ -514,87 +542,240 @@ class StremioPlayerCardEditor extends LitElement {
     this._config = config;
   }
 
-  get _entity() {
-    return this._config?.entity || '';
+  updated(changedProps) {
+    if (changedProps.has('hass') && this.hass) {
+      this._updateEntities();
+    }
   }
 
-  get _show_poster() {
-    return this._config?.show_poster !== false;
+  _updateEntities() {
+    // Find Stremio media player entities
+    this._stremioEntities = Object.keys(this.hass.states)
+      .filter(entityId => 
+        entityId.startsWith('media_player.') && 
+        entityId.toLowerCase().includes('stremio')
+      )
+      .map(entityId => ({
+        entity_id: entityId,
+        friendly_name: this.hass.states[entityId].attributes.friendly_name || entityId,
+      }));
+
+    // Find Apple TV media_player entities
+    this._appleTvEntities = Object.keys(this.hass.states)
+      .filter(entityId => {
+        if (!entityId.startsWith('media_player.')) return false;
+        const state = this.hass.states[entityId];
+        const friendlyName = (state.attributes.friendly_name || '').toLowerCase();
+        const entityLower = entityId.toLowerCase();
+        // Match Apple TV by entity ID or friendly name
+        return entityLower.includes('apple_tv') ||
+               entityLower.includes('appletv') ||
+               friendlyName.includes('apple tv') ||
+               friendlyName.includes('appletv');
+      })
+      .map(entityId => ({
+        entity_id: entityId,
+        friendly_name: this.hass.states[entityId].attributes.friendly_name || entityId,
+      }));
   }
 
-  get _show_progress() {
-    return this._config?.show_progress !== false;
+  _selectEntity(entityId) {
+    this._config = { ...this._config, entity: entityId };
+    this.dispatchEvent(new CustomEvent('config-changed', {
+      bubbles: true,
+      composed: true,
+      detail: { config: this._config },
+    }));
   }
 
-  get _show_actions() {
-    return this._config?.show_actions !== false;
+  _selectAppleTv(entityId) {
+    this._config = { ...this._config, apple_tv_entity: entityId || undefined };
+    this.dispatchEvent(new CustomEvent('config-changed', {
+      bubbles: true,
+      composed: true,
+      detail: { config: this._config },
+    }));
+  }
+
+  _toggleSection(section) {
+    this._expandedSections = {
+      ...this._expandedSections,
+      [section]: !this._expandedSections[section],
+    };
   }
 
   render() {
-    if (!this.hass) {
+    if (!this.hass || !this._config) {
       return html``;
     }
 
     return html`
       <div class="card-config">
-        <ha-entity-picker
-          .hass=${this.hass}
-          .value=${this._entity}
-          .configValue=${'entity'}
-          .includeDomains=${['media_player', 'sensor']}
-          @value-changed=${this._valueChanged}
-          allow-custom-entity
-        ></ha-entity-picker>
+        <!-- Entity Section -->
+        <div class="config-section">
+          <div class="section-header" @click=${() => this._toggleSection('entity')}>
+            <ha-icon icon="mdi:link-variant"></ha-icon>
+            <span>Entity</span>
+            <ha-icon class="expand-icon ${this._expandedSections.entity ? 'expanded' : ''}" icon="mdi:chevron-down"></ha-icon>
+          </div>
+          ${this._expandedSections.entity ? html`
+            <div class="section-content">
+              ${this._stremioEntities?.length > 0 ? html`
+                <div class="entity-buttons">
+                  ${this._stremioEntities.map(entity => html`
+                    <button 
+                      class="entity-btn ${this._config.entity === entity.entity_id ? 'selected' : ''}"
+                      @click=${() => this._selectEntity(entity.entity_id)}
+                    >
+                      <ha-icon icon="mdi:play-circle"></ha-icon>
+                      <span>${entity.friendly_name}</span>
+                    </button>
+                  `)}
+                </div>
+              ` : html`
+                <div class="no-entities">
+                  <ha-icon icon="mdi:alert-circle-outline"></ha-icon>
+                  <span>No Stremio media players found.</span>
+                </div>
+              `}
+              
+              <ha-entity-picker
+                .hass=${this.hass}
+                .value=${this._config.entity || ''}
+                .configValue=${'entity'}
+                .includeDomains=${['media_player']}
+                label="Or select manually"
+                @value-changed=${this._valueChanged}
+                allow-custom-entity
+              ></ha-entity-picker>
+            </div>
+          ` : ''}
+        </div>
 
-        <ha-formfield label="Show Poster">
-          <ha-switch
-            .checked=${this._show_poster}
-            .configValue=${'show_poster'}
-            @change=${this._valueChanged}
-          ></ha-switch>
-        </ha-formfield>
+        <!-- Display Section -->
+        <div class="config-section">
+          <div class="section-header" @click=${() => this._toggleSection('display')}>
+            <ha-icon icon="mdi:palette"></ha-icon>
+            <span>Display Options</span>
+            <ha-icon class="expand-icon ${this._expandedSections.display ? 'expanded' : ''}" icon="mdi:chevron-down"></ha-icon>
+          </div>
+          ${this._expandedSections.display ? html`
+            <div class="section-content">
+              <div class="toggle-group">
+                <ha-formfield label="Show Poster">
+                  <ha-switch
+                    .checked=${this._config.show_poster !== false}
+                    .configValue=${'show_poster'}
+                    @change=${this._valueChanged}
+                  ></ha-switch>
+                </ha-formfield>
 
-        <ha-formfield label="Show Progress">
-          <ha-switch
-            .checked=${this._show_progress}
-            .configValue=${'show_progress'}
-            @change=${this._valueChanged}
-          ></ha-switch>
-        </ha-formfield>
+                <ha-formfield label="Show Progress Bar">
+                  <ha-switch
+                    .checked=${this._config.show_progress !== false}
+                    .configValue=${'show_progress'}
+                    @change=${this._valueChanged}
+                  ></ha-switch>
+                </ha-formfield>
 
-        <ha-formfield label="Show Actions">
-          <ha-switch
-            .checked=${this._show_actions}
-            .configValue=${'show_actions'}
-            @change=${this._valueChanged}
-          ></ha-switch>
-        </ha-formfield>
+                <ha-formfield label="Show Action Buttons">
+                  <ha-switch
+                    .checked=${this._config.show_actions !== false}
+                    .configValue=${'show_actions'}
+                    @change=${this._valueChanged}
+                  ></ha-switch>
+                </ha-formfield>
+
+                <ha-formfield label="Show Browse Button">
+                  <ha-switch
+                    .checked=${this._config.show_browse_button === true}
+                    .configValue=${'show_browse_button'}
+                    @change=${this._valueChanged}
+                  ></ha-switch>
+                </ha-formfield>
+
+                <ha-formfield label="Show Backdrop Effect">
+                  <ha-switch
+                    .checked=${this._config.show_backdrop === true}
+                    .configValue=${'show_backdrop'}
+                    @change=${this._valueChanged}
+                  ></ha-switch>
+                </ha-formfield>
+
+                <ha-formfield label="Compact Mode">
+                  <ha-switch
+                    .checked=${this._config.compact_mode === true}
+                    .configValue=${'compact_mode'}
+                    @change=${this._valueChanged}
+                  ></ha-switch>
+                </ha-formfield>
+              </div>
+            </div>
+          ` : ''}
+        </div>
+
+        <!-- Device Section -->
+        <div class="config-section">
+          <div class="section-header" @click=${() => this._toggleSection('device')}>
+            <ha-icon icon="mdi:devices"></ha-icon>
+            <span>Device Integration</span>
+            <ha-icon class="expand-icon ${this._expandedSections.device ? 'expanded' : ''}" icon="mdi:chevron-down"></ha-icon>
+          </div>
+          ${this._expandedSections.device ? html`
+            <div class="section-content">
+              <p class="helper-text">Select an Apple TV to enable handover functionality.</p>
+              
+              ${this._appleTvEntities?.length > 0 ? html`
+                <div class="entity-buttons">
+                  ${this._appleTvEntities.map(entity => html`
+                    <button 
+                      class="entity-btn ${this._config.apple_tv_entity === entity.entity_id ? 'selected' : ''}"
+                      @click=${() => this._selectAppleTv(entity.entity_id)}
+                    >
+                      <ha-icon icon="mdi:apple"></ha-icon>
+                      <span>${entity.friendly_name}</span>
+                    </button>
+                  `)}
+                  <button 
+                    class="entity-btn ${!this._config.apple_tv_entity ? 'selected' : ''}"
+                    @click=${() => this._selectAppleTv('')}
+                  >
+                    <ha-icon icon="mdi:close"></ha-icon>
+                    <span>None</span>
+                  </button>
+                </div>
+              ` : ''}
+
+              <ha-entity-picker
+                .hass=${this.hass}
+                .value=${this._config.apple_tv_entity || ''}
+                .configValue=${'apple_tv_entity'}
+                .includeDomains=${['media_player']}
+                label="Apple TV Entity"
+                allow-custom-entity
+                @value-changed=${this._valueChanged}
+              ></ha-entity-picker>
+            </div>
+          ` : ''}
+        </div>
       </div>
     `;
   }
 
   _valueChanged(ev) {
-    if (!this._config || !this.hass) {
-      return;
-    }
+    if (!this._config || !this.hass) return;
 
     const target = ev.target;
     const configValue = target.configValue;
     const value = target.checked !== undefined ? target.checked : ev.detail?.value;
 
     if (configValue) {
-      this._config = {
-        ...this._config,
-        [configValue]: value,
-      };
-      // Dispatch config-changed with bubbles and composed for HA compatibility
-      this.dispatchEvent(
-        new CustomEvent('config-changed', {
-          bubbles: true,
-          composed: true,
-          detail: { config: this._config },
-        })
-      );
+      this._config = { ...this._config, [configValue]: value };
+      this.dispatchEvent(new CustomEvent('config-changed', {
+        bubbles: true,
+        composed: true,
+        detail: { config: this._config },
+      }));
     }
   }
 
@@ -603,13 +784,112 @@ class StremioPlayerCardEditor extends LitElement {
       .card-config {
         display: flex;
         flex-direction: column;
-        gap: 16px;
+        gap: 8px;
+        padding: 8px;
+      }
+
+      .config-section {
+        border: 1px solid var(--divider-color);
+        border-radius: 8px;
+        overflow: hidden;
+      }
+
+      .section-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 12px 16px;
+        background: var(--secondary-background-color);
+        cursor: pointer;
+        user-select: none;
+      }
+
+      .section-header:hover {
+        background: var(--primary-background-color);
+      }
+
+      .section-header span {
+        flex: 1;
+        font-weight: 500;
+      }
+
+      .expand-icon {
+        transition: transform 0.2s;
+      }
+
+      .expand-icon.expanded {
+        transform: rotate(180deg);
+      }
+
+      .section-content {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
         padding: 16px;
       }
-      ha-formfield {
+
+      .toggle-group {
         display: flex;
-        justify-content: space-between;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .helper-text {
+        color: var(--secondary-text-color);
+        font-size: 0.9em;
+        margin: 0;
+      }
+
+      ha-entity-picker {
+        width: 100%;
+      }
+
+      .entity-buttons {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-bottom: 12px;
+      }
+
+      .entity-btn {
+        display: flex;
         align-items: center;
+        gap: 8px;
+        padding: 12px 16px;
+        background: var(--secondary-background-color);
+        border: 1px solid var(--divider-color);
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 14px;
+        color: var(--primary-text-color);
+        transition: all 0.2s ease;
+      }
+
+      .entity-btn:hover {
+        background: var(--primary-background-color);
+        border-color: var(--primary-color);
+      }
+
+      .entity-btn.selected {
+        background: var(--primary-color);
+        border-color: var(--primary-color);
+        color: var(--text-primary-color);
+      }
+
+      .entity-btn span {
+        flex: 1;
+        text-align: left;
+      }
+
+      .no-entities {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 12px;
+        background: var(--warning-color, #ffc107);
+        border-radius: 8px;
+        color: var(--primary-text-color);
+        margin-bottom: 12px;
       }
     `;
   }

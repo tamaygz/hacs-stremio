@@ -40,15 +40,34 @@ CONF_APPLE_TV_ENTITY_ID: Final = "apple_tv_entity_id"
 CONF_APPLE_TV_CREDENTIALS: Final = "apple_tv_credentials"
 CONF_APPLE_TV_IDENTIFIER: Final = "apple_tv_identifier"
 CONF_POLLING_GATE_ENTITIES: Final = "polling_gate_entities"
+CONF_SHOW_COPY_URL: Final = "show_copy_url"
+CONF_DEFAULT_CATALOG_SOURCE: Final = "default_catalog_source"
+CONF_ADDON_STREAM_ORDER: Final = "addon_stream_order"
+CONF_STREAM_QUALITY_PREFERENCE: Final = "stream_quality_preference"
+CONF_RESET_ADDON_ORDER: Final = "reset_addon_order"
 
 # Options defaults
 DEFAULT_PLAYER_SCAN_INTERVAL: Final = 30  # seconds
 DEFAULT_LIBRARY_SCAN_INTERVAL: Final = 300  # seconds (5 minutes)
+DEFAULT_CONTINUE_WATCHING_LIMIT: Final = 100  # Max items in continue watching list
 DEFAULT_ENABLE_APPLE_TV_HANDOVER: Final = False
 DEFAULT_HANDOVER_METHOD: Final = "auto"
 DEFAULT_APPLE_TV_DEVICE: Final = ""
 DEFAULT_APPLE_TV_ENTITY_ID: Final = ""
 DEFAULT_POLLING_GATE_ENTITIES: Final[list[str]] = []
+DEFAULT_SHOW_COPY_URL: Final = True  # Show "Copy URL" in media browser streams
+DEFAULT_CATALOG_SOURCE: Final = "cinemeta"  # Default metadata addon
+DEFAULT_ADDON_STREAM_ORDER: Final[list[str]] = []  # Empty = use Stremio's order
+DEFAULT_STREAM_QUALITY_PREFERENCE: Final = "any"  # any, 4k, 1080p, 720p
+
+# Stream quality options
+STREAM_QUALITY_OPTIONS: Final = ["any", "4k", "1080p", "720p", "480p"]
+
+# Catalog source options (addon IDs)
+CATALOG_SOURCE_OPTIONS: Final = {
+    "cinemeta": "Cinemeta (Default)",
+    "tmdb": "TMDB",
+}
 
 # Polling gate intervals (seconds)
 POLLING_GATE_ACTIVE_INTERVAL: Final = None  # Use configured interval
@@ -140,15 +159,22 @@ EVENT_PLAYBACK_STARTED: Final = "stremio_playback_started"
 EVENT_PLAYBACK_STOPPED: Final = "stremio_playback_stopped"
 EVENT_NEW_CONTENT: Final = "stremio_new_content"
 EVENT_STREAM_URL: Final = "stremio_stream_url"
+EVENT_NEW_EPISODES: Final = "stremio_new_episodes_detected"
+EVENT_RESUME_AVAILABLE: Final = "stremio_resume_available"
 
 # Service Names
 SERVICE_GET_STREAMS: Final = "get_streams"
+SERVICE_GET_SERIES_METADATA: Final = "get_series_metadata"
 SERVICE_SEARCH_LIBRARY: Final = "search_library"
 SERVICE_ADD_TO_LIBRARY: Final = "add_to_library"
 SERVICE_REMOVE_FROM_LIBRARY: Final = "remove_from_library"
 SERVICE_REFRESH_LIBRARY: Final = "refresh_library"
 SERVICE_HANDOVER_TO_APPLE_TV: Final = "handover_to_apple_tv"
 SERVICE_BROWSE_CATALOG: Final = "browse_catalog"
+SERVICE_GET_UPCOMING_EPISODES: Final = "get_upcoming_episodes"
+SERVICE_GET_RECOMMENDATIONS: Final = "get_recommendations"
+SERVICE_GET_SIMILAR_CONTENT: Final = "get_similar_content"
+SERVICE_GET_ADDONS: Final = "get_addons"
 
 # API Constants
 API_BASE_URL: Final = "https://api.strem.io"

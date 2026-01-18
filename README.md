@@ -7,6 +7,8 @@
 
 A comprehensive Home Assistant Custom Component (HACS) integration that connects to the Stremio API to track your library, viewing activity, and media consumption.
 
+> **🍎 Built for Apple TV** — This integration was created primarily to bring easy Stremio playback to Apple TV using the VLC app. Stream your favorite content directly to your Apple TV with seamless AirPlay handover!
+
 <p align="center">
   <img src="https://www.stremio.com/website/stremio-logo-small.png" alt="Stremio Logo" width="150">
 </p>
@@ -25,6 +27,7 @@ A comprehensive Home Assistant Custom Component (HACS) integration that connects
 | 🔍 **Media Source**        | Browse library from HA media browser            |
 | 🎯 **Services**            | Search, manage library, get stream URLs         |
 | 🎭 **Catalog Browsing**    | Browse popular movies, TV shows, and by genre   |
+| ⚙️ **Stream Preferences**  | Configure addon order & quality preferences     |
 
 ---
 
@@ -59,10 +62,11 @@ A comprehensive Home Assistant Custom Component (HACS) integration that connects
 
 ### Binary Sensors
 
-| Entity                                  | Description                  |
-| --------------------------------------- | ---------------------------- |
-| `binary_sensor.stremio_is_playing`      | On when media is playing     |
-| `binary_sensor.stremio_has_new_content` | On when new content detected |
+| Entity                                      | Description                                |
+| ------------------------------------------- | ------------------------------------------ |
+| `binary_sensor.stremio_is_watching`         | On when media is currently being watched   |
+| `binary_sensor.stremio_has_continue_watching` | On when there are items to continue watching |
+| `binary_sensor.stremio_has_new_episodes`    | On when any series has unwatched episodes  |
 
 ### Media Player
 

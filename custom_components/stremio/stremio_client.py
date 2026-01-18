@@ -324,7 +324,7 @@ class StremioClient:
             raise StremioConnectionError(f"Failed to get library: {err}") from err
 
     async def async_get_continue_watching(
-        self, limit: int = 10
+        self, limit: int = 100
     ) -> list[dict[str, Any]]:
         """Get continue watching list.
 
@@ -332,7 +332,7 @@ class StremioClient:
         Items are sorted by most recently watched.
 
         Args:
-            limit: Maximum items to return
+            limit: Maximum items to return (default 100 to match Stremio Web)
 
         Returns:
             List of continue watching items
@@ -420,6 +420,8 @@ class StremioClient:
         media_type: str = "movie",
         season: int | None = None,
         episode: int | None = None,
+        addon_order: list[str] | None = None,
+        quality_preference: str = "any",
     ) -> list[dict[str, Any]]:
         """Get available streams for content from user's installed addons.
 
@@ -434,6 +436,8 @@ class StremioClient:
             media_type: Type of media ("movie" or "series")
             season: Season number for series
             episode: Episode number for series
+            addon_order: Optional list of addon names/IDs in preferred order
+            quality_preference: Preferred quality ("any", "4k", "1080p", "720p", "480p")
 
         Returns:
             List of stream dictionaries with keys like:
@@ -476,6 +480,16 @@ class StremioClient:
                 media_type,
             )
 
+            # Sort addons by user preference if addon_order is provided
+            if addon_order:
+                stream_addons = self._sort_addons_by_preference(
+                    stream_addons, addon_order
+                )
+                _LOGGER.debug(
+                    "Sorted addons by user preference: %s",
+                    [a.get("name") for a in stream_addons],
+                )
+
             if not stream_addons:
                 _LOGGER.info("No stream addons found for %s %s", media_type, media_id)
                 return []
@@ -484,6 +498,17 @@ class StremioClient:
             all_streams = await self._fetch_streams_from_addons(
                 stream_addons, media_type, video_id
             )
+
+            # Filter streams by quality preference
+            if quality_preference and quality_preference != "any":
+                all_streams = self._filter_streams_by_quality(
+                    all_streams, quality_preference
+                )
+                _LOGGER.debug(
+                    "Filtered to %d streams matching quality preference: %s",
+                    len(all_streams),
+                    quality_preference,
+                )
 
             _LOGGER.info(
                 "Found %d total streams for %s from %d addons",
@@ -529,7 +554,9 @@ class StremioClient:
             resources = manifest.get("resources", [])
             provides_stream = False
             types_match = False
-            prefix_match = True  # Default to true if no prefix defined
+            prefix_match = (
+                True  # Default to true if no prefix defined or media_id is empty
+            )
 
             for resource in resources:
                 if isinstance(resource, str):
@@ -538,22 +565,26 @@ class StremioClient:
                         # Use manifest-level types
                         types = manifest.get("types", [])
                         types_match = media_type in types or not types
-                        # Check id prefix
+                        # Check id prefix - skip check if media_id is empty
                         prefixes = manifest.get("idPrefixes", [])
-                        if prefixes:
+                        if prefixes and media_id:
                             prefix_match = any(media_id.startswith(p) for p in prefixes)
+                        else:
+                            prefix_match = True
                 elif isinstance(resource, dict):
                     if resource.get("name") == "stream":
                         provides_stream = True
                         # Use resource-specific types or fallback to manifest
                         types = resource.get("types", manifest.get("types", []))
                         types_match = media_type in types or not types
-                        # Check id prefix
+                        # Check id prefix - skip check if media_id is empty
                         prefixes = resource.get(
                             "idPrefixes", manifest.get("idPrefixes", [])
                         )
-                        if prefixes:
+                        if prefixes and media_id:
                             prefix_match = any(media_id.startswith(p) for p in prefixes)
+                        else:
+                            prefix_match = True
 
             if provides_stream and types_match and prefix_match:
                 stream_addons.append(
@@ -570,6 +601,172 @@ class StremioClient:
                 )
 
         return stream_addons
+
+    def _sort_addons_by_preference(
+        self,
+        addons: list[dict[str, Any]],
+        addon_order: list[str] | str,
+    ) -> list[dict[str, Any]]:
+        """Sort addons according to user preference.
+
+        Args:
+            addons: List of addon dictionaries with 'name' and 'id' keys
+            addon_order: User's preferred order (list of addon names/IDs or multiline string)
+
+        Returns:
+            Sorted list of addons with preferred ones first
+        """
+        if not addon_order:
+            return addons
+
+        # Parse addon_order if it's a string (multiline text from config)
+        order_list: list[str]
+        if isinstance(addon_order, str):
+            order_list = [
+                line.strip() for line in addon_order.split("\n") if line.strip()
+            ]
+        else:
+            order_list = addon_order
+
+        if not order_list:
+            return addons
+
+        _LOGGER.debug("Addon preference order: %s", order_list)
+        _LOGGER.debug("Available addons: %s", [a.get("name") for a in addons])
+
+        # Create a mapping of addon name/id to index in preference list
+        # Lower index = higher priority
+        # Store both exact lowercase match and normalized (alphanumeric only) for fuzzy match
+        preference_map: dict[str, int] = {}
+        preference_map_normalized: dict[str, int] = {}
+        for idx, pref in enumerate(order_list):
+            pref_lower = pref.lower()
+            preference_map[pref_lower] = idx
+            # Create normalized version (remove special chars for fuzzy matching)
+            pref_normalized = "".join(c.lower() for c in pref if c.isalnum())
+            if pref_normalized:
+                preference_map_normalized[pref_normalized] = idx
+
+        def get_sort_key(addon: dict[str, Any]) -> tuple[int, str]:
+            """Get sort key for addon (priority, name)."""
+            name = addon.get("name", "")
+            addon_id = addon.get("id", "")
+            name_lower = name.lower()
+            addon_id_lower = addon_id.lower()
+
+            # First try exact match (case-insensitive)
+            if name_lower in preference_map:
+                _LOGGER.debug(
+                    "Addon '%s' matched by exact name at position %d",
+                    name,
+                    preference_map[name_lower],
+                )
+                return (preference_map[name_lower], name_lower)
+            if addon_id_lower in preference_map:
+                _LOGGER.debug(
+                    "Addon '%s' matched by exact ID at position %d",
+                    name,
+                    preference_map[addon_id_lower],
+                )
+                return (preference_map[addon_id_lower], name_lower)
+
+            # Try normalized match (ignore special characters)
+            name_normalized = "".join(c.lower() for c in name if c.isalnum())
+            addon_id_normalized = "".join(c.lower() for c in addon_id if c.isalnum())
+            if name_normalized in preference_map_normalized:
+                _LOGGER.debug(
+                    "Addon '%s' matched by normalized name at position %d",
+                    name,
+                    preference_map_normalized[name_normalized],
+                )
+                return (preference_map_normalized[name_normalized], name_lower)
+            if addon_id_normalized in preference_map_normalized:
+                _LOGGER.debug(
+                    "Addon '%s' matched by normalized ID at position %d",
+                    name,
+                    preference_map_normalized[addon_id_normalized],
+                )
+                return (preference_map_normalized[addon_id_normalized], name_lower)
+
+            # Try partial/contains match for preferences
+            for pref_lower, idx in preference_map.items():
+                if pref_lower in name_lower or name_lower in pref_lower:
+                    _LOGGER.debug(
+                        "Addon '%s' matched by partial name '%s' at position %d",
+                        name,
+                        pref_lower,
+                        idx,
+                    )
+                    return (idx, name_lower)
+                if pref_lower in addon_id_lower or addon_id_lower in pref_lower:
+                    _LOGGER.debug(
+                        "Addon '%s' matched by partial ID '%s' at position %d",
+                        name,
+                        pref_lower,
+                        idx,
+                    )
+                    return (idx, name_lower)
+
+            # Not in preference list - put at the end
+            _LOGGER.debug("Addon '%s' not matched, placing at end", name)
+            return (len(order_list), name_lower)
+
+        return sorted(addons, key=get_sort_key)
+
+    def _filter_streams_by_quality(
+        self,
+        streams: list[dict[str, Any]],
+        quality_preference: str,
+    ) -> list[dict[str, Any]]:
+        """Filter and sort streams by quality preference.
+
+        Args:
+            streams: List of stream dictionaries
+            quality_preference: Desired quality ("4k", "1080p", "720p", "480p")
+
+        Returns:
+            Filtered list with matching quality streams first, then others
+        """
+        if quality_preference == "any":
+            return streams
+
+        # Quality patterns to look for (in stream name/title)
+        quality_patterns: dict[str, list[str]] = {
+            "4k": ["4k", "2160p", "uhd"],
+            "1080p": ["1080p", "1080", "fhd", "full hd"],
+            "720p": ["720p", "720", "hd"],
+            "480p": ["480p", "480", "sd"],
+        }
+
+        patterns = quality_patterns.get(quality_preference.lower(), [])
+        if not patterns:
+            return streams
+
+        def stream_matches_quality(stream: dict[str, Any]) -> bool:
+            """Check if stream matches the quality preference."""
+            # Check in name, title, and quality fields
+            searchable = " ".join(
+                [
+                    str(stream.get("name", "")),
+                    str(stream.get("title", "")),
+                    str(stream.get("quality", "")),
+                ]
+            ).lower()
+
+            return any(pattern in searchable for pattern in patterns)
+
+        # Sort streams: matching quality first, then others
+        matching = [s for s in streams if stream_matches_quality(s)]
+        non_matching = [s for s in streams if not stream_matches_quality(s)]
+
+        _LOGGER.debug(
+            "Quality filter '%s': %d matching, %d other streams",
+            quality_preference,
+            len(matching),
+            len(non_matching),
+        )
+
+        return matching + non_matching
 
     async def _fetch_streams_from_addons(
         self,
@@ -1223,25 +1420,31 @@ class StremioClient:
         )
 
         # Build catalog URL
+        # Cinemeta API uses path-based format for extra parameters:
+        # /catalog/{type}/{id}.json - basic catalog
+        # /catalog/{type}/{id}/genre={genre}.json - genre filtered
+        # /catalog/{type}/{id}/skip={skip}.json - pagination
+        # /catalog/{type}/{id}/genre={genre}&skip={skip}.json - combined
         from .const import CINEMETA_BASE_URL
 
-        catalog_url = (
-            f"{CINEMETA_BASE_URL}/catalog/{media_type}/{catalog_id}/popular.json"
-        )
-
-        # Add query parameters
-        params = {}
+        # Build extra path components for genre and skip
+        extra_parts = []
         if genre:
-            params["genre"] = genre
+            extra_parts.append(f"genre={genre}")
         if skip > 0:
-            params["skip"] = str(skip)
+            extra_parts.append(f"skip={skip}")
+
+        if extra_parts:
+            extra_path = "&".join(extra_parts)
+            catalog_url = f"{CINEMETA_BASE_URL}/catalog/{media_type}/{catalog_id}/{extra_path}.json"
+        else:
+            catalog_url = f"{CINEMETA_BASE_URL}/catalog/{media_type}/{catalog_id}.json"
 
         try:
             session = await self._get_session()
 
             async with session.get(
                 catalog_url,
-                params=params if params else None,
                 timeout=aiohttp.ClientTimeout(total=15),
             ) as response:
                 if response.status != 200:
@@ -1347,6 +1550,399 @@ class StremioClient:
             skip=skip,
             limit=limit,
         )
+
+    async def async_get_upcoming_episodes(
+        self, days_ahead: int = 7
+    ) -> list[dict[str, Any]]:
+        """Get upcoming episode air dates for series in the user's library.
+
+        Fetches metadata for all series in the library and checks for upcoming
+        episodes based on air dates.
+
+        Args:
+            days_ahead: Number of days to look ahead (default 7)
+
+        Returns:
+            List of upcoming episodes with series info and air dates
+
+        Raises:
+            StremioAuthError: Authentication failed
+            StremioConnectionError: Connection failed
+        """
+        import datetime
+
+        _LOGGER.debug("Fetching upcoming episodes for next %d days", days_ahead)
+
+        try:
+            # Get user's library
+            library = await self.async_get_library()
+
+            # Filter to series only
+            series_items = [item for item in library if item.get("type") == "series"]
+            _LOGGER.debug("Found %d series in library", len(series_items))
+
+            upcoming = []
+            today = datetime.datetime.now(datetime.timezone.utc)
+            cutoff_date = today + datetime.timedelta(days=days_ahead)
+
+            # Fetch metadata for each series (limit concurrent requests)
+            for series in series_items[:20]:  # Limit to avoid rate limiting
+                try:
+                    imdb_id = (
+                        series.get("imdb_id") or series.get("id", "").split(":")[-1]
+                    )
+                    if not imdb_id:
+                        continue
+
+                    metadata = await self.async_get_series_metadata(imdb_id)
+                    if not metadata:
+                        continue
+
+                    # Check each season/episode for upcoming air dates
+                    for season in metadata.get("seasons", []):
+                        for episode in season.get("episodes", []):
+                            released_str = episode.get("released")
+                            if not released_str:
+                                continue
+
+                            try:
+                                # Parse ISO format air date
+                                air_date = datetime.datetime.fromisoformat(
+                                    released_str.replace("Z", "+00:00")
+                                )
+
+                                # Check if it's upcoming (after today, before cutoff)
+                                if today <= air_date <= cutoff_date:
+                                    upcoming.append(
+                                        {
+                                            "series_id": imdb_id,
+                                            "series_title": series.get("title")
+                                            or metadata.get("title"),
+                                            "poster": series.get("poster")
+                                            or metadata.get("poster"),
+                                            "season": season.get("number"),
+                                            "episode": episode.get("number"),
+                                            "episode_title": episode.get("title"),
+                                            "air_date": released_str,
+                                            "air_date_formatted": air_date.strftime(
+                                                "%Y-%m-%d"
+                                            ),
+                                            "days_until": (air_date - today).days,
+                                        }
+                                    )
+                            except (ValueError, TypeError):
+                                continue
+
+                except Exception as err:
+                    _LOGGER.debug(
+                        "Error fetching metadata for series %s: %s",
+                        series.get("title"),
+                        err,
+                    )
+                    continue
+
+            # Sort by air date
+            upcoming.sort(key=lambda x: x.get("air_date", ""))
+
+            _LOGGER.info(
+                "Found %d upcoming episodes in next %d days", len(upcoming), days_ahead
+            )
+            return upcoming
+
+        except StremioAuthError:
+            raise
+        except StremioConnectionError:
+            raise
+        except Exception as err:
+            _LOGGER.exception("Failed to get upcoming episodes: %s", err)
+            raise StremioConnectionError(
+                f"Failed to get upcoming episodes: {err}"
+            ) from err
+
+    async def async_get_recommendations(
+        self,
+        media_type: str | None = None,
+        limit: int = 20,
+    ) -> list[dict[str, Any]]:
+        """Get content recommendations based on user's library.
+
+        Analyzes the user's library to identify preferred genres and fetches
+        recommendations from catalogs matching those preferences.
+
+        Args:
+            media_type: Optional filter for "movie" or "series" (None for both)
+            limit: Maximum recommendations to return (default 20)
+
+        Returns:
+            List of recommended content items
+
+        Raises:
+            StremioAuthError: Authentication failed
+            StremioConnectionError: Connection failed
+        """
+        _LOGGER.debug("Fetching recommendations: type=%s, limit=%d", media_type, limit)
+
+        try:
+            # Get user's library to analyze preferences
+            library = await self.async_get_library()
+
+            if not library:
+                _LOGGER.debug("Library is empty, returning popular content")
+                # Return popular content if library is empty
+                if media_type == "movie":
+                    return await self.async_get_popular_movies(limit=limit)
+                elif media_type == "series":
+                    return await self.async_get_popular_series(limit=limit)
+                else:
+                    movies = await self.async_get_popular_movies(limit=limit // 2)
+                    series = await self.async_get_popular_series(limit=limit // 2)
+                    return movies + series
+
+            # Filter library by type if specified
+            filtered_library = library
+            if media_type:
+                filtered_library = [
+                    item for item in library if item.get("type") == media_type
+                ]
+
+            # Analyze genres from library
+            genre_counts: dict[str, int] = {}
+            library_ids = set()
+            for item in filtered_library:
+                library_ids.add(item.get("imdb_id") or item.get("id"))
+                for genre in item.get("genres", []):
+                    genre_counts[genre] = genre_counts.get(genre, 0) + 1
+
+            # Get top genres (sorted by count)
+            top_genres = sorted(genre_counts.items(), key=lambda x: x[1], reverse=True)[
+                :3
+            ]
+            _LOGGER.debug("Top genres from library: %s", top_genres)
+
+            recommendations = []
+            seen_ids = set()
+
+            # Fetch recommendations based on top genres
+            for genre, _ in top_genres:
+                try:
+                    if media_type == "movie" or media_type is None:
+                        movies = await self.async_get_catalog(
+                            media_type="movie",
+                            catalog_id="top",
+                            genre=genre,
+                            limit=limit,
+                        )
+                        for movie in movies:
+                            item_id = movie.get("imdb_id") or movie.get("id")
+                            if (
+                                item_id
+                                and item_id not in library_ids
+                                and item_id not in seen_ids
+                            ):
+                                movie["recommendation_reason"] = (
+                                    f"Based on your interest in {genre}"
+                                )
+                                recommendations.append(movie)
+                                seen_ids.add(item_id)
+
+                    if media_type == "series" or media_type is None:
+                        series = await self.async_get_catalog(
+                            media_type="series",
+                            catalog_id="top",
+                            genre=genre,
+                            limit=limit,
+                        )
+                        for show in series:
+                            item_id = show.get("imdb_id") or show.get("id")
+                            if (
+                                item_id
+                                and item_id not in library_ids
+                                and item_id not in seen_ids
+                            ):
+                                show["recommendation_reason"] = (
+                                    f"Based on your interest in {genre}"
+                                )
+                                recommendations.append(show)
+                                seen_ids.add(item_id)
+
+                except Exception as err:
+                    _LOGGER.debug(
+                        "Error fetching recommendations for genre %s: %s", genre, err
+                    )
+                    continue
+
+                if len(recommendations) >= limit:
+                    break
+
+            # If not enough recommendations, add some popular content
+            if len(recommendations) < limit:
+                try:
+                    popular = await self.async_get_catalog(
+                        media_type=media_type or "movie",
+                        catalog_id="top",
+                        limit=limit - len(recommendations),
+                    )
+                    for item in popular:
+                        item_id = item.get("imdb_id") or item.get("id")
+                        if (
+                            item_id
+                            and item_id not in library_ids
+                            and item_id not in seen_ids
+                        ):
+                            item["recommendation_reason"] = "Popular right now"
+                            recommendations.append(item)
+                            seen_ids.add(item_id)
+                            if len(recommendations) >= limit:
+                                break
+                except Exception as err:
+                    _LOGGER.debug("Error fetching popular content: %s", err)
+
+            _LOGGER.info("Generated %d recommendations", len(recommendations[:limit]))
+            return recommendations[:limit]
+
+        except StremioAuthError:
+            raise
+        except StremioConnectionError:
+            raise
+        except Exception as err:
+            _LOGGER.exception("Failed to get recommendations: %s", err)
+            raise StremioConnectionError(
+                f"Failed to get recommendations: {err}"
+            ) from err
+
+    async def async_get_similar_content(
+        self,
+        media_id: str,
+        limit: int = 10,
+    ) -> list[dict[str, Any]]:
+        """Get similar movies/shows based on a specific media item.
+
+        Uses Cinemeta's meta endpoint to fetch related content based on
+        genres, cast, and other metadata similarities.
+
+        Args:
+            media_id: IMDb ID of the media item (e.g., "tt1234567")
+            limit: Maximum similar items to return (default 10)
+
+        Returns:
+            List of similar content items
+
+        Raises:
+            StremioConnectionError: Connection failed
+        """
+        _LOGGER.debug("Fetching similar content for %s, limit=%d", media_id, limit)
+
+        try:
+            # First, get the source item's metadata
+            # Try series first, then movie
+            from .const import CINEMETA_BASE_URL
+
+            session = await self._get_session()
+            source_meta = None
+            source_type = None
+
+            for content_type in ["series", "movie"]:
+                meta_url = f"{CINEMETA_BASE_URL}/meta/{content_type}/{media_id}.json"
+                try:
+                    async with session.get(
+                        meta_url,
+                        timeout=aiohttp.ClientTimeout(total=10),
+                    ) as response:
+                        if response.status == 200:
+                            data = await response.json()
+                            source_meta = data.get("meta", {})
+                            if source_meta:
+                                source_type = content_type
+                                break
+                except Exception:
+                    continue
+
+            if not source_meta:
+                _LOGGER.debug("Could not find metadata for %s", media_id)
+                return []
+
+            # Extract genres and other metadata for finding similar content
+            source_genres = source_meta.get("genres", [])
+            source_director = source_meta.get("director")
+            source_cast = source_meta.get("cast", [])[:3]  # Top 3 cast members
+
+            _LOGGER.debug(
+                "Source: %s, genres=%s, director=%s",
+                source_meta.get("name"),
+                source_genres,
+                source_director,
+            )
+
+            similar = []
+            seen_ids = {media_id}  # Don't include the source item
+
+            # Search by primary genre
+            if source_genres:
+                primary_genre = source_genres[0]
+                try:
+                    genre_results = await self.async_get_catalog(
+                        media_type=source_type,
+                        catalog_id="top",
+                        genre=primary_genre,
+                        limit=limit * 2,  # Fetch more to filter
+                    )
+
+                    for item in genre_results:
+                        item_id = item.get("imdb_id") or item.get("id")
+                        if item_id and item_id not in seen_ids:
+                            # Score similarity based on shared genres
+                            item_genres = item.get("genres", [])
+                            shared_genres = set(source_genres) & set(item_genres)
+                            item["similarity_score"] = len(shared_genres)
+                            item["similarity_reason"] = (
+                                f"Similar {primary_genre} content"
+                            )
+                            similar.append(item)
+                            seen_ids.add(item_id)
+
+                except Exception as err:
+                    _LOGGER.debug("Error fetching genre-based similar: %s", err)
+
+            # If we have a secondary genre and need more results
+            if len(source_genres) > 1 and len(similar) < limit:
+                secondary_genre = source_genres[1]
+                try:
+                    genre_results = await self.async_get_catalog(
+                        media_type=source_type,
+                        catalog_id="top",
+                        genre=secondary_genre,
+                        limit=limit,
+                    )
+
+                    for item in genre_results:
+                        item_id = item.get("imdb_id") or item.get("id")
+                        if item_id and item_id not in seen_ids:
+                            item_genres = item.get("genres", [])
+                            shared_genres = set(source_genres) & set(item_genres)
+                            item["similarity_score"] = len(shared_genres)
+                            item["similarity_reason"] = (
+                                f"You might also like this {secondary_genre}"
+                            )
+                            similar.append(item)
+                            seen_ids.add(item_id)
+                            if len(similar) >= limit * 2:
+                                break
+
+                except Exception as err:
+                    _LOGGER.debug("Error fetching secondary genre similar: %s", err)
+
+            # Sort by similarity score and limit
+            similar.sort(key=lambda x: x.get("similarity_score", 0), reverse=True)
+            result = similar[:limit]
+
+            _LOGGER.info("Found %d similar items for %s", len(result), media_id)
+            return result
+
+        except Exception as err:
+            _LOGGER.exception("Failed to get similar content for %s: %s", media_id, err)
+            raise StremioConnectionError(
+                f"Failed to get similar content: {err}"
+            ) from err
 
 
 class StremioAuthError(HomeAssistantError):

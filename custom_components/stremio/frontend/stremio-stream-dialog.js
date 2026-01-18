@@ -32,6 +32,7 @@ class StremioStreamDialog extends LitElement {
       open: { type: Boolean },
       mediaItem: { type: Object },
       streams: { type: Array },
+      appleTvEntity: { type: String },
       _loading: { type: Boolean },
       _copiedIndex: { type: Number },
     };
@@ -348,9 +349,11 @@ class StremioStreamDialog extends LitElement {
   _playOnAppleTv(stream) {
     if (!this.hass) return;
 
-    // Show device selection or use default
+    // Use configured entity or fallback to hardcoded default
+    const deviceId = this.appleTvEntity || 'media_player.apple_tv';
+    
     this.hass.callService('stremio', 'handover_to_apple_tv', {
-      device_id: 'media_player.apple_tv', // User would configure this
+      device_id: deviceId,
       stream_url: stream.url,
     });
   }
@@ -495,7 +498,7 @@ if (!customElements.get('stremio-stream-dialog')) {
 
 // Global helper to open the dialog
 window.StremioStreamDialog = {
-  show(hass, mediaItem, streams) {
+  show(hass, mediaItem, streams, appleTvEntity) {
     let dialog = document.querySelector('stremio-stream-dialog');
     if (!dialog) {
       dialog = document.createElement('stremio-stream-dialog');
@@ -504,6 +507,7 @@ window.StremioStreamDialog = {
     dialog.hass = hass;
     dialog.mediaItem = mediaItem;
     dialog.streams = streams || [];
+    dialog.appleTvEntity = appleTvEntity;
     dialog.open = true;
     return dialog;
   },

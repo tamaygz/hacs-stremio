@@ -27,7 +27,6 @@ from homeassistant.core import HomeAssistant
 
 from custom_components.stremio.const import DOMAIN
 
-
 # Skip all tests on Windows with a helpful message
 if sys.platform == "win32":
 
@@ -128,19 +127,30 @@ MOCK_CONTINUE_WATCHING = [
 
 MOCK_STREAMS = [
     {
-        "name": "Torrent",
-        "title": "1080p BluRay",
+        "name": "Torrentio",
+        "title": "1080p BluRay x264",
         "url": "http://example.com/stream1.mp4",
         "quality": "1080p",
         "size": "2.5 GB",
         "seeds": 150,
+        "addon": "Torrentio",
     },
     {
-        "name": "HTTP",
+        "name": "Torrentio",
+        "title": "4K HDR BluRay",
+        "url": "http://example.com/stream4k.mp4",
+        "quality": "4k",
+        "size": "15 GB",
+        "seeds": 50,
+        "addon": "Torrentio",
+    },
+    {
+        "name": "CinemetaStreams",
         "title": "720p WEB-DL",
         "externalUrl": "http://example.com/stream2.mp4",
         "quality": "720p",
         "size": "1.2 GB",
+        "addon": "CinemetaStreams",
     },
 ]
 
@@ -160,6 +170,59 @@ MOCK_CURRENT_MEDIA = {
 # ============================================================================
 
 
+MOCK_UPCOMING_EPISODES = [
+    {
+        "series_id": "tt0903747",
+        "series_title": "Breaking Bad",
+        "episode_title": "Felina",
+        "season": 5,
+        "episode": 16,
+        "air_date": "2024-12-20",
+        "poster": "https://example.com/breakingbad.jpg",
+    },
+]
+
+MOCK_RECOMMENDATIONS = [
+    {
+        "id": "tt0137523",
+        "type": "movie",
+        "title": "Fight Club",
+        "year": 1999,
+        "poster": "https://example.com/fightclub.jpg",
+        "rating": "8.8",
+        "reason": "Because you watched The Shawshank Redemption",
+    },
+    {
+        "id": "tt1396484",
+        "type": "series",
+        "title": "It's Always Sunny in Philadelphia",
+        "year": 2005,
+        "poster": "https://example.com/sunny.jpg",
+        "rating": "8.8",
+        "reason": "Because you watched Breaking Bad",
+    },
+]
+
+MOCK_SIMILAR_CONTENT = [
+    {
+        "id": "tt0110912",
+        "type": "movie",
+        "title": "Pulp Fiction",
+        "year": 1994,
+        "poster": "https://example.com/pulpfiction.jpg",
+        "rating": "8.9",
+    },
+    {
+        "id": "tt0109830",
+        "type": "movie",
+        "title": "Forrest Gump",
+        "year": 1994,
+        "poster": "https://example.com/forrestgump.jpg",
+        "rating": "8.8",
+    },
+]
+
+
 @pytest.fixture
 def mock_stremio_client():
     """Create a mock Stremio API client."""
@@ -175,6 +238,11 @@ def mock_stremio_client():
     client.remove_from_library = AsyncMock(return_value=True)
     client.get_user_info = AsyncMock(return_value=MOCK_USER_DATA)
     client.is_authenticated = True
+
+    # New service methods
+    client.async_get_upcoming_episodes = AsyncMock(return_value=MOCK_UPCOMING_EPISODES)
+    client.async_get_recommendations = AsyncMock(return_value=MOCK_RECOMMENDATIONS)
+    client.async_get_similar_content = AsyncMock(return_value=MOCK_SIMILAR_CONTENT)
 
     return client
 
@@ -210,6 +278,10 @@ def mock_config_entry(hass: HomeAssistant):
             "library_update_interval": 300,
             "enable_apple_tv_handover": False,
             "handover_method": "auto",
+            "show_copy_url": True,
+            "default_catalog_source": "cinemeta",
+            "addon_stream_order": "",
+            "stream_quality_preference": "any",
         },
         unique_id="test@example.com",
         title="Stremio - test@example.com",
