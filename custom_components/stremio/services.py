@@ -383,7 +383,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         SERVICE_SEARCH_LIBRARY,
         handle_search_library,
         schema=SEARCH_LIBRARY_SCHEMA,
-        supports_response=SupportsResponse.ONLY,
+        supports_response=SupportsResponse.OPTIONAL,
     )
 
     hass.services.async_register(
@@ -391,7 +391,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         SERVICE_GET_STREAMS,
         handle_get_streams,
         schema=GET_STREAMS_SCHEMA,
-        supports_response=SupportsResponse.ONLY,
+        supports_response=SupportsResponse.OPTIONAL,
     )
 
     hass.services.async_register(
