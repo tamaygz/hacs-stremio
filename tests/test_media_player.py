@@ -47,7 +47,9 @@ class TestStremioMediaPlayer:
         assert player.state == MediaPlayerState.PLAYING
 
     @pytest.mark.asyncio
-    async def test_state_idle(self, hass: HomeAssistant, mock_coordinator, mock_config_entry):
+    async def test_state_idle(
+        self, hass: HomeAssistant, mock_coordinator, mock_config_entry
+    ):
         """Test media player state when idle."""
         mock_coordinator.data = {
             "current_watching": None,

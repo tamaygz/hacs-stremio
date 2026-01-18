@@ -298,7 +298,9 @@ class TestServiceRegistration:
     async def test_services_unregistered(self, hass: HomeAssistant):
         """Test that all services are unregistered on unload."""
         # First setup services
-        hass.data[DOMAIN] = {"test_entry": {"coordinator": MagicMock(), "client": AsyncMock()}}
+        hass.data[DOMAIN] = {
+            "test_entry": {"coordinator": MagicMock(), "client": AsyncMock()}
+        }
         await async_setup_services(hass)
 
         # Then unload

@@ -30,6 +30,7 @@ from custom_components.stremio.const import DOMAIN
 
 # Skip all tests on Windows with a helpful message
 if sys.platform == "win32":
+
     def pytest_collection_modifyitems(config, items):
         """Skip all tests on Windows due to pytest-socket incompatibility."""
         skip_windows = pytest.mark.skip(

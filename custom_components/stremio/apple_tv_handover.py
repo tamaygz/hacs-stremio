@@ -513,10 +513,8 @@ class HandoverManager:
                 entity_id = device_identifier
                 if not device_identifier.startswith("media_player."):
                     entity_id = await self._find_media_player_entity(device_identifier)
-                
-                await self.handover_via_vlc(
-                    entity_id, stream_url, title, subtitle_url
-                )
+
+                await self.handover_via_vlc(entity_id, stream_url, title, subtitle_url)
                 result["success"] = True
                 result["method"] = "vlc"
                 result["entity_id"] = entity_id
@@ -545,10 +543,10 @@ class HandoverManager:
         """
         # Normalize the device name for comparison
         normalized_name = device_name.lower().replace(" ", "_").replace("-", "_")
-        
+
         # Search through all media_player entities
         all_states = self.hass.states.async_all("media_player")
-        
+
         for state in all_states:
             # Check if entity_id contains the normalized device name
             if normalized_name in state.entity_id.lower():
@@ -558,7 +556,7 @@ class HandoverManager:
                     device_name,
                 )
                 return state.entity_id
-            
+
             # Also check friendly name
             friendly_name = state.attributes.get("friendly_name", "").lower()
             if device_name.lower() in friendly_name:
@@ -568,7 +566,7 @@ class HandoverManager:
                     device_name,
                 )
                 return state.entity_id
-        
+
         # If we have discovered devices, provide more helpful error
         if device_name in self._discovered_devices:
             raise HandoverError(
@@ -577,7 +575,7 @@ class HandoverManager:
                 f"entity_id directly (e.g., media_player.apple_tv_living_room). "
                 f"You can find this in Home Assistant's Settings > Devices & Services > Entities."
             )
-        
+
         raise HandoverError(
             f"Could not find a media_player entity for '{device_name}'. "
             f"Please provide a valid entity_id (e.g., media_player.apple_tv_living_room)."

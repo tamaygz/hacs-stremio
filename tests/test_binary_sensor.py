@@ -169,7 +169,9 @@ class TestBinarySensorDeviceInfo:
     """Tests for binary sensor device info."""
 
     @pytest.mark.asyncio
-    async def test_device_info(self, hass: HomeAssistant, mock_coordinator, mock_config_entry):
+    async def test_device_info(
+        self, hass: HomeAssistant, mock_coordinator, mock_config_entry
+    ):
         """Test device info is set correctly."""
         description = BINARY_SENSOR_TYPES[0]
         sensor = StremioBinarySensor(mock_coordinator, mock_config_entry, description)

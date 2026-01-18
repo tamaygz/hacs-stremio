@@ -5,12 +5,25 @@
  * description, cast, year, genres, and provides access to streams.
  * 
  * @customElement stremio-media-details-card
- * @version 1.0.0
+ * @version 0.2.4
  */
 
-const LitElement = Object.getPrototypeOf(customElements.get("ha-panel-lovelace"));
-const html = LitElement.prototype.html;
-const css = LitElement.prototype.css;
+// Safe LitElement access - wait for HA frontend to be ready
+const loadCardHelpers = async () => {
+  if (customElements.get("ha-panel-lovelace")) {
+    return {
+      LitElement: Object.getPrototypeOf(customElements.get("ha-panel-lovelace")),
+      html: Object.getPrototypeOf(customElements.get("ha-panel-lovelace")).prototype.html,
+      css: Object.getPrototypeOf(customElements.get("ha-panel-lovelace")).prototype.css,
+    };
+  }
+  
+  await customElements.whenDefined("ha-panel-lovelace");
+  const Lit = Object.getPrototypeOf(customElements.get("ha-panel-lovelace"));
+  return { LitElement: Lit, html: Lit.prototype.html, css: Lit.prototype.css };
+};
+
+const { LitElement, html, css } = await loadCardHelpers();
 
 class StremioMediaDetailsCard extends LitElement {
   static get properties() {
