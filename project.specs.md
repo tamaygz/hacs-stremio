@@ -40,11 +40,13 @@ A Home Assistant Custom Component (HACS) integration that connects to the Stremi
   - 🎬 Metadata fetching (via Cinemeta)
 
 **Installation:**
+
 ```bash
 pip install stremio-api
 ```
 
 **Basic Usage:**
+
 ```python
 from stremio_api import StremioAPIClient
 
@@ -59,11 +61,13 @@ async with StremioAPIClient(auth_key=None) as client:
 **API Endpoint:** `https://api.strem.io`
 
 **Authentication Methods:**
+
 - Email/Password login
 - Apple Sign-In authentication
 - Persistent auth key (stored after login)
 
 **Available Data:**
+
 - User profile (email, name, user ID)
 - Library items (movies, series, added content)
 - Continue Watching list with progress
@@ -74,6 +78,7 @@ async with StremioAPIClient(auth_key=None) as client:
 ### Existing Reference Implementation
 
 [@AboveColin's stremio-ha](https://github.com/AboveColin/stremio-ha) provides a working example with:
+
 - Config flow authentication
 - Media player entity
 - Multiple sensor types
@@ -138,7 +143,7 @@ custom_components/stremio/
 ```python
 class StremioDataUpdateCoordinator(DataUpdateCoordinator):
     """Manage fetching Stremio data."""
-    
+
     async def _async_update_data(self):
         """Fetch data from Stremio API."""
         return {
@@ -156,12 +161,14 @@ class StremioDataUpdateCoordinator(DataUpdateCoordinator):
 ### 1. Config Flow Setup
 
 **Initial Configuration:**
+
 - User enters Stremio email and password
 - Integration authenticates and retrieves auth key
 - Auth key is stored securely in config entry
 - Device registration via API (if supported)
 
 **Options Flow:**
+
 - Update polling interval (30s - 300s)
 - Toggle specific sensors on/off
 - Configure notification preferences
@@ -170,6 +177,7 @@ class StremioDataUpdateCoordinator(DataUpdateCoordinator):
 ### 2. Sensors
 
 #### 2.1 User Profile Sensor
+
 ```yaml
 sensor.stremio_user
   state: "user_display_name"
@@ -181,6 +189,7 @@ sensor.stremio_user
 ```
 
 #### 2.2 Library Statistics Sensor
+
 ```yaml
 sensor.stremio_library
   state: 150  # Total items
@@ -193,6 +202,7 @@ sensor.stremio_library
 ```
 
 #### 2.3 Current Watching Sensor
+
 ```yaml
 sensor.stremio_current_watching
   state: "Movie/Series Title"
@@ -211,6 +221,7 @@ sensor.stremio_current_watching
 ```
 
 #### 2.4 Last Watched Sensor
+
 ```yaml
 sensor.stremio_last_watched
   state: "Previous Title"
@@ -222,6 +233,7 @@ sensor.stremio_last_watched
 ```
 
 #### 2.5 Watch Time Sensor
+
 ```yaml
 sensor.stremio_watch_time
   state: 127.5  # Total hours
@@ -234,6 +246,7 @@ sensor.stremio_watch_time
 ```
 
 #### 2.6 Addons Sensor
+
 ```yaml
 sensor.stremio_addons
   state: 12  # Number of installed addons
@@ -252,6 +265,7 @@ sensor.stremio_addons
 ```
 
 #### 2.7 Metadata Sensors (for current item)
+
 ```yaml
 sensor.stremio_current_cast:
   state: "Actor 1, Actor 2, Actor 3"
@@ -263,7 +277,7 @@ sensor.stremio_current_genres:
   state: "Action, Drama, Thriller"
 
 sensor.stremio_current_rating:
-  state: 8.5  # IMDb rating
+  state: 8.5 # IMDb rating
 
 sensor.stremio_current_description:
   state: "Plot synopsis..."
@@ -272,6 +286,7 @@ sensor.stremio_current_description:
 ### 3. Binary Sensors
 
 #### 3.1 Currently Playing
+
 ```yaml
 binary_sensor.stremio_playing
   state: on/off
@@ -281,6 +296,7 @@ binary_sensor.stremio_playing
 ```
 
 #### 3.2 Library Updated
+
 ```yaml
 binary_sensor.stremio_library_updated
   state: on/off  # On when library changes detected
@@ -315,6 +331,7 @@ media_player.stremio
 ### 5. Events
 
 #### 5.1 Playback Start Event
+
 ```yaml
 event_type: stremio_playback_started
 data:
@@ -325,6 +342,7 @@ data:
 ```
 
 #### 5.2 Playback Update Event
+
 ```yaml
 event_type: stremio_playback_progress
 data:
@@ -335,6 +353,7 @@ data:
 ```
 
 #### 5.3 Library Update Event
+
 ```yaml
 event_type: stremio_library_updated
 data:
@@ -347,6 +366,7 @@ data:
 ### 6. Services
 
 #### 6.1 Get Stream Links
+
 ```yaml
 service: stremio.get_streams
 data:
@@ -357,21 +377,24 @@ data:
 **Response:** Fires `stremio_streams_received` event with available streams.
 
 #### 6.2 Play on Apple TV
+
 ```yaml
 service: stremio.play_on_apple_tv
 data:
   entity_id: "media_player.living_room_apple_tv"
   content_id: "tt1234567"
-  stream_url: "https://stream.url/video.mp4"  # Optional, auto-fetched if not provided
+  stream_url: "https://stream.url/video.mp4" # Optional, auto-fetched if not provided
 ```
 
 Fetches stream URLs from Stremio and plays on the specified Apple TV using AirPlay or VLC.
 
 **Modes:**
+
 - **Direct AirPlay** (default): Uses `pyatv` to stream URL directly via AirPlay
 - **VLC Handover**: Launches VLC app on Apple TV with stream URL using `vlc-x-callback://` scheme
 
 #### 6.3 Refresh Data
+
 ```yaml
 service: stremio.refresh
 ```
@@ -379,6 +402,7 @@ service: stremio.refresh
 Forces an immediate data refresh from the API.
 
 #### 6.4 Add to Library
+
 ```yaml
 service: stremio.add_to_library
 data:
@@ -388,6 +412,7 @@ data:
 ```
 
 #### 6.5 Remove from Library
+
 ```yaml
 service: stremio.remove_from_library
 data:
@@ -442,6 +467,7 @@ Provide rich, interactive UI components for browsing Stremio library, viewing cu
 **Purpose:** Display current/last watched media with rich controls and actions
 
 **Features:**
+
 - Display current watching media with artwork
 - Show playback progress (from Continue Watching)
 - Media metadata (title, episode, rating, cast)
@@ -453,12 +479,12 @@ Provide rich, interactive UI components for browsing Stremio library, viewing cu
 ```yaml
 type: custom:stremio-media-card
 entity: media_player.stremio
-artwork: cover  # cover, full-cover, material, none
-info: scroll  # scroll, short
+artwork: cover # cover, full-cover, material, none
+info: scroll # scroll, short
 hide:
   power: true
   volume: true
-  controls: true  # Hide play/pause (read-only anyway)
+  controls: true # Hide play/pause (read-only anyway)
 shortcuts:
   - name: Get Streams
     type: service
@@ -497,6 +523,7 @@ shortcuts:
 ```
 
 **Implementation:**
+
 - Extend mini-media-player or create custom card
 - Use LitElement/TypeScript
 - Support HA theme variables
@@ -512,15 +539,16 @@ shortcuts:
 #### 2.1 Media Source Integration (Built-in HA)
 
 **Implementation:**
+
 ```python
 # In Stremio integration
 from homeassistant.components.media_source import MediaSource
 
 class StremioMediaSource(MediaSource):
     """Stremio media source implementation."""
-    
+
     name = "Stremio"
-    
+
     async def async_browse_media(self, item):
         """Browse Stremio library."""
         # Return library structure:
@@ -531,6 +559,7 @@ class StremioMediaSource(MediaSource):
 ```
 
 **Hierarchy:**
+
 ```
 Stremio
 ├── Continue Watching (5 items)
@@ -546,6 +575,7 @@ Stremio
 ```
 
 **Features:**
+
 - Browse via standard HA media browser
 - Click item to see details
 - "Play on" action for media_player entities
@@ -560,15 +590,15 @@ Stremio
 ```yaml
 type: custom:stremio-library-card
 entity: sensor.stremio_library
-view: grid  # grid, list, compact
+view: grid # grid, list, compact
 filter:
-  type: all  # all, movies, series
-  sort: recent  # recent, title, rating, year
+  type: all # all, movies, series
+  sort: recent # recent, title, rating, year
 search: true
 actions:
-  show_streams: true  # Show "Get Streams" button
-  play_on_devices: true  # Show device selection
-  add_to_continue: true  # Add to continue watching
+  show_streams: true # Show "Get Streams" button
+  play_on_devices: true # Show device selection
+  add_to_continue: true # Add to continue watching
 ```
 
 **Visual Design (Grid View):**
@@ -594,6 +624,7 @@ actions:
 ```
 
 **Implementation:**
+
 - Custom card with TypeScript/LitElement
 - Virtual scrolling for large libraries
 - Lazy image loading
@@ -608,16 +639,18 @@ actions:
 **Purpose:** Display available streams for content and enable URL copying
 
 **Trigger Methods:**
+
 1. Click "Get Streams" button on media player card
 2. Click stream icon [📡] on library card
 3. Service call: `stremio.show_stream_selector`
 
 **Service Definition:**
+
 ```yaml
 service: stremio.show_stream_selector
 data:
   content_id: "tt1234567"
-  browser_id: "this"  # Show on current browser only
+  browser_id: "this" # Show on current browser only
 ```
 
 **Dialog Content:**
@@ -661,14 +694,14 @@ async def show_stream_selector(hass, content_id, browser_id="this"):
     """Show stream selector dialog."""
     # 1. Fetch streams from Stremio
     streams = await coordinator.client.get_streams(content_id)
-    
+
     # 2. Build dialog content
     card_config = {
         "type": "custom:stremio-stream-dialog",
         "streams": streams,
         "content_id": content_id,
     }
-    
+
     # 3. Show via browser_mod
     await hass.services.async_call(
         "browser_mod",
@@ -684,6 +717,7 @@ async def show_stream_selector(hass, content_id, browser_id="this"):
 **Copy URL Functionality:**
 
 **Option 1: Native Clipboard API (Preferred)**
+
 ```javascript
 // In custom card JavaScript
 async copyToClipboard(url) {
@@ -699,6 +733,7 @@ async copyToClipboard(url) {
 ```
 
 **Option 2: Notification with Copyable Text (Android)**
+
 ```yaml
 # Automation triggered by stream selection
 automation:
@@ -717,6 +752,7 @@ automation:
 ```
 
 **Option 3: Display in Input Text Helper**
+
 ```yaml
 # Create helper
 input_text:
@@ -737,6 +773,7 @@ entities:
 **Purpose:** Add "Get Streams" and "Copy URL" buttons everywhere media is displayed
 
 **Locations:**
+
 1. Media player card shortcuts
 2. Library card item actions
 3. Continue Watching list items
@@ -931,12 +968,14 @@ script:
 #### Frontend (Custom Cards)
 
 **Technology Stack:**
+
 - TypeScript
 - LitElement (HA standard)
 - Rollup for bundling
 - HACS compatible structure
 
 **File Structure:**
+
 ```
 www/stremio-cards/
 ├── stremio-media-card.js
@@ -946,16 +985,21 @@ www/stremio-cards/
 ```
 
 **Card Registration:**
+
 ```javascript
-customElements.define('stremio-media-card', StremioMediaCard);
-customElements.define('stremio-library-card', StremioLibraryCard);
-customElements.define('stremio-stream-dialog', StremioStreamDialog);
-customElements.define('stremio-continue-watching-card', StremioContinueWatchingCard);
+customElements.define("stremio-media-card", StremioMediaCard);
+customElements.define("stremio-library-card", StremioLibraryCard);
+customElements.define("stremio-stream-dialog", StremioStreamDialog);
+customElements.define(
+  "stremio-continue-watching-card",
+  StremioContinueWatchingCard,
+);
 ```
 
 #### Backend (Integration)
 
 **Media Source Implementation:**
+
 ```python
 # media_source.py
 from homeassistant.components.media_source import (
@@ -971,13 +1015,13 @@ async def async_get_media_source(hass):
 
 class StremioMediaSource(MediaSource):
     """Stremio media source."""
-    
+
     name: str = "Stremio"
-    
+
     async def async_resolve_media(self, item: MediaSourceItem) -> PlayMedia:
         """Resolve media to a playable URL."""
         # Return stream URL
-        
+
     async def async_browse_media(
         self, item: MediaSourceItem
     ) -> BrowseMediaSource:
@@ -986,15 +1030,16 @@ class StremioMediaSource(MediaSource):
 ```
 
 **Service: Show Stream Selector:**
+
 ```python
 async def show_stream_selector(call):
     """Service to show stream selector dialog."""
     content_id = call.data.get("content_id")
     browser_id = call.data.get("browser_id", "this")
-    
+
     # Fetch streams
     streams = await coordinator.async_get_streams(content_id)
-    
+
     # Fire event for dialog display
     hass.bus.async_fire(
         "stremio_show_streams",
@@ -1025,6 +1070,7 @@ resources:
 ### 10. Implementation Checklist
 
 **Phase 1: Basic Media Player Card**
+
 - [ ] Create base media player card extending mini-media-player pattern
 - [ ] Display current media with artwork
 - [ ] Add shortcut buttons for actions
@@ -1032,6 +1078,7 @@ resources:
 - [ ] Test with media player entity
 
 **Phase 2: Stream Selector Dialog**
+
 - [ ] Create stream dialog component
 - [ ] Implement `stremio.show_stream_selector` service
 - [ ] Add stream URL display with copy button
@@ -1039,6 +1086,7 @@ resources:
 - [ ] Test popup display via browser_mod
 
 **Phase 3: Media Source Integration**
+
 - [ ] Implement `MediaSource` for Stremio
 - [ ] Create library browsing structure
 - [ ] Add continue watching section
@@ -1046,6 +1094,7 @@ resources:
 - [ ] Add context menu actions
 
 **Phase 4: Library Card**
+
 - [ ] Create custom library card with grid/list views
 - [ ] Implement filtering and search
 - [ ] Add stream icons on items
@@ -1053,12 +1102,14 @@ resources:
 - [ ] Mobile responsive design
 
 **Phase 5: Continue Watching Card**
+
 - [ ] Create continue watching list card
 - [ ] Show progress bars
 - [ ] Add resume/remove actions
 - [ ] Integrate with sensors
 
 **Phase 6: Documentation & Examples**
+
 - [ ] Card configuration examples
 - [ ] Dashboard templates
 - [ ] Automation examples
@@ -1071,16 +1122,19 @@ resources:
 ### Config Flow
 
 **Step 1: User Authentication**
+
 - Input fields:
   - Email (required, string)
   - Password (required, password field)
-  
+
 **Step 2: Validation**
+
 - Attempt login via `stremio-api`
 - Retrieve and store auth key
 - Fetch user profile for validation
 
 **Step 3: Completion**
+
 - Create config entry with encrypted auth key
 - Set up coordinator and entities
 - Show success message
@@ -1091,14 +1145,15 @@ resources:
 
 ```yaml
 options:
-  scan_interval: 60  # seconds (30-300)
+  scan_interval: 60 # seconds (30-300)
   enable_metadata_sensors: true
   enable_events: true
-  continue_watching_limit: 10  # items to fetch
+  continue_watching_limit: 10 # items to fetch
   library_sync: true
 ```
 
 **Options UI:**
+
 - Number selector for scan interval
 - Toggle switches for features
 - Save and apply changes without restarting
@@ -1122,6 +1177,7 @@ async def authenticate(email: str, password: str) -> str:
 **Update Frequency:** 60 seconds (configurable)
 
 **Data Fetched Per Cycle:**
+
 1. User profile (cached, updated hourly)
 2. Continue watching list (every update)
 3. Library items (every update, paginated if needed)
@@ -1131,11 +1187,13 @@ async def authenticate(email: str, password: str) -> str:
 ### Error Handling
 
 **Authentication Errors:**
+
 - Invalid credentials → Prompt re-authentication
 - Expired auth key → Auto re-login if credentials stored
 - API unavailable → Retry with exponential backoff
 
 **Data Errors:**
+
 - Network timeout → Use cached data, retry next cycle
 - Rate limiting → Increase scan interval temporarily
 - Malformed data → Log warning, skip update
@@ -1151,24 +1209,28 @@ async def authenticate(email: str, password: str) -> str:
 ## Implementation Plan
 
 ### Phase 1: Foundation (Week 1)
+
 - [ ] Set up project structure
 - [ ] Implement manifest.json and strings.json
 - [ ] Create `const.py` with constants
 - [ ] Set up basic `__init__.py` with platform loading
 
 ### Phase 2: Authentication (Week 1)
+
 - [ ] Implement config flow with email/password
 - [ ] Add authentication validation
 - [ ] Secure auth key storage
 - [ ] Add error handling for auth failures
 
 ### Phase 3: API Client (Week 2)
+
 - [ ] Install and wrap `stremio-api` library
 - [ ] Create `coordinator.py` with DataUpdateCoordinator
 - [ ] Implement data fetching methods
 - [ ] Add error handling and retries
 
 ### Phase 4: Core Entities (Week 2-3)
+
 - [ ] Implement user sensor
 - [ ] Implement library sensor
 - [ ] Implement current/last watching sensors
@@ -1176,12 +1238,14 @@ async def authenticate(email: str, password: str) -> str:
 - [ ] Implement addon sensor
 
 ### Phase 5: Advanced Entities (Week 3)
+
 - [ ] Implement metadata sensors
 - [ ] Implement binary sensors
 - [ ] Implement media player entity (read-only)
 - [ ] Add entity state management
 
 ### Phase 6: Events & Services (Week 4)
+
 - [ ] Implement event firing for playback changes
 - [ ] Implement library update events
 - [ ] Add `get_streams` service
@@ -1194,12 +1258,14 @@ async def authenticate(email: str, password: str) -> str:
   - [ ] Stream URL fetching and caching
 
 ### Phase 7: Options Flow (Week 4)
+
 - [ ] Implement options flow handler
 - [ ] Add configuration options UI
 - [ ] Add options validation
 - [ ] Test options updates
 
 ### Phase 8: Testing & Polish (Week 5)
+
 - [ ] Unit tests for all components
 - [ ] Integration tests
 - [ ] Documentation structure setup
@@ -1213,6 +1279,7 @@ async def authenticate(email: str, password: str) -> str:
 - [ ] Logo and branding
 
 ### Phase 9: Release (Week 5)
+
 - [ ] Complete CHANGELOG.md
 - [ ] HACS submission
 - [ ] Community announcement
@@ -1228,11 +1295,13 @@ async def authenticate(email: str, password: str) -> str:
 **Issue:** Stremio API does not provide webhooks or real-time player state.
 
 **Impact:**
+
 - Cannot detect play/pause/stop events in real-time
 - Cannot control playback remotely
 - Updates only via polling (60-second intervals)
 
 **Workaround:**
+
 - Poll "Continue Watching" API for progress changes
 - Infer playback events from progress deltas
 - Lower polling interval for more responsive updates (trade-off: more API calls)
@@ -1244,11 +1313,13 @@ async def authenticate(email: str, password: str) -> str:
 **Issue:** API only exposes watch progress, not current playback state.
 
 **Impact:**
+
 - Cannot determine if user is actively watching NOW
 - Only know "last watched" and "currently watching" (from Continue Watching)
 - No pause/buffering/error states available
 
 **Workaround:**
+
 - Infer "playing" state by monitoring progress updates
 - Mark as "idle" if no progress change in X minutes
 - Use binary sensor to indicate likely playback
@@ -1258,6 +1329,7 @@ async def authenticate(email: str, password: str) -> str:
 **Issue:** Stremio API is user-centric, not device-specific.
 
 **Impact:**
+
 - Cannot distinguish which device is playing
 - Multi-device households see aggregated data
 - Cannot target specific devices for commands
@@ -1267,6 +1339,7 @@ async def authenticate(email: str, password: str) -> str:
 **Issue:** Metadata depends on addons and content sources.
 
 **Impact:**
+
 - Some content may lack complete metadata
 - IMDb IDs may be missing for some items
 - Poster images may not always be available
@@ -1276,6 +1349,7 @@ async def authenticate(email: str, password: str) -> str:
 **Issue:** Library changes may not reflect immediately in API.
 
 **Impact:**
+
 - Adding/removing items may take time to appear
 - Sync conflicts between devices possible
 
@@ -1294,11 +1368,13 @@ Enable seamless playback of Stremio content on Apple TV devices directly from Ho
 **Technology:** Home Assistant's Apple TV integration + `pyatv` library
 
 **How it works:**
+
 1. Fetch stream URL from Stremio API for requested content
 2. Use `pyatv.stream.play_url()` to send URL directly to Apple TV via AirPlay
 3. Apple TV fetches and plays the stream natively
 
 **Advantages:**
+
 - No additional apps required on Apple TV
 - Native AirPlay protocol support
 - Works with most video formats supported by Apple TV
@@ -1306,12 +1382,14 @@ Enable seamless playback of Stremio content on Apple TV devices directly from Ho
 - Integrates with existing HA Apple TV integration
 
 **Limitations:**
+
 - Limited format support (MP4, M4V, MOV primarily)
 - May not work with DRM-protected streams
 - Requires network-accessible stream URLs
 - HTTPS streams must have valid certificates
 
 **Implementation:**
+
 ```python
 # In Stremio integration
 async def play_on_apple_tv(
@@ -1337,22 +1415,26 @@ async def play_on_apple_tv(
 **Technology:** VLC for Apple TV + URL scheme `vlc-x-callback://`
 
 **How it works:**
+
 1. Fetch stream URL from Stremio API
 2. Launch VLC app on Apple TV using deep link
 3. Pass stream URL to VLC using `vlc-x-callback://x-callback-url/stream?url=<STREAM_URL>`
 4. VLC handles playback with broader format support
 
 **Advantages:**
+
 - Support for MKV, AVI, and other formats not supported by Apple TV natively
 - Subtitle support
 - Advanced playback controls
 - Works with various streaming protocols (HTTP, RTSP, etc.)
 
 **Limitations:**
+
 - Requires VLC app installed on Apple TV
 - URL scheme support on tvOS is limited (may not work on all tvOS versions)
 - Less native integration than AirPlay
-pyatv>=0.14.0  # For Apple TV AirPlay streaming
+  pyatv>=0.14.0 # For Apple TV AirPlay streaming
+
 ```
 
 ### Home Assistant Requirements
@@ -1378,6 +1460,7 @@ await hass.services.async_call(
 ```
 
 **VLC URL Scheme Format:**
+
 ```
 vlc-x-callback://x-callback-url/stream?url=<ENCODED_STREAM_URL>&x-success=<SUCCESS_CALLBACK>&x-error=<ERROR_CALLBACK>
 ```
@@ -1385,11 +1468,13 @@ vlc-x-callback://x-callback-url/stream?url=<ENCODED_STREAM_URL>&x-success=<SUCCE
 #### Approach 3: Hybrid Mode (Recommended for Production)
 
 Automatically select best method based on:
+
 1. Stream format/protocol
 2. Available apps on Apple TV
 3. User preference
 
 **Decision Logic:**
+
 ```python
 if stream_format in ["mp4", "m4v", "mov"] and not requires_subtitles:
     # Use native AirPlay
@@ -1408,14 +1493,14 @@ else:
 
 **Parameters:**
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| entity_id | string | Yes | Apple TV media player entity ID |
-| content_id | string | Conditional* | Stremio content ID (e.g., IMDb ID) |
-| stream_url | string | Conditional* | Direct stream URL (if already known) |
-| method | string | No | Playback method: "auto", "airplay", "vlc" (default: "auto") |
-| subtitle_url | string | No | URL to subtitle file (SRT, VTT) |
-| start_position | integer | No | Start playback at position (seconds) |
+| Parameter      | Type    | Required      | Description                                                 |
+| -------------- | ------- | ------------- | ----------------------------------------------------------- |
+| entity_id      | string  | Yes           | Apple TV media player entity ID                             |
+| content_id     | string  | Conditional\* | Stremio content ID (e.g., IMDb ID)                          |
+| stream_url     | string  | Conditional\* | Direct stream URL (if already known)                        |
+| method         | string  | No            | Playback method: "auto", "airplay", "vlc" (default: "auto") |
+| subtitle_url   | string  | No            | URL to subtitle file (SRT, VTT)                             |
+| start_position | integer | No            | Start playback at position (seconds)                        |
 
 \* Either `content_id` or `stream_url` must be provided
 
@@ -1455,11 +1540,11 @@ data:
 ```yaml
 apple_tv_integration:
   enabled: true
-  default_method: "auto"  # auto, airplay, vlc
-  preferred_quality: "1080p"  # 4k, 1080p, 720p, auto
-  auto_resume: true  # Resume from Continue Watching position
-  subtitle_language: "en"  # Default subtitle language
-  fallback_to_airplay: true  # If VLC fails, try AirPlay
+  default_method: "auto" # auto, airplay, vlc
+  preferred_quality: "1080p" # 4k, 1080p, 720p, auto
+  auto_resume: true # Resume from Continue Watching position
+  subtitle_language: "en" # Default subtitle language
+  fallback_to_airplay: true # If VLC fails, try AirPlay
 ```
 
 ### User Experience Flow
@@ -1487,17 +1572,20 @@ apple_tv_integration:
 ### Technical Requirements
 
 **Home Assistant Integration Dependencies:**
+
 ```yaml
 dependencies:
-  - apple_tv  # HA built-in Apple TV integration
+  - apple_tv # HA built-in Apple TV integration
 ```
 
 **Python Library Requirements:**
+
 ```txt
 pyatv>=0.14.0  # For AirPlay streaming control
 ```
 
 **Apple TV Requirements:**
+
 - tvOS 14.0+ (for deep linking support)
 - VLC for Apple TV 3.3.9+ (if using VLC method)
 - Network connectivity between HA and Apple TV
@@ -1506,6 +1594,7 @@ pyatv>=0.14.0  # For AirPlay streaming control
 ### Implementation Checklist
 
 **Phase 1: Core Functionality**
+
 - [ ] Add `pyatv` as dependency
 - [ ] Implement stream URL fetching from Stremio
 - [ ] Create basic AirPlay streaming service
@@ -1513,6 +1602,7 @@ pyatv>=0.14.0  # For AirPlay streaming control
 - [ ] Test with common stream formats
 
 **Phase 2: VLC Integration**
+
 - [ ] Implement VLC URL scheme builder
 - [ ] Add VLC app detection (optional)
 - [ ] Create VLC deep link launcher
@@ -1520,6 +1610,7 @@ pyatv>=0.14.0  # For AirPlay streaming control
 - [ ] Test with MKV, AVI formats
 
 **Phase 3: Smart Selection**
+
 - [ ] Implement automatic method selection
 - [ ] Add format detection logic
 - [ ] Create user preference system
@@ -1527,6 +1618,7 @@ pyatv>=0.14.0  # For AirPlay streaming control
 - [ ] Implement fallback mechanisms
 
 **Phase 4: Enhanced Features**
+
 - [ ] Add subtitle support
 - [ ] Implement resume from position
 - [ ] Add quality selection
@@ -1690,6 +1782,7 @@ homeassistant>=2025.1.0
 ### Root Level Documentation
 
 **README.md** - Main project documentation
+
 - Project overview and features
 - Quick installation via HACS
 - Basic configuration steps
@@ -1697,12 +1790,14 @@ homeassistant>=2025.1.0
 - Support and community links
 
 **project.specs.md** (this file) - Complete technical specifications
+
 - Architecture and design decisions
 - Implementation details
 - API integration specs
 - Feature specifications
 
 **agentinstructions.md** - AI agent development instructions
+
 - Context for AI assistants
 - Development workflow
 - Code generation guidelines
@@ -1742,6 +1837,7 @@ docs/
 ### Documentation Content Map
 
 #### docs/installation.md
+
 - HACS installation (recommended)
 - Manual installation
 - Prerequisites and dependencies
@@ -1749,6 +1845,7 @@ docs/
 - Verification steps
 
 #### docs/configuration.md
+
 - Config flow options
 - Options flow settings
 - YAML configuration (if supported)
@@ -1756,6 +1853,7 @@ docs/
 - Multiple instances
 
 #### docs/features/media-player.md
+
 - Entity attributes
 - Supported features
 - State meanings
@@ -1763,6 +1861,7 @@ docs/
 - Example use cases
 
 #### docs/features/sensors.md
+
 - All sensor types
 - Attribute descriptions
 - Update intervals
@@ -1770,6 +1869,7 @@ docs/
 - Integration with other systems
 
 #### docs/features/services.md
+
 - Service definitions
 - Parameter descriptions
 - YAML examples
@@ -1777,6 +1877,7 @@ docs/
 - Error codes
 
 #### docs/features/events.md
+
 - Event types
 - Event data structures
 - Listening to events
@@ -1784,6 +1885,7 @@ docs/
 - Example automations
 
 #### docs/features/apple-tv.md
+
 - Setup requirements
 - Configuration options
 - Usage examples
@@ -1791,6 +1893,7 @@ docs/
 - Format compatibility
 
 #### docs/features/ui-components.md
+
 - Custom card installation
 - Card configurations
 - Dashboard examples
@@ -1798,12 +1901,14 @@ docs/
 - Mobile optimization
 
 #### docs/guides/quick-start.md
+
 - 5-minute setup
 - First automation
 - Dashboard setup
 - Common patterns
 
 #### docs/guides/automations.md
+
 - Playback automations
 - Library notifications
 - Device handover
@@ -1811,6 +1916,7 @@ docs/
 - Blueprint templates
 
 #### docs/guides/dashboards.md
+
 - Basic dashboard
 - Media room setup
 - Mobile layout
@@ -1818,6 +1924,7 @@ docs/
 - Complete examples
 
 #### docs/guides/troubleshooting.md
+
 - Common errors
 - Debug logging
 - Network issues
@@ -1825,6 +1932,7 @@ docs/
 - Support resources
 
 #### docs/development/setup.md
+
 - Development environment
 - Required tools
 - Running locally
@@ -1832,6 +1940,7 @@ docs/
 - VS Code configuration
 
 #### docs/development/architecture.md
+
 - Component structure
 - Data flow
 - Coordinator pattern
@@ -1839,6 +1948,7 @@ docs/
 - Service registration
 
 #### docs/development/testing.md
+
 - Unit testing
 - Integration testing
 - Manual testing
@@ -1846,6 +1956,7 @@ docs/
 - CI/CD pipeline
 
 #### docs/development/contributing.md
+
 - Code standards
 - Commit conventions
 - Pull request process
@@ -1853,6 +1964,7 @@ docs/
 - Community guidelines
 
 #### docs/development/release.md
+
 - Version numbering
 - Release checklist
 - HACS validation
@@ -1860,6 +1972,7 @@ docs/
 - Rollback procedures
 
 #### docs/api/stremio-api.md
+
 - API endpoints
 - Request/response formats
 - Authentication details
@@ -1867,18 +1980,21 @@ docs/
 - Example requests
 
 #### docs/api/rate-limits.md
+
 - Rate limit details
 - Backoff strategies
 - Best practices
 - Monitoring
 
 #### docs/api/authentication.md
+
 - Auth flow
 - Token management
 - Re-authentication
 - Security considerations
 
 #### docs/CHANGELOG.md
+
 - Version history
 - Breaking changes
 - New features
@@ -1890,6 +2006,7 @@ docs/
 ## Testing Strategy
 
 ### Unit Tests
+
 - Config flow authentication
 - Options flow updates
 - Coordinator data updates
@@ -1899,6 +2016,7 @@ docs/
 **Details:** See [docs/development/testing.md](docs/development/testing.md)
 
 ### Integration Tests
+
 - Full setup flow
 - Entity registration
 - Service calls
@@ -1907,6 +2025,7 @@ docs/
 **Details:** See [docs/development/testing.md](docs/development/testing.md)
 
 ### Manual Testing
+
 - Real Stremio account integration
 - Multi-device scenarios
 - Network failure handling
@@ -1967,14 +2086,17 @@ MIT License (matching stremio-api library)
 - [Documentation Files
 
 ### Root Files
+
 - `README.md` - Main project overview and quick start
 - `project.specs.md` - This file, complete technical specifications
 - `agentinstructions.md` - AI agent development instructions
 
 ### Documentation Directory (/docs/)
+
 All detailed documentation lives in the `/docs/` directory. See [Documentation Structure](#documentation-structure) section above for complete file listing.
 
 **Key Documentation:**
+
 - [Installation Guide](docs/installation.md)
 - [Configuration Reference](docs/configuration.md)
 - [Features Overview](docs/features/)
@@ -1997,6 +2119,7 @@ All detailed documentation lives in the `/docs/` directory. See [Documentation S
 **Document Version:** 1.1  
 **Created:** January 17, 2026  
 **Last Updssues:** GitHub Issues
+
 - **Discussions:** GitHub Discussions
 - **Community:** Home Assistant Community Forum
 
