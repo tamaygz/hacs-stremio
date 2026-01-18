@@ -591,15 +591,21 @@ class StremioContinueWatchingCard extends LitElement {
       serviceData.episode = episode;
     }
 
-    // Call service with return_response to get streams back
-    this._hass.callService('stremio', 'get_streams', serviceData, undefined, true, true)
+    // Call service with return_response using WebSocket directly
+    // The callService with returnResponse=true doesn't work reliably
+    this._hass.callWS({
+      type: 'call_service',
+      domain: 'stremio',
+      service: 'get_streams',
+      service_data: serviceData,
+      return_response: true,
+    })
       .then((response) => {
         console.log('[Continue Watching Card] Streams response:', response);
         
         // Handle different response formats:
-        // HA 2024+: { context: {...}, response: { streams: [...] } }
-        // Some versions: { context: {...}, streams: [...] }
-        // Direct return: { streams: [...] }
+        // WebSocket response: { response: { streams: [...] } }
+        // Or direct: { streams: [...] }
         let streams = null;
         
         if (response?.response?.streams) {
