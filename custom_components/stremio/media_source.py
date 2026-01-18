@@ -858,16 +858,17 @@ class StremioMediaSource(MediaSource):
                 stream_identifier = f"{media_type}/{media_id}#{idx}"
 
             # Add the main playable stream entry
+            # Use TRACK media class to render as list item instead of thumbnail grid
             children.append(
                 BrowseMediaSource(
                     domain=DOMAIN,
                     identifier=stream_identifier,
-                    media_class=MediaClass.VIDEO,
+                    media_class=MediaClass.TRACK,
                     media_content_type=MediaType.VIDEO,
                     title=f"▶️ {label}",
                     can_play=True,
                     can_expand=False,
-                    thumbnail=poster,
+                    thumbnail=None,  # No thumbnail for list view
                 )
             )
 
@@ -916,6 +917,7 @@ class StremioMediaSource(MediaSource):
             can_expand=True,
             thumbnail=poster,
             children=children,
+            children_media_class=MediaClass.TRACK,  # Hint to render children as list
         )
 
     def _build_catalogs_browse(self) -> BrowseMediaSource:

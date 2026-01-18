@@ -91,46 +91,88 @@ class StremioMediaPlayer(
         self._previous_state: MediaPlayerState | None = None
         self._previous_media_title: str | None = None
         self._previous_media_id: str | None = None
+        # Flag to allow state updates (set by handover operations)
+        self._pending_state_update: bool = False
 
     @callback
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator.
 
-        Only trigger a state update if the actual state has changed.
-        This prevents the media browser from resetting during navigation
-        when the coordinator polls but nothing has changed.
+        This method is very conservative about triggering state updates to prevent
+        the media browser from resetting during navigation. State updates only occur:
+        1. When _pending_state_update flag is set (after handover operations)
+        2. When the entity is first initialized (previous values are None)
+
+        Regular polling updates are suppressed to keep the media browser stable.
         """
         current_state = self.state
         current_title = self.media_title
         current_media_id = self._get_current_media_id()
 
+        # Check if this is the first update (initialization)
+        is_first_update = (
+            self._previous_state is None
+            and self._previous_media_title is None
+            and self._previous_media_id is None
+        )
+
         # Check if anything actually changed
         state_changed = current_state != self._previous_state
         title_changed = current_title != self._previous_media_title
         media_id_changed = current_media_id != self._previous_media_id
+        something_changed = state_changed or title_changed or media_id_changed
 
-        if state_changed or title_changed or media_id_changed:
+        # Only update state if:
+        # 1. This is the first update (initialization), OR
+        # 2. A pending update was requested (from handover), OR
+        # 3. The state went from PLAYING to IDLE or vice versa (major state change)
+        should_update = (
+            is_first_update
+            or self._pending_state_update
+            or (something_changed and state_changed)
+        )
+
+        if should_update and something_changed:
             _LOGGER.debug(
                 "Media player state update: state=%s (changed=%s), title=%s (changed=%s), "
-                "media_id=%s (changed=%s)",
+                "media_id=%s (changed=%s), pending=%s, first=%s",
                 current_state,
                 state_changed,
                 current_title,
                 title_changed,
                 current_media_id,
                 media_id_changed,
+                self._pending_state_update,
+                is_first_update,
             )
             self._previous_state = current_state
             self._previous_media_title = current_title
             self._previous_media_id = current_media_id
+            self._pending_state_update = False  # Clear the flag
             self.async_write_ha_state()
         else:
-            _LOGGER.debug(
-                "Skipping state update - no change (state=%s, title=%s, media_id=%s)",
-                current_state,
-                current_title,
-                current_media_id,
-            )
+            # Still update the tracked values to stay in sync, but don't trigger UI update
+            if something_changed:
+                _LOGGER.debug(
+                    "Suppressing state update to avoid media browser reset "
+                    "(state=%s, title=%s, media_id=%s)",
+                    current_state,
+                    current_title,
+                    current_media_id,
+                )
+                self._previous_state = current_state
+                self._previous_media_title = current_title
+                self._previous_media_id = current_media_id
+
+    def request_state_update(self) -> None:
+        """Request a state update on the next coordinator update.
+
+        Call this after a handover operation to ensure the UI reflects
+        the new state.
+        """
+        self._pending_state_update = True
+        # Trigger an immediate update
+        self._handle_coordinator_update()
 
     def _get_current_media_id(self) -> str | None:
         """Get the current media IMDB ID from coordinator data."""
@@ -375,6 +417,9 @@ class StremioMediaPlayer(
 
             # Update the current media on the Stremio device coordinator
             self.coordinator.set_current_media(media_info, stream_url)
+
+            # Request a state update so the UI reflects the new media
+            self.request_state_update()
 
         except HandoverError as err:
             _LOGGER.error("Apple TV handover failed: %s", err)
