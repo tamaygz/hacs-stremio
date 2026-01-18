@@ -32,6 +32,7 @@ from ..const import INTEGRATION_VERSION, JSMODULES, URL_BASE
 
 if TYPE_CHECKING:
     from homeassistant.components.lovelace import LovelaceData
+    from homeassistant.components.lovelace.resources import ResourceStorageCollection
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -52,30 +53,38 @@ class JSModuleRegistration:
             hass: Home Assistant instance
         """
         self.hass = hass
-        self._lovelace_data: LovelaceData | dict[str, Any] | None = self.hass.data.get(
-            "lovelace"
+        self._lovelace_data: Any = self.hass.data.get("lovelace")
+        _LOGGER.debug(
+            "Lovelace data type: %s, value: %s",
+            type(self._lovelace_data).__name__,
+            self._lovelace_data,
         )
 
     @property
-    def lovelace(self) -> LovelaceData | None:
-        """Get the Lovelace data object.
+    def lovelace_resources(self) -> ResourceStorageCollection | None:
+        """Get the Lovelace resources collection.
 
         Returns:
-            LovelaceData object or None if not available/compatible
+            ResourceStorageCollection or None if not available
         """
         if self._lovelace_data is None:
+            _LOGGER.debug("Lovelace data is None")
             return None
 
-        # Handle different HA versions - lovelace data might be a dict or object
+        # Modern HA (2024+): lovelace data has a resources attribute
+        if hasattr(self._lovelace_data, "resources"):
+            _LOGGER.debug("Found resources attribute on lovelace data")
+            return self._lovelace_data.resources  # type: ignore[return-value]
+
+        # Try to access resources from dict-based structure
         if isinstance(self._lovelace_data, dict):
-            # In some versions, the actual data is nested
-            if "dashboards" in self._lovelace_data:
-                # Try to get the default dashboard's data
-                return None  # Dict-based storage, can't use automatic registration
-            return None
+            resources = self._lovelace_data.get("resources")
+            if resources is not None:
+                _LOGGER.debug("Found resources in lovelace dict")
+                return resources  # type: ignore[return-value]
 
-        # It's a proper LovelaceData object
-        return self._lovelace_data  # type: ignore[return-value]
+        _LOGGER.debug("Could not find lovelace resources")
+        return None
 
     @property
     def lovelace_mode(self) -> str | None:
@@ -87,13 +96,13 @@ class JSModuleRegistration:
         if self._lovelace_data is None:
             return None
 
-        # Handle dict-based storage (older HA versions or different config)
-        if isinstance(self._lovelace_data, dict):
-            return self._lovelace_data.get("mode")
-
         # Handle object-based storage (modern HA)
         if hasattr(self._lovelace_data, "mode"):
             return self._lovelace_data.mode  # type: ignore[union-attr]
+
+        # Handle dict-based storage (older HA versions or different config)
+        if isinstance(self._lovelace_data, dict):
+            return self._lovelace_data.get("mode")
 
         return None
 
@@ -103,7 +112,15 @@ class JSModuleRegistration:
 
         # Only register modules if Lovelace is in storage mode
         mode = self.lovelace_mode
-        if mode == "storage" and self.lovelace is not None:
+        resources = self.lovelace_resources
+        
+        _LOGGER.debug(
+            "Lovelace mode: %s, resources available: %s",
+            mode,
+            resources is not None,
+        )
+        
+        if mode == "storage" and resources is not None:
             await self._async_wait_for_lovelace_resources()
         else:
             _LOGGER.info(
