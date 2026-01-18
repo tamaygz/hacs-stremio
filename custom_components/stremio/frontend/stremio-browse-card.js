@@ -1199,6 +1199,10 @@ class StremioBrowseCard extends LitElement {
               ${this._loadingSimilar ? 'Loading...' : 'Find Similar'}
             </button>
           ` : ''}
+          <button class="detail-button tertiary" @click=${() => this._addToLibrary(item)}>
+            <ha-icon icon="mdi:plus"></ha-icon>
+            Add to Library
+          </button>
         </div>
 
         <div class="detail-actions">
@@ -1209,13 +1213,6 @@ class StremioBrowseCard extends LitElement {
           <button class="detail-button secondary" @click=${() => this._getStreamsForDetailItem(item)}>
             <ha-icon icon="mdi:format-list-bulleted"></ha-icon>
             Get Streams
-          </button>
-        </div>
-
-        <div class="detail-actions">
-          <button class="detail-button secondary" @click=${() => this._addToLibrary(item)}>
-            <ha-icon icon="mdi:plus"></ha-icon>
-            Add to Library
           </button>
         </div>
       </div>

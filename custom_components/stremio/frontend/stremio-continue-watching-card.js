@@ -825,7 +825,7 @@ class StremioContinueWatchingCard extends LitElement {
               </h2>
             </div>
             <div 
-              class="continue-watching-grid ${this.config.horizontal_scroll ? 'horizontal' : ''}" 
+              class="items-grid ${this.config.horizontal_scroll ? 'horizontal' : ''}" 
               role="list" 
               aria-label="Similar items"
               style="${this.config.card_height > 0 ? `max-height: ${this.config.card_height}px` : ''}; --grid-columns: ${this.config.columns || 4}; --poster-aspect-ratio: ${this.config.poster_aspect_ratio || '2/3'}"
@@ -1131,7 +1131,7 @@ class StremioContinueWatchingCard extends LitElement {
 
     return html`
       <div 
-        class="continue-watching-item" 
+        class="item" 
         role="listitem"
         tabindex="0"
         @click=${() => this._handleSimilarItemClick(item)}
