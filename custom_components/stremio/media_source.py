@@ -19,7 +19,7 @@ from homeassistant.components.media_source import (
 )
 from homeassistant.core import HomeAssistant
 
-from .const import DOMAIN
+from .const import DOMAIN, EVENT_STREAM_URL
 
 _LOGGER = logging.getLogger(__name__)
 

@@ -51,7 +51,7 @@ SEARCH_LIBRARY_SCHEMA = vol.Schema(
             ["all", "title", "genre", "cast"]
         ),
         vol.Optional(ATTR_LIMIT, default=10): vol.All(
-            vol.Coerce(int), vol.Range(min=1, max=50)
+            vol.Coerce(int), vol.Range(min=1, max=50)  # type: ignore[arg-type]
         ),
     }
 )
@@ -60,8 +60,8 @@ GET_STREAMS_SCHEMA = vol.Schema(
     {
         vol.Required(ATTR_MEDIA_ID): cv.string,
         vol.Required(ATTR_MEDIA_TYPE): vol.In(["movie", "series"]),
-        vol.Optional(ATTR_SEASON): vol.Coerce(int),
-        vol.Optional(ATTR_EPISODE): vol.Coerce(int),
+        vol.Optional(ATTR_SEASON): vol.Coerce(int),  # type: ignore[arg-type]
+        vol.Optional(ATTR_EPISODE): vol.Coerce(int),  # type: ignore[arg-type]
     }
 )
 
@@ -122,7 +122,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         hass: Home Assistant instance
     """
 
-    async def handle_search_library(call: ServiceCall) -> ServiceResponse:
+    async def handle_search_library(call: ServiceCall) -> ServiceResponse:  # type: ignore[return-value]
         """Handle search_library service call."""
         coordinator, client = _get_entry_data(hass)
 
@@ -186,7 +186,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             _LOGGER.exception("Error searching library: %s", err)
             raise HomeAssistantError(f"Failed to search library: {err}") from err
 
-    async def handle_get_streams(call: ServiceCall) -> ServiceResponse:
+    async def handle_get_streams(call: ServiceCall) -> ServiceResponse:  # type: ignore[return-value]
         """Handle get_streams service call."""
         _, client = _get_entry_data(hass)
 
