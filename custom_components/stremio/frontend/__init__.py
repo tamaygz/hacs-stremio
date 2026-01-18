@@ -47,18 +47,63 @@ class JSModuleRegistration:
             hass: Home Assistant instance
         """
         self.hass = hass
-        self.lovelace: LovelaceData | None = self.hass.data.get("lovelace")
+        self._lovelace_data: LovelaceData | dict[str, Any] | None = self.hass.data.get(
+            "lovelace"
+        )
+
+    @property
+    def lovelace(self) -> LovelaceData | None:
+        """Get the Lovelace data object.
+
+        Returns:
+            LovelaceData object or None if not available/compatible
+        """
+        if self._lovelace_data is None:
+            return None
+
+        # Handle different HA versions - lovelace data might be a dict or object
+        if isinstance(self._lovelace_data, dict):
+            # In some versions, the actual data is nested
+            if "dashboards" in self._lovelace_data:
+                # Try to get the default dashboard's data
+                return None  # Dict-based storage, can't use automatic registration
+            return None
+
+        # It's a proper LovelaceData object
+        return self._lovelace_data  # type: ignore[return-value]
+
+    @property
+    def lovelace_mode(self) -> str | None:
+        """Get the Lovelace mode safely.
+
+        Returns:
+            'storage', 'yaml', or None if not available
+        """
+        if self._lovelace_data is None:
+            return None
+
+        # Handle dict-based storage (older HA versions or different config)
+        if isinstance(self._lovelace_data, dict):
+            return self._lovelace_data.get("mode")
+
+        # Handle object-based storage (modern HA)
+        if hasattr(self._lovelace_data, "mode"):
+            return self._lovelace_data.mode  # type: ignore[union-attr]
+
+        return None
 
     async def async_register(self) -> None:
         """Register frontend resources."""
         await self._async_register_path()
 
         # Only register modules if Lovelace is in storage mode
-        if self.lovelace and self.lovelace.mode == "storage":
+        mode = self.lovelace_mode
+        if mode == "storage" and self.lovelace is not None:
             await self._async_wait_for_lovelace_resources()
         else:
             _LOGGER.info(
-                "Lovelace is in YAML mode. Add resources manually: %s/*.js",
+                "Lovelace mode is '%s'. Add resources manually if needed: %s/*.js",
+                mode or "unknown",
                 URL_BASE,
             )
 
@@ -183,7 +228,7 @@ class JSModuleRegistration:
 
     async def async_unregister(self) -> None:
         """Remove Lovelace resources from this integration."""
-        if not self.lovelace or self.lovelace.mode != "storage":
+        if self.lovelace is None or self.lovelace_mode != "storage":
             return
 
         for module in JSMODULES:
