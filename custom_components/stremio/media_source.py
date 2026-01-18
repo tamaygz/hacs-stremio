@@ -175,80 +175,95 @@ class StremioMediaSource(MediaSource):
         identifier = item.identifier or ROOT_IDENTIFIER
         _LOGGER.debug("Browsing media with identifier: %s", identifier)
 
-        # Handle root level browsing
-        if identifier == ROOT_IDENTIFIER or not identifier:
-            return self._build_root_browse()
+        try:
+            # Handle root level browsing
+            if identifier == ROOT_IDENTIFIER or not identifier:
+                return self._build_root_browse()
 
-        # Handle copyurl: identifiers - fire event with URL for clipboard
-        if identifier.startswith("copyurl:"):
-            stream_url = identifier[8:]  # Remove "copyurl:" prefix
-            _LOGGER.info("Stream URL requested for copy: %s", stream_url)
-            # Fire an event with the URL so automations/frontend can handle it
-            self.hass.bus.async_fire(
-                "stremio_stream_url",
-                {"url": stream_url, "action": "copy"},
+            # Handle copyurl: identifiers - fire event with URL for clipboard
+            if identifier.startswith("copyurl:"):
+                stream_url = identifier[8:]  # Remove "copyurl:" prefix
+                _LOGGER.info("Stream URL requested for copy: %s", stream_url)
+                # Fire an event with the URL so automations/frontend can handle it
+                self.hass.bus.async_fire(
+                    "stremio_stream_url",
+                    {"url": stream_url, "action": "copy"},
+                )
+                # Return a simple browse result showing the URL was copied
+                return BrowseMediaSource(
+                    domain=DOMAIN,
+                    identifier=identifier,
+                    media_class=MediaClass.URL,
+                    media_content_type="",
+                    title=f"URL: {stream_url}",
+                    can_play=False,
+                    can_expand=False,
+                    children=[],
+                )
+
+            # Handle different browse sections
+            if identifier == LIBRARY_IDENTIFIER:
+                return await self._build_library_browse()
+            if identifier == CONTINUE_WATCHING_IDENTIFIER:
+                return await self._build_continue_watching_browse()
+            if identifier == MOVIES_IDENTIFIER:
+                return await self._build_movies_browse()
+            if identifier == SERIES_IDENTIFIER:
+                return await self._build_series_browse()
+            if identifier == CATALOGS_IDENTIFIER:
+                return self._build_catalogs_browse()
+            if identifier == POPULAR_MOVIES_IDENTIFIER:
+                return await self._build_popular_movies_browse()
+            if identifier == POPULAR_SERIES_IDENTIFIER:
+                return await self._build_popular_series_browse()
+            if identifier == NEW_MOVIES_IDENTIFIER:
+                return await self._build_new_movies_browse()
+            if identifier == NEW_SERIES_IDENTIFIER:
+                return await self._build_new_series_browse()
+            if identifier == MOVIE_GENRES_IDENTIFIER:
+                return self._build_movie_genres_browse()
+            if identifier == SERIES_GENRES_IDENTIFIER:
+                return self._build_series_genres_browse()
+            if identifier == RECOMMENDED_IDENTIFIER:
+                return await self._build_recommended_browse()
+
+            # Handle similar content browsing (similar/type/imdb_id)
+            if identifier.startswith(f"{SIMILAR_IDENTIFIER}/"):
+                return await self._build_similar_browse(identifier)
+
+            # Handle genre browsing with format: movie_genres/Genre or series_genres/Genre
+            if identifier.startswith(f"{MOVIE_GENRES_IDENTIFIER}/"):
+                return await self._build_genre_content_browse(identifier, "movie")
+            if identifier.startswith(f"{SERIES_GENRES_IDENTIFIER}/"):
+                return await self._build_genre_content_browse(identifier, "series")
+
+            # Handle individual series items (series/imdb_id or series/imdb_id/season)
+            if identifier.startswith(f"{SERIES_IDENTIFIER}/"):
+                return await self._build_series_detail_browse(identifier)
+
+            # Handle individual movie items (movie/imdb_id)
+            if identifier.startswith("movie/"):
+                return await self._build_movie_detail_browse(identifier)
+
+            # Handle streams browsing (streams/type/imdb_id or streams/series/imdb_id/season/episode)
+            if identifier.startswith(f"{STREAMS_IDENTIFIER}/"):
+                return await self._build_streams_browse(identifier)
+
+            # Unknown identifier - return error state instead of raising
+            _LOGGER.warning("Unknown media identifier: %s", identifier)
+            return self._build_error_browse(
+                identifier, "Unknown", f"Unknown path: {identifier}"
             )
-            # Return a simple browse result showing the URL was copied
-            return BrowseMediaSource(
-                domain=DOMAIN,
-                identifier=identifier,
-                media_class=MediaClass.URL,
-                media_content_type="",
-                title=f"URL: {stream_url}",
-                can_play=False,
-                can_expand=False,
-                children=[],
+
+        except BrowseError:
+            # Re-raise BrowseError as-is (these are intentional)
+            raise
+        except Exception as err:
+            # Catch unexpected errors and return error state instead of crashing
+            _LOGGER.exception("Error browsing media identifier %s: %s", identifier, err)
+            return self._build_error_browse(
+                identifier, "Error", f"Failed to load: {err}"
             )
-
-        # Handle different browse sections
-        if identifier == LIBRARY_IDENTIFIER:
-            return await self._build_library_browse()
-        if identifier == CONTINUE_WATCHING_IDENTIFIER:
-            return await self._build_continue_watching_browse()
-        if identifier == MOVIES_IDENTIFIER:
-            return await self._build_movies_browse()
-        if identifier == SERIES_IDENTIFIER:
-            return await self._build_series_browse()
-        if identifier == CATALOGS_IDENTIFIER:
-            return self._build_catalogs_browse()
-        if identifier == POPULAR_MOVIES_IDENTIFIER:
-            return await self._build_popular_movies_browse()
-        if identifier == POPULAR_SERIES_IDENTIFIER:
-            return await self._build_popular_series_browse()
-        if identifier == NEW_MOVIES_IDENTIFIER:
-            return await self._build_new_movies_browse()
-        if identifier == NEW_SERIES_IDENTIFIER:
-            return await self._build_new_series_browse()
-        if identifier == MOVIE_GENRES_IDENTIFIER:
-            return self._build_movie_genres_browse()
-        if identifier == SERIES_GENRES_IDENTIFIER:
-            return self._build_series_genres_browse()
-        if identifier == RECOMMENDED_IDENTIFIER:
-            return await self._build_recommended_browse()
-
-        # Handle similar content browsing (similar/type/imdb_id)
-        if identifier.startswith(f"{SIMILAR_IDENTIFIER}/"):
-            return await self._build_similar_browse(identifier)
-
-        # Handle genre browsing with format: movie_genres/Genre or series_genres/Genre
-        if identifier.startswith(f"{MOVIE_GENRES_IDENTIFIER}/"):
-            return await self._build_genre_content_browse(identifier, "movie")
-        if identifier.startswith(f"{SERIES_GENRES_IDENTIFIER}/"):
-            return await self._build_genre_content_browse(identifier, "series")
-
-        # Handle individual series items (series/imdb_id or series/imdb_id/season)
-        if identifier.startswith(f"{SERIES_IDENTIFIER}/"):
-            return await self._build_series_detail_browse(identifier)
-
-        # Handle individual movie items (movie/imdb_id)
-        if identifier.startswith("movie/"):
-            return await self._build_movie_detail_browse(identifier)
-
-        # Handle streams browsing (streams/type/imdb_id or streams/series/imdb_id/season/episode)
-        if identifier.startswith(f"{STREAMS_IDENTIFIER}/"):
-            return await self._build_streams_browse(identifier)
-
-        raise BrowseError(f"Unknown media identifier: {identifier}")
 
     def _build_root_browse(self) -> BrowseMediaSource:
         """Build root level browse menu."""
@@ -328,7 +343,7 @@ class StremioMediaSource(MediaSource):
     async def _build_library_browse(self) -> BrowseMediaSource:
         """Build library browse view."""
         coordinator = self._get_coordinator()
-        if not coordinator:
+        if not coordinator or not coordinator.data:
             return self._build_empty_browse(LIBRARY_IDENTIFIER, "Library")
 
         library_items = coordinator.data.get("library", [])
@@ -353,7 +368,7 @@ class StremioMediaSource(MediaSource):
     async def _build_continue_watching_browse(self) -> BrowseMediaSource:
         """Build continue watching browse view."""
         coordinator = self._get_coordinator()
-        if not coordinator:
+        if not coordinator or not coordinator.data:
             return self._build_empty_browse(
                 CONTINUE_WATCHING_IDENTIFIER, "Continue Watching"
             )
@@ -380,7 +395,7 @@ class StremioMediaSource(MediaSource):
     async def _build_movies_browse(self) -> BrowseMediaSource:
         """Build movies browse view."""
         coordinator = self._get_coordinator()
-        if not coordinator:
+        if not coordinator or not coordinator.data:
             return self._build_empty_browse(MOVIES_IDENTIFIER, "Movies")
 
         library_items = coordinator.data.get("library", [])
@@ -406,7 +421,7 @@ class StremioMediaSource(MediaSource):
     async def _build_series_browse(self) -> BrowseMediaSource:
         """Build TV series browse view."""
         coordinator = self._get_coordinator()
-        if not coordinator:
+        if not coordinator or not coordinator.data:
             return self._build_empty_browse(SERIES_IDENTIFIER, "TV Series")
 
         library_items = coordinator.data.get("library", [])
@@ -442,14 +457,20 @@ class StremioMediaSource(MediaSource):
         media_id = parts[1] if len(parts) > 1 else None
 
         if not media_id:
-            raise BrowseError("Invalid movie identifier")
+            _LOGGER.warning("Invalid movie identifier: %s", identifier)
+            return self._build_error_browse(
+                identifier, "Invalid Movie", "Movie ID not found in path"
+            )
 
         coordinator = self._get_coordinator()
         if not coordinator:
-            raise BrowseError("Stremio coordinator not available")
+            _LOGGER.warning("Coordinator not available for movie detail browse")
+            return self._build_error_browse(
+                identifier, "Unavailable", "Stremio integration not ready"
+            )
 
         # Find movie in library
-        library_items = coordinator.data.get("library", [])
+        library_items = coordinator.data.get("library", []) if coordinator.data else []
         movie_item = next(
             (
                 item
@@ -525,14 +546,20 @@ class StremioMediaSource(MediaSource):
         episode = int(parts[3]) if len(parts) > 3 else None
 
         if not media_id:
-            raise BrowseError("Invalid series identifier")
+            _LOGGER.warning("Invalid series identifier: %s", identifier)
+            return self._build_error_browse(
+                identifier, "Invalid Series", "Series ID not found in path"
+            )
 
         coordinator = self._get_coordinator()
         if not coordinator:
-            raise BrowseError("Stremio coordinator not available")
+            _LOGGER.warning("Coordinator not available for series detail browse")
+            return self._build_error_browse(
+                identifier, "Unavailable", "Stremio integration not ready"
+            )
 
         # Try to find series in library for basic info
-        library_items = coordinator.data.get("library", [])
+        library_items = coordinator.data.get("library", []) if coordinator.data else []
         series_item = next(
             (
                 item
@@ -552,11 +579,22 @@ class StremioMediaSource(MediaSource):
         # Fetch detailed metadata from Cinemeta to get accurate season/episode info
         # This works for both library items and catalog items
         client = coordinator.client
-        metadata = await client.async_get_series_metadata(media_id)
+        metadata = None
+        try:
+            metadata = await client.async_get_series_metadata(media_id)
+        except Exception as err:
+            _LOGGER.warning(
+                "Failed to fetch series metadata for %s: %s", media_id, err
+            )
 
         if not metadata:
-            # If we can't get metadata, we can't display seasons/episodes
-            raise BrowseError(f"Could not fetch series metadata for {media_id}")
+            # If we can't get metadata, show an error state instead of crashing
+            _LOGGER.warning("Could not fetch series metadata for %s", media_id)
+            return self._build_error_browse(
+                identifier,
+                title or f"Series ({media_id})",
+                "Failed to load series metadata. Please try again.",
+            )
 
         # Use metadata for title and poster if not from library
         if not title:
@@ -829,18 +867,24 @@ class StremioMediaSource(MediaSource):
         episode = int(parts[4]) if len(parts) > 4 else None
 
         if not media_type or not media_id:
-            raise BrowseError("Invalid streams identifier")
+            _LOGGER.warning("Invalid streams identifier: %s", identifier)
+            return self._build_error_browse(
+                identifier, "Invalid Request", "Missing media type or ID"
+            )
 
         coordinator = self._get_coordinator()
         if not coordinator:
-            raise BrowseError("Stremio coordinator not available")
+            _LOGGER.warning("Coordinator not available for streams browse")
+            return self._build_error_browse(
+                identifier, "Unavailable", "Stremio integration not ready"
+            )
 
         # Build title based on content type
         title = "Available Streams"
         poster = None
 
         # Try to find item in library for metadata
-        library_items = coordinator.data.get("library", [])
+        library_items = coordinator.data.get("library", []) if coordinator.data else []
         library_item = next(
             (
                 item
@@ -859,6 +903,7 @@ class StremioMediaSource(MediaSource):
                 title = f"Streams for {item_title}"
 
         # Fetch available streams from the API
+        streams = []
         try:
             client = coordinator.client
             streams = await client.async_get_streams(
@@ -869,7 +914,7 @@ class StremioMediaSource(MediaSource):
             )
         except Exception as err:
             _LOGGER.error("Failed to fetch streams: %s", err)
-            streams = []
+            # Don't return error here, just show empty streams list
 
         # Build stream children
         children = []
@@ -1297,7 +1342,10 @@ class StremioMediaSource(MediaSource):
         media_id = parts[2] if len(parts) > 2 else None
 
         if not media_type or not media_id:
-            raise BrowseError("Invalid similar content identifier")
+            _LOGGER.warning("Invalid similar content identifier: %s", identifier)
+            return self._build_error_browse(
+                identifier, "Invalid Request", "Missing media type or ID"
+            )
 
         coordinator = self._get_coordinator()
         if not coordinator:
@@ -1306,7 +1354,7 @@ class StremioMediaSource(MediaSource):
         # Try to get source item info for better title
         title = "Similar Content"
         poster = None
-        library_items = coordinator.data.get("library", [])
+        library_items = coordinator.data.get("library", []) if coordinator.data else []
         source_item = next(
             (
                 item
@@ -1364,7 +1412,9 @@ class StremioMediaSource(MediaSource):
             )
         except Exception as err:
             _LOGGER.error("Error fetching similar content for %s: %s", media_id, err)
-            return self._build_empty_browse(identifier, title)
+            return self._build_error_browse(
+                identifier, title, f"Failed to load similar content"
+            )
 
     async def _build_genre_content_browse(
         self, identifier: str, media_type: str
@@ -1383,7 +1433,10 @@ class StremioMediaSource(MediaSource):
         genre = parts[1] if len(parts) > 1 else None
 
         if not genre:
-            raise BrowseError("Invalid genre identifier")
+            _LOGGER.warning("Invalid genre identifier: %s", identifier)
+            return self._build_error_browse(
+                identifier, "Invalid Genre", "Genre not specified"
+            )
 
         coordinator = self._get_coordinator()
         if not coordinator:
@@ -1424,8 +1477,10 @@ class StremioMediaSource(MediaSource):
             )
         except Exception as err:
             _LOGGER.error("Error fetching %s genre content: %s", genre, err)
-            return self._build_empty_browse(
-                identifier, f"{genre} {media_type.title()}s"
+            return self._build_error_browse(
+                identifier,
+                f"{genre} {media_type.title()}s",
+                "Failed to load genre content",
             )
 
     def _build_catalog_item(self, item: dict[str, Any]) -> BrowseMediaSource | None:
@@ -1496,6 +1551,41 @@ class StremioMediaSource(MediaSource):
             can_play=False,
             can_expand=False,
             children=[],
+        )
+
+    def _build_error_browse(
+        self, identifier: str, title: str, error_message: str
+    ) -> BrowseMediaSource:
+        """Build an error browse result that doesn't close the browser.
+
+        Args:
+            identifier: The browse identifier
+            title: The title for the browse result
+            error_message: Error message to display
+
+        Returns:
+            BrowseMediaSource with error message as child
+        """
+        return BrowseMediaSource(
+            domain=DOMAIN,
+            identifier=identifier,
+            media_class=MediaClass.DIRECTORY,
+            media_content_type="",
+            title=title,
+            can_play=False,
+            can_expand=False,
+            children=[
+                BrowseMediaSource(
+                    domain=DOMAIN,
+                    identifier="",
+                    media_class=MediaClass.VIDEO,
+                    media_content_type="",
+                    title=f"⚠️ {error_message}",
+                    can_play=False,
+                    can_expand=False,
+                    thumbnail=None,
+                )
+            ],
         )
 
     def _get_coordinator(self):

@@ -141,12 +141,15 @@ class StremioBrowseCard extends LitElement {
 
       .catalog-poster-container {
         width: 100%;
-        aspect-ratio: var(--poster-aspect-ratio, 2/3);
+        /* Use padding-bottom technique for consistent aspect ratio across all browsers */
+        /* --poster-height-ratio is height/width as percentage, e.g., 150 for 2:3 */
+        padding-bottom: calc(var(--poster-height-ratio, 150) * 1%);
         position: relative;
         overflow: hidden;
         border-radius: 8px 8px 0 0;
         background: var(--secondary-background-color);
         flex-shrink: 0;
+        height: 0; /* Required for padding-bottom technique to work */
       }
 
       .catalog-poster {
@@ -211,12 +214,14 @@ class StremioBrowseCard extends LitElement {
 
       .item-poster-container {
         width: 100%;
-        aspect-ratio: var(--poster-aspect-ratio, 2/3);
+        /* Use padding-bottom technique for consistent aspect ratio across all browsers */
+        padding-bottom: calc(var(--poster-height-ratio, 150) * 1%);
         position: relative;
         overflow: hidden;
         border-radius: 8px 8px 0 0;
         background: var(--secondary-background-color);
         flex-shrink: 0;
+        height: 0; /* Required for padding-bottom technique to work */
       }
 
       .item-poster {
@@ -1040,7 +1045,19 @@ class StremioBrowseCard extends LitElement {
     const columns = Number(this.config.columns || 5);
     const posterAspectRatio = this.config.poster_aspect_ratio || '2/3';
     const cardHeight = this.config.card_height > 0 ? `${this.config.card_height}px` : 'none';
-    const gridStyle = `--card-max-height: ${cardHeight}; --grid-columns: ${columns}; --poster-aspect-ratio: ${posterAspectRatio};`;
+    
+    // Calculate height ratio for padding-bottom technique
+    // For aspect ratio "w/h" (width/height), padding-bottom needs height/width * 100
+    // e.g., "2/3" -> height/width = 3/2 = 1.5 -> 150%
+    let posterHeightRatio = 150; // default 2:3 -> 150%
+    if (posterAspectRatio.includes('/')) {
+      const [w, h] = posterAspectRatio.split('/').map(Number);
+      if (w > 0 && h > 0) {
+        posterHeightRatio = (h / w) * 100;
+      }
+    }
+    
+    const gridStyle = `--card-max-height: ${cardHeight}; --grid-columns: ${columns}; --poster-height-ratio: ${posterHeightRatio};`;
 
     // If showing similar items, show that view
     if (this._similarItems && this._similarItems.length > 0) {
@@ -1181,7 +1198,6 @@ class StremioBrowseCard extends LitElement {
         role="listitem"
         tabindex="0"
         aria-label="${item.title}"
-        style="--poster-aspect-ratio: ${this.config.poster_aspect_ratio || '2/3'}"
         @click=${() => this._handleItemClick(item)}
         @keydown=${(e) => {
           if (e.key === 'Enter' || e.key === ' ') {

@@ -137,12 +137,14 @@ class StremioContinueWatchingCard extends LitElement {
 
       .item-poster-container {
         width: 100%;
-        aspect-ratio: var(--poster-aspect-ratio, 2/3);
+        /* Use padding-bottom technique for consistent aspect ratio across all browsers */
+        padding-bottom: calc(var(--poster-height-ratio, 150) * 1%);
         position: relative;
         overflow: hidden;
         border-radius: 6px;
         background: var(--secondary-background-color);
         flex-shrink: 0;
+        height: 0; /* Required for padding-bottom technique to work */
       }
 
       .item-poster {
@@ -181,6 +183,7 @@ class StremioContinueWatchingCard extends LitElement {
         font-size: 0.65em;
         text-transform: uppercase;
         font-weight: 600;
+        z-index: 1;
       }
 
       .item-title {
@@ -190,12 +193,12 @@ class StremioContinueWatchingCard extends LitElement {
         text-overflow: ellipsis;
         white-space: nowrap;
         color: var(--primary-text-color);
+        height: 20px;
+        line-height: 20px;
       }
 
-      .item-year {
-        font-size: 0.7em;
-        color: var(--secondary-text-color);
-        margin-top: 2px;
+      .item-title.hidden {
+        visibility: hidden;
       }
 
       .item-progress {
@@ -216,8 +219,10 @@ class StremioContinueWatchingCard extends LitElement {
       .item-progress-text {
         font-size: 0.7em;
         color: var(--secondary-text-color);
-        margin-top: 2px;
         text-align: center;
+        height: 16px;
+        line-height: 16px;
+        margin-top: 2px;
       }
 
       .empty-state {
@@ -822,7 +827,17 @@ class StremioContinueWatchingCard extends LitElement {
       const columns = Number(this.config.columns || 4);
       const posterAspectRatio = this.config.poster_aspect_ratio || '2/3';
       const cardHeight = this.config.card_height > 0 ? `${this.config.card_height}px` : 'none';
-      const gridStyle = `--card-max-height: ${cardHeight}; --grid-columns: ${columns}; --poster-aspect-ratio: ${posterAspectRatio};`;
+      
+      // Calculate height ratio for padding-bottom technique
+      let posterHeightRatio = 150; // default 2:3 -> 150%
+      if (posterAspectRatio.includes('/')) {
+        const [w, h] = posterAspectRatio.split('/').map(Number);
+        if (w > 0 && h > 0) {
+          posterHeightRatio = (h / w) * 100;
+        }
+      }
+      
+      const gridStyle = `--card-max-height: ${cardHeight}; --grid-columns: ${columns}; --poster-height-ratio: ${posterHeightRatio};`;
 
       const filteredItems = this._getFilteredItems();
 
@@ -934,7 +949,11 @@ class StremioContinueWatchingCard extends LitElement {
   _renderItem(item) {
     const title = item.title || 'Unknown';
     const progress = typeof item.progress_percent === 'number' ? item.progress_percent : 0;
-
+    const showTitle = this.config.show_title !== false;
+    const showProgressText = this.config.show_progress_text !== false;
+    
+    // Always render all slots to maintain alignment across items in the same row
+    // The content may be empty but the space is reserved
     return html`
       <div 
         class="item" 
@@ -943,7 +962,6 @@ class StremioContinueWatchingCard extends LitElement {
         @click=${() => this._handleItemClick(item)}
         @keydown=${(e) => e.key === 'Enter' && this._handleItemClick(item)}
         aria-label="${title}, ${progress.toFixed(0)}% watched"
-        style="--poster-aspect-ratio: ${this.config.poster_aspect_ratio || '2/3'}"
       >
         <div class="item-poster-container">
           ${item.poster ? html`
@@ -953,21 +971,15 @@ class StremioContinueWatchingCard extends LitElement {
               <ha-icon icon="mdi:${item.type === 'series' ? 'television' : 'movie'}"></ha-icon>
             </div>
           `}
-        </div>
-        ${this.config.show_media_type_badge && item.type ? html`
-          <span class="media-type-badge ${item.type}">${item.type === 'series' ? 'TV' : 'Movie'}</span>
-        ` : ''}
-        ${this.config.show_title !== false ? html`
-          <div class="item-title" title="${title}">${title}</div>
-        ` : ''}
-        ${progress > 0 ? html`
-          <div class="item-progress" role="progressbar" aria-valuenow="${progress}" aria-valuemin="0" aria-valuemax="100">
-            <div class="item-progress-fill" style="width: ${progress}%"></div>
-          </div>
-          ${this.config.show_progress_text !== false ? html`
-            <div class="item-progress-text">${progress.toFixed(0)}% watched</div>
+          ${this.config.show_media_type_badge && item.type ? html`
+            <span class="media-type-badge ${item.type}">${item.type === 'series' ? 'TV' : 'Movie'}</span>
           ` : ''}
-        ` : ''}
+        </div>
+        <div class="item-title${showTitle ? '' : ' hidden'}" title="${title}">${showTitle ? title : ''}</div>
+        <div class="item-progress" role="progressbar" aria-valuenow="${progress}" aria-valuemin="0" aria-valuemax="100">
+          <div class="item-progress-fill" style="width: ${progress}%"></div>
+        </div>
+        <div class="item-progress-text">${showProgressText && progress > 0 ? `${progress.toFixed(0)}%` : ''}</div>
       </div>
     `;
   }
@@ -1156,7 +1168,6 @@ class StremioContinueWatchingCard extends LitElement {
         @click=${() => this._handleSimilarItemClick(item)}
         @keydown=${(e) => e.key === 'Enter' && this._handleSimilarItemClick(item)}
         aria-label="${title}${year ? ` (${year})` : ''}"
-        style="--poster-aspect-ratio: ${this.config.poster_aspect_ratio || '2/3'}"
       >
         <div class="item-poster-container">
           ${item.poster ? html`

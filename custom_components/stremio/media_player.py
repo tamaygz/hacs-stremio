@@ -231,14 +231,27 @@ class StremioMediaPlayer(
         """Return entity specific state attributes."""
         if self.coordinator.data and self.coordinator.data.get("current_watching"):
             current = self.coordinator.data["current_watching"]
-            return {
+            attrs = {
                 "type": current.get("type"),
                 "season": current.get("season"),
                 "episode": current.get("episode"),
+                "episode_title": current.get("episode_title"),
                 "year": current.get("year"),
                 "imdb_id": current.get("imdb_id"),
                 "progress_percent": current.get("progress_percent"),
+                "poster": current.get("poster"),
+                # Extended metadata (may be populated from metadata fetch)
+                "description": current.get("description"),
+                "genres": current.get("genres", []),
+                "cast": current.get("cast", []),
+                "director": current.get("director"),
+                "backdrop_url": current.get("backdrop"),
+                "runtime": current.get("duration"),
+                "rating": current.get("rating"),
+                "series_title": current.get("series_title"),
             }
+            # Remove None values to keep attributes clean
+            return {k: v for k, v in attrs.items() if v is not None}
         return {}
 
     async def async_browse_media(

@@ -171,22 +171,37 @@ class StremioRecommendationsCard extends LitElement {
         transform: scale(1.05);
       }
 
-      .item-poster {
+      .item-poster-container {
         width: 100%;
-        aspect-ratio: var(--poster-aspect-ratio, 2/3);
-        object-fit: cover;
+        /* Use padding-bottom technique for consistent aspect ratio across all browsers */
+        padding-bottom: calc(var(--poster-height-ratio, 150) * 1%);
+        position: relative;
+        overflow: hidden;
         border-radius: 6px;
         background: var(--secondary-background-color);
+        flex-shrink: 0;
+        height: 0; /* Required for padding-bottom technique to work */
+      }
+
+      .item-poster {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        position: absolute;
+        top: 0;
+        left: 0;
       }
 
       .item-poster-placeholder {
         width: 100%;
-        aspect-ratio: var(--poster-aspect-ratio, 2/3);
-        border-radius: 6px;
-        background: var(--secondary-background-color);
+        height: 100%;
+        position: absolute;
+        top: 0;
+        left: 0;
         display: flex;
         align-items: center;
         justify-content: center;
+        background: var(--secondary-background-color);
       }
 
       .item-poster-placeholder ha-icon {
@@ -721,7 +736,17 @@ class StremioRecommendationsCard extends LitElement {
       const columns = Number(this.config.columns || 4);
       const posterAspectRatio = this.config.poster_aspect_ratio || '2/3';
       const cardHeight = this.config.card_height > 0 ? `${this.config.card_height}px` : 'none';
-      const gridStyle = `--card-max-height: ${cardHeight}; --grid-columns: ${columns}; --poster-aspect-ratio: ${posterAspectRatio};`;
+      
+      // Calculate height ratio for padding-bottom technique
+      let posterHeightRatio = 150; // default 2:3 -> 150%
+      if (posterAspectRatio.includes('/')) {
+        const [w, h] = posterAspectRatio.split('/').map(Number);
+        if (w > 0 && h > 0) {
+          posterHeightRatio = (h / w) * 100;
+        }
+      }
+      
+      const gridStyle = `--card-max-height: ${cardHeight}; --grid-columns: ${columns}; --poster-height-ratio: ${posterHeightRatio};`;
 
       // If an item is selected, show detail view
       if (this._selectedItem) {
@@ -837,7 +862,7 @@ class StremioRecommendationsCard extends LitElement {
         @keydown=${(e) => e.key === 'Enter' && this._handleItemClick(item)}
         aria-label="${title}${reason ? ` - ${reason}` : ''}"
       >
-        <div style="position: relative;">
+        <div class="item-poster-container">
           ${item.poster ? html`
             <img class="item-poster" src="${item.poster}" alt="" loading="lazy" />
           ` : html`

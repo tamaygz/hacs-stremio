@@ -35,6 +35,8 @@ class StremioMediaDetailsCard extends LitElement {
       _loading: { type: Boolean },
       _showStreamDialog: { type: Boolean },
       _expanded: { type: Boolean },
+      _fetchedMetadata: { type: Object },
+      _metadataFetchId: { type: String },
     };
   }
 
@@ -396,6 +398,8 @@ class StremioMediaDetailsCard extends LitElement {
     this._loading = false;
     this._showStreamDialog = false;
     this._expanded = false;
+    this._fetchedMetadata = null;
+    this._metadataFetchId = null;
   }
 
   setConfig(config) {
@@ -496,12 +500,14 @@ class StremioMediaDetailsCard extends LitElement {
     }
 
     const attributes = entity.attributes || {};
+    const imdbId = attributes.imdb_id;
+    const mediaType = attributes.type || attributes.media_content_type || 'movie';
     
     // Build media object from entity attributes
     this._media = {
       title: attributes.media_title || entity.state,
-      type: attributes.media_content_type || 'unknown',
-      poster: attributes.entity_picture || attributes.media_image_url,
+      type: mediaType,
+      poster: attributes.entity_picture || attributes.media_image_url || attributes.poster,
       backdrop: attributes.backdrop_url,
       year: attributes.year,
       runtime: attributes.runtime || attributes.media_duration,
@@ -519,9 +525,105 @@ class StremioMediaDetailsCard extends LitElement {
       progress: attributes.media_position || 0,
       duration: attributes.media_duration || 0,
       // IDs for actions
-      media_id: attributes.media_id,
-      stremio_id: attributes.stremio_id,
+      media_id: attributes.media_id || imdbId,
+      stremio_id: attributes.stremio_id || imdbId,
+      imdb_id: imdbId,
     };
+    
+    // If we have an imdb_id but missing detailed metadata, fetch it
+    const needsMetadata = imdbId && (
+      !this._media.description || 
+      (this._media.genres?.length === 0) ||
+      (this._media.cast?.length === 0)
+    );
+    
+    // Only fetch if we haven't already fetched for this ID
+    if (needsMetadata && this._metadataFetchId !== imdbId) {
+      this._fetchMetadata(imdbId, mediaType);
+    }
+    
+    // Apply any previously fetched metadata
+    if (this._fetchedMetadata && this._metadataFetchId === imdbId) {
+      this._applyFetchedMetadata();
+    }
+  }
+  
+  async _fetchMetadata(imdbId, mediaType) {
+    if (!imdbId || !this.hass) return;
+    
+    // Mark that we're fetching for this ID
+    this._metadataFetchId = imdbId;
+    
+    try {
+      console.log('[Media Details] Fetching metadata for:', imdbId, mediaType);
+      
+      // Use the get_series_metadata service for series, or search for movies
+      if (mediaType === 'series' || mediaType === 'episode') {
+        const response = await this.hass.callWS({
+          type: 'call_service',
+          domain: 'stremio',
+          service: 'get_series_metadata',
+          service_data: { media_id: imdbId },
+          return_response: true,
+        });
+        
+        if (response?.response?.metadata) {
+          this._fetchedMetadata = response.response.metadata;
+          this._applyFetchedMetadata();
+        }
+      } else {
+        // For movies, use search to get metadata
+        const response = await this.hass.callWS({
+          type: 'call_service',
+          domain: 'stremio',
+          service: 'search',
+          service_data: { query: this._media.title, limit: 1 },
+          return_response: true,
+        });
+        
+        if (response?.response?.results?.[0]) {
+          this._fetchedMetadata = response.response.results[0];
+          this._applyFetchedMetadata();
+        }
+      }
+    } catch (err) {
+      console.warn('[Media Details] Failed to fetch metadata:', err);
+    }
+  }
+  
+  _applyFetchedMetadata() {
+    if (!this._fetchedMetadata || !this._media) return;
+    
+    const meta = this._fetchedMetadata;
+    
+    // Only apply if we don't already have the data
+    if (!this._media.description && meta.description) {
+      this._media.description = meta.description;
+    }
+    if ((!this._media.genres || this._media.genres.length === 0) && meta.genres?.length > 0) {
+      this._media.genres = meta.genres;
+    }
+    if ((!this._media.cast || this._media.cast.length === 0) && meta.cast?.length > 0) {
+      this._media.cast = meta.cast;
+    }
+    if (!this._media.backdrop && meta.background) {
+      this._media.backdrop = meta.background;
+    }
+    if (!this._media.rating && meta.imdbRating) {
+      this._media.rating = meta.imdbRating;
+    }
+    if (!this._media.director && meta.director?.length > 0) {
+      this._media.director = meta.director.join(', ');
+    }
+    if (!this._media.year && meta.year) {
+      this._media.year = meta.year;
+    }
+    if (!this._media.runtime && meta.runtime) {
+      this._media.runtime = meta.runtime;
+    }
+    
+    // Trigger re-render
+    this.requestUpdate();
   }
 
   render() {
@@ -601,7 +703,7 @@ class StremioMediaDetailsCard extends LitElement {
               <ha-icon icon="mdi:movie-outline"></ha-icon>
             </div>
           `}
-          ${progressPercent > 0 ? html`
+          ${this.config.show_progress !== false && progressPercent > 0 ? html`
             <div class="progress-overlay">
               <div class="progress-bar" style="width: ${progressPercent}%"></div>
             </div>
@@ -676,7 +778,7 @@ class StremioMediaDetailsCard extends LitElement {
   }
 
   _renderDescription() {
-    if (!this._media.description) return '';
+    if (this.config.show_description === false || !this._media.description) return '';
 
     return html`
       <div class="description-section">

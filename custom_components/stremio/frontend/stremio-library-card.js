@@ -110,6 +110,7 @@ class StremioLibraryCard extends LitElement {
         overflow-y: auto;
         flex: 1;
         min-height: 0;
+        align-items: start; /* Prevent items from stretching to fill row height */
       }
 
       .library-grid.horizontal {
