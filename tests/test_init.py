@@ -14,7 +14,7 @@ from custom_components.stremio.const import CONF_AUTH_KEY, DOMAIN
 
 
 @pytest.mark.asyncio
-async def test_async_setup_entry_success(mock_hass, mock_config_entry):
+async def test_async_setup_entry_success(hass: HomeAssistant, mock_config_entry):
     """Test successful setup of config entry."""
     # Create mock client
     mock_client = AsyncMock()
@@ -24,10 +24,6 @@ async def test_async_setup_entry_success(mock_hass, mock_config_entry):
     # Create mock coordinator
     mock_coordinator = MagicMock()
     mock_coordinator.async_config_entry_first_refresh = AsyncMock()
-
-    # Setup mock hass.config_entries
-    mock_hass.config_entries = MagicMock()
-    mock_hass.config_entries.async_forward_entry_setups = AsyncMock()
 
     # Create mock session
     mock_session = MagicMock()
@@ -47,15 +43,15 @@ async def test_async_setup_entry_success(mock_hass, mock_config_entry):
     ):
         from custom_components.stremio import async_setup_entry
 
-        result = await async_setup_entry(mock_hass, mock_config_entry)
+        result = await async_setup_entry(hass, mock_config_entry)
 
         assert result is True
-        assert DOMAIN in mock_hass.data
-        assert mock_config_entry.entry_id in mock_hass.data[DOMAIN]
+        assert DOMAIN in hass.data
+        assert mock_config_entry.entry_id in hass.data[DOMAIN]
 
 
 @pytest.mark.asyncio
-async def test_async_setup_entry_auth_failure(mock_hass, mock_config_entry):
+async def test_async_setup_entry_auth_failure(hass: HomeAssistant, mock_config_entry):
     """Test setup failure due to authentication error."""
     from custom_components.stremio.stremio_client import StremioAuthError
 
@@ -79,11 +75,11 @@ async def test_async_setup_entry_auth_failure(mock_hass, mock_config_entry):
         from custom_components.stremio import async_setup_entry
 
         with pytest.raises(ConfigEntryAuthFailed):
-            await async_setup_entry(mock_hass, mock_config_entry)
+            await async_setup_entry(hass, mock_config_entry)
 
 
 @pytest.mark.asyncio
-async def test_async_setup_entry_connection_failure(mock_hass, mock_config_entry):
+async def test_async_setup_entry_connection_failure(hass: HomeAssistant, mock_config_entry):
     """Test setup failure due to connection error."""
     from custom_components.stremio.stremio_client import StremioConnectionError
 
@@ -107,24 +103,23 @@ async def test_async_setup_entry_connection_failure(mock_hass, mock_config_entry
         from custom_components.stremio import async_setup_entry
 
         with pytest.raises(ConfigEntryNotReady):
-            await async_setup_entry(mock_hass, mock_config_entry)
+            await async_setup_entry(hass, mock_config_entry)
 
 
 @pytest.mark.asyncio
-async def test_async_unload_entry(mock_hass, mock_config_entry, mock_coordinator):
+async def test_async_unload_entry(hass: HomeAssistant, mock_config_entry, mock_coordinator):
     """Test unloading config entry."""
     # Create mock client
     mock_client = AsyncMock()
     mock_client.async_close = AsyncMock()
 
     # Setup mock data
-    mock_hass.data[DOMAIN] = {
+    hass.data[DOMAIN] = {
         mock_config_entry.entry_id: {
             "coordinator": mock_coordinator,
             "client": mock_client,
         }
     }
-    mock_hass.config_entries.async_unload_platforms = AsyncMock(return_value=True)
 
     with patch(
         "custom_components.stremio.async_unload_services",
@@ -132,21 +127,18 @@ async def test_async_unload_entry(mock_hass, mock_config_entry, mock_coordinator
     ):
         from custom_components.stremio import async_unload_entry
 
-        result = await async_unload_entry(mock_hass, mock_config_entry)
+        result = await async_unload_entry(hass, mock_config_entry)
 
         assert result is True
-        assert mock_config_entry.entry_id not in mock_hass.data.get(DOMAIN, {})
+        assert mock_config_entry.entry_id not in hass.data.get(DOMAIN, {})
 
 
 @pytest.mark.asyncio
-async def test_async_reload_entry(mock_hass, mock_config_entry):
+async def test_async_reload_entry(hass: HomeAssistant, mock_config_entry):
     """Test reloading config entry."""
-    mock_hass.config_entries.async_reload = AsyncMock()
-
     from custom_components.stremio import async_reload_entry
 
-    await async_reload_entry(mock_hass, mock_config_entry)
+    with patch.object(hass.config_entries, "async_reload", new_callable=AsyncMock) as mock_reload:
+        await async_reload_entry(hass, mock_config_entry)
 
-    mock_hass.config_entries.async_reload.assert_called_once_with(
-        mock_config_entry.entry_id
-    )
+        mock_reload.assert_called_once_with(mock_config_entry.entry_id)
