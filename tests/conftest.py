@@ -1,27 +1,23 @@
 """Pytest fixtures and configuration for Stremio integration tests.
 
-NOTE: Tests must be run on Linux/macOS or in a devcontainer/WSL2.
+IMPORTANT: Tests must be run on Linux/macOS/WSL2 or in a devcontainer.
+
 The pytest-homeassistant-custom-component package uses pytest-socket to block
-network calls, which conflicts with Windows' ProactorEventLoop for asyncio.
-See docs/testing.md for details.
+network calls, but this conflicts with Windows' ProactorEventLoop which needs
+sockets for internal operations (socket.socketpair() for self-pipe).
+
+To run tests on Windows, use one of these options:
+1. Use WSL2 (Windows Subsystem for Linux)
+2. Use a Docker devcontainer
+3. Run tests in GitHub Actions (Linux)
+
+See docs/testing.md for more details.
 """
 
 from __future__ import annotations
 
 import socket
 import sys
-
-# On Windows, we need to enable socket BEFORE pytest-socket patches it.
-# This must happen at module import time, before pytest plugins load.
-if sys.platform == "win32":
-    # Store the real socket class before pytest-socket can patch it
-    _real_socket = socket.socket
-    
-    # We'll use this to patch back after pytest-socket disables it
-    def _enable_socket():
-        """Re-enable socket after pytest-socket blocks it."""
-        socket.socket = _real_socket
-
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -32,23 +28,17 @@ from homeassistant.core import HomeAssistant
 from custom_components.stremio.const import DOMAIN
 
 
-def pytest_configure(config):
-    """Enable socket for Windows before any test fixtures load.
-    
-    This is necessary because Windows' ProactorEventLoop requires socket access
-    for internal event loop operations (socketpair for self-pipe).
-    """
-    if sys.platform == "win32":
-        # Restore the real socket class
-        _enable_socket()
-
-
-@pytest.fixture(autouse=True)
-def enable_socket_for_windows():
-    """Ensure socket is enabled for each test on Windows."""
-    if sys.platform == "win32":
-        _enable_socket()
-    yield
+# Skip all tests on Windows with a helpful message
+if sys.platform == "win32":
+    def pytest_collection_modifyitems(config, items):
+        """Skip all tests on Windows due to pytest-socket incompatibility."""
+        skip_windows = pytest.mark.skip(
+            reason="Tests cannot run on Windows due to pytest-socket blocking "
+            "socket.socketpair() required by asyncio ProactorEventLoop. "
+            "Please run tests on Linux/macOS/WSL2 or in a devcontainer."
+        )
+        for item in items:
+            item.add_marker(skip_windows)
 
 
 # Import fixtures from pytest-homeassistant-custom-component

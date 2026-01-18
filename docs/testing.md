@@ -4,12 +4,58 @@ This guide covers testing practices for the Stremio HACS Integration.
 
 ## Platform Requirements
 
-> **Important:** Tests are designed to run on **Linux/macOS** or in the **devcontainer**.
+> **⚠️ Important:** Tests are designed to run on **Linux/macOS** environments only.
 >
-> The `pytest-homeassistant-custom-component` package blocks socket access for safety, which conflicts with Windows' asyncio ProactorEventLoop. For Windows users:
-> - **Recommended:** Use the VS Code devcontainer (Docker-based Linux environment)
-> - **Alternative:** Use WSL2 with a Linux distribution
-> - **CI:** GitHub Actions runs tests on Linux automatically
+> Tests will be **automatically skipped** on Windows with a descriptive message.
+
+### Why Tests Don't Run on Windows
+
+The `pytest-homeassistant-custom-component` package uses `pytest-socket` to block network calls during tests. This is a safety feature to ensure tests don't make real API calls. However:
+
+- Windows uses `ProactorEventLoop` for asyncio (required by Home Assistant)
+- `ProactorEventLoop` internally calls `socket.socketpair()` to create its "self-pipe"
+- `pytest-socket` blocks this, causing all async tests to fail before they even start
+
+This is a fundamental incompatibility between the Home Assistant test framework and Windows.
+
+### Supported Testing Environments
+
+| Environment | Status | Notes |
+|-------------|--------|-------|
+| **Linux (native)** | ✅ Fully supported | Recommended |
+| **macOS (native)** | ✅ Fully supported | Uses SelectorEventLoop |
+| **WSL2 on Windows** | ✅ Fully supported | Install dependencies in WSL |
+| **Devcontainer (Docker)** | ✅ Fully supported | Best option for Windows |
+| **GitHub Actions** | ✅ Fully supported | Runs on Linux runners |
+| **Windows (native)** | ❌ Not supported | Tests skip automatically |
+
+### Running Tests on Windows
+
+**Option 1: VS Code Devcontainer (Recommended)**
+1. Install Docker Desktop for Windows
+2. Open project in VS Code
+3. Click "Reopen in Container" when prompted
+4. Run tests normally inside the container
+
+**Option 2: WSL2**
+```bash
+# Open WSL terminal
+wsl
+
+# Navigate to project
+cd /mnt/c/Users/YourName/path/to/hacs-stremio
+
+# Set up Python environment
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements_dev.txt
+
+# Run tests
+pytest tests/
+```
+
+**Option 3: Use GitHub Actions**
+Push your changes to a branch and let CI run the tests automatically.
 
 ## Running Tests
 
