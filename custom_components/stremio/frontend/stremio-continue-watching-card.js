@@ -5,8 +5,8 @@
  * 
  * @customElement stremio-continue-watching-card
  * @extends LitElement
- * @version 0.3.1
- * @cacheBust 20260118
+ * @version 0.3.2
+ * @cacheBust 20260118b
  */
 
 // Safe LitElement access - wait for HA frontend to be ready
@@ -540,33 +540,76 @@ class StremioContinueWatchingCard extends LitElement {
     }
 
     console.log('[Continue Watching Card] Getting streams for:', id, item.type);
+    this._showToast('Fetching streams...');
     
-    // Call service and show feedback
-    this._hass.callService('stremio', 'get_streams', {
+    // For series, we need season/episode
+    const serviceData = {
       media_id: id,
       media_type: item.type || 'movie',
-    }).then(() => {
-      console.log('[Continue Watching Card] Streams service called successfully');
-      this._showToast('Fetching streams...');
-    }).catch((error) => {
-      console.error('[Continue Watching Card] Failed to get streams:', error);
-      this._showToast(`Failed to get streams: ${error.message}`, 'error');
-    });
+    };
+    
+    // Add season/episode for series
+    if (item.type === 'series') {
+      serviceData.season = item.season || 1;
+      serviceData.episode = item.episode || 1;
+    }
 
-    // Fire custom event to show stream dialog
-    this.dispatchEvent(
-      new CustomEvent('stremio-open-stream-dialog', {
-        bubbles: true,
-        composed: true,
-        detail: { 
-          item,
-          mediaId: id,
-          title: item.title,
+    // Call service with return_response to get streams back
+    this._hass.callService('stremio', 'get_streams', serviceData, undefined, true, true)
+      .then((response) => {
+        console.log('[Continue Watching Card] Streams response:', response);
+        
+        if (response && response.response && response.response.streams) {
+          const streams = response.response.streams;
+          console.log('[Continue Watching Card] Found', streams.length, 'streams');
+          
+          if (streams.length > 0) {
+            this._showStreamDialog(item, streams);
+          } else {
+            this._showToast('No streams found for this title');
+          }
+        } else {
+          console.log('[Continue Watching Card] Unexpected response format:', response);
+          this._showToast('No streams found');
+        }
+      })
+      .catch((error) => {
+        console.error('[Continue Watching Card] Failed to get streams:', error);
+        this._showToast(`Failed to get streams: ${error.message}`, 'error');
+      });
+  }
+
+  _showStreamDialog(item, streams) {
+    console.log('[Continue Watching Card] Opening stream dialog with', streams.length, 'streams');
+    
+    // Use the global helper if available
+    if (window.StremioStreamDialog) {
+      window.StremioStreamDialog.show(
+        this._hass,
+        {
+          title: item.title || item.name,
           type: item.type,
           poster: item.poster,
+          imdb_id: item.imdb_id || item.id,
         },
-      })
-    );
+        streams
+      );
+    } else {
+      // Fallback: Create dialog directly
+      let dialog = document.querySelector('stremio-stream-dialog');
+      if (!dialog) {
+        dialog = document.createElement('stremio-stream-dialog');
+        document.body.appendChild(dialog);
+      }
+      dialog.hass = this._hass;
+      dialog.mediaItem = {
+        title: item.title || item.name,
+        type: item.type,
+        poster: item.poster,
+      };
+      dialog.streams = streams;
+      dialog.open = true;
+    }
   }
 
   _showToast(message, type = 'info') {

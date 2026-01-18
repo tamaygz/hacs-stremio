@@ -5,8 +5,8 @@
  * Cards are auto-registered when the integration loads.
  * 
  * @author @tamaygz
- * @version 0.3.1
- * @cacheBust 20260118
+ * @version 0.3.2
+ * @cacheBust 20260118b
  */
 
 // Import card components (relative paths - all in frontend/ folder)
