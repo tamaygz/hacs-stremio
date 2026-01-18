@@ -338,10 +338,11 @@ class StremioContinueWatchingCard extends LitElement {
       return;
     }
 
-    // Get continue watching data from sensor
-    const entity = this._hass.states[this.config.entity];
+    // Get continue watching data from sensor - resolve from device name if needed
+    const sensorEntity = this._resolveEntity(this.config);
+    const entity = this._hass.states[sensorEntity];
     
-    console.log('[Continue Watching Card] Looking for entity:', this.config.entity);
+    console.log('[Continue Watching Card] Looking for entity:', sensorEntity);
     console.log('[Continue Watching Card] Entity found:', entity);
     console.log('[Continue Watching Card] Entity attributes:', entity?.attributes);
     console.log('[Continue Watching Card] Items in attributes:', entity?.attributes?.items);
@@ -354,6 +355,39 @@ class StremioContinueWatchingCard extends LitElement {
 
     this._continueWatchingItems = entity.attributes.items || [];
     console.log('[Continue Watching Card] Items loaded:', this._continueWatchingItems.length);
+  }
+
+  _resolveEntity(config) {
+    // Helper to resolve entity from config - supports both entity ID and device name
+    if (!config.entity) {
+      return 'sensor.stremio_continue_watching_count'; // default
+    }
+    
+    // If it starts with sensor., it's already an entity ID
+    if (config.entity.startsWith('sensor.')) {
+      return config.entity;
+    }
+    
+    // Otherwise, treat it as a device name and try to find matching entity
+    if (this._hass) {
+      const deviceName = config.entity.toLowerCase();
+      // Look for entities that match the device name pattern
+      for (const entityId in this._hass.states) {
+        if (entityId.includes('continue_watching_count')) {
+          const entity = this._hass.states[entityId];
+          // Check if device name is in the entity ID (normalized)
+          const normalizedEntityId = entityId.toLowerCase().replace(/_/g, '');
+          const normalizedDeviceName = deviceName.replace(/[^a-z0-9]/g, '');
+          if (normalizedEntityId.includes(normalizedDeviceName)) {
+            console.log('[Continue Watching Card] Resolved device name to entity:', deviceName, '->', entityId);
+            return entityId;
+          }
+        }
+      }
+    }
+    
+    // Fallback to treating it as entity ID directly
+    return config.entity;
   }
 
   _getFilteredItems() {
@@ -440,6 +474,8 @@ class StremioContinueWatchingCard extends LitElement {
   }
 
   _openFullDetails(item) {
+    console.log('[Continue Watching Card] Opening full details for:', item.title);
+    
     // Fire event to open in stremio-media-details-card or browser_mod popup
     this.dispatchEvent(
       new CustomEvent('stremio-open-media-details', {
@@ -456,15 +492,30 @@ class StremioContinueWatchingCard extends LitElement {
         },
       })
     );
+    
+    // Show toast notification
+    this._showToast(`Opening details for "${item.title}"`);
   }
 
   _getStreams(item) {
     const id = item.imdb_id || item.id;
-    if (!id || !this._hass) return;
+    if (!id || !this._hass) {
+      console.error('[Continue Watching Card] Cannot get streams: missing ID or hass');
+      return;
+    }
 
+    console.log('[Continue Watching Card] Getting streams for:', id, item.type);
+    
+    // Call service and show feedback
     this._hass.callService('stremio', 'get_streams', {
       media_id: id,
       media_type: item.type || 'movie',
+    }).then(() => {
+      console.log('[Continue Watching Card] Streams service called successfully');
+      this._showToast('Fetching streams...');
+    }).catch((error) => {
+      console.error('[Continue Watching Card] Failed to get streams:', error);
+      this._showToast(`Failed to get streams: ${error.message}`, 'error');
     });
 
     // Fire custom event to show stream dialog
@@ -481,6 +532,18 @@ class StremioContinueWatchingCard extends LitElement {
         },
       })
     );
+  }
+
+  _showToast(message, type = 'info') {
+    // Show HA toast notification using persistent notification
+    if (this._hass && this._hass.callService) {
+      const notificationId = `stremio_cw_${Date.now()}`;
+      this._hass.callService('persistent_notification', 'create', {
+        notification_id: notificationId,
+        title: 'Continue Watching',
+        message: message,
+      }).catch(err => console.error('Failed to show toast:', err));
+    }
   }
 
   render() {
@@ -688,7 +751,8 @@ class StremioContinueWatchingCardEditor extends LitElement {
           .configValue=${'entity'}
           .includeDomains=${['sensor']}
           .entityFilter=${(entity) => entity.entity_id.includes('continue_watching')}
-          label="Continue Watching Sensor"
+          label="Continue Watching Sensor or Device Name"
+          helper="Enter full entity ID (e.g., sensor.stremio_post_tamaygunduz_de_continue_watching_count) or just device identifier (e.g., tamaygunduz)"
           allow-custom-entity
           @value-changed=${this._valueChanged}
         ></ha-entity-picker>
