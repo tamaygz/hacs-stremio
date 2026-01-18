@@ -101,6 +101,7 @@ class StremioBrowseCard extends LitElement {
         padding: 16px;
         max-height: 500px;
         overflow-y: auto;
+        align-items: start;
       }
 
       @media (max-width: 768px) {
@@ -119,6 +120,7 @@ class StremioBrowseCard extends LitElement {
         position: relative;
         display: flex;
         flex-direction: column;
+        align-self: start;
       }
 
       .catalog-item:hover {
@@ -578,6 +580,10 @@ class StremioBrowseCard extends LitElement {
 
   _getItemMediaType(item) {
     // Try to determine media type from item or content ID
+    // Check direct type property first (from similar content API)
+    if (item.type) {
+      return item.type === 'tvshow' ? 'series' : item.type;
+    }
     if (item.media_content_type) {
       return item.media_content_type === 'tvshow' ? 'series' : item.media_content_type;
     }
@@ -683,15 +689,22 @@ class StremioBrowseCard extends LitElement {
   }
 
   _extractMediaId(item) {
-    // Extract IMDb ID or similar from media_content_id
+    // Extract IMDb ID from item - check direct properties first (from similar content API)
+    if (item.imdb_id) {
+      return item.imdb_id;
+    }
+    if (item.id && item.id.startsWith('tt')) {
+      return item.id;
+    }
+    // Try to extract from media_content_id (format is "type/id")
     if (item.media_content_id) {
       const parts = item.media_content_id.split('/');
       if (parts.length > 1) {
-        return parts[1]; // Usually format is "type/id"
+        return parts[1];
       }
       return parts[0];
     }
-    return item.id || item.imdb_id;
+    return item.id;
   }
 
   _openInStremio(item) {
@@ -889,7 +902,18 @@ class StremioBrowseCard extends LitElement {
     // Clear similar view and show detail for this item
     this._similarItems = null;
     this._similarSourceItem = null;
-    this._selectedItem = item;
+    
+    // Normalize item properties for consistent handling
+    // Similar items have poster/name/type/imdb_id, catalog items have thumbnail/title/media_content_id
+    const normalizedItem = {
+      ...item,
+      title: item.title || item.name,
+      thumbnail: item.thumbnail || item.poster,
+      // Ensure media_content_id is set if not present (for _extractMediaId fallback)
+      media_content_id: item.media_content_id || `${item.type || 'movie'}/${item.imdb_id || item.id}`,
+    };
+    
+    this._selectedItem = normalizedItem;
   }
 
   /**

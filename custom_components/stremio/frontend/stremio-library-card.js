@@ -104,6 +104,7 @@ class StremioLibraryCard extends LitElement {
         padding: 16px;
         max-height: 400px;
         overflow-y: auto;
+        align-items: start;
       }
 
       .library-grid.horizontal {
@@ -113,6 +114,7 @@ class StremioLibraryCard extends LitElement {
         overflow-y: hidden;
         scroll-snap-type: x mandatory;
         -webkit-overflow-scrolling: touch;
+        align-items: stretch;
       }
 
       .library-grid.horizontal .library-item {
@@ -128,6 +130,7 @@ class StremioLibraryCard extends LitElement {
         position: relative;
         display: flex;
         flex-direction: column;
+        align-self: start;
       }
 
       .library-item:hover {
@@ -1143,7 +1146,18 @@ class StremioLibraryCard extends LitElement {
     // Clear similar view and show detail for this item
     this._similarItems = null;
     this._similarSourceItem = null;
-    this._selectedItem = item;
+    
+    // Normalize item properties for consistent handling
+    // Similar items from API have poster/name/type/imdb_id directly
+    const normalizedItem = {
+      ...item,
+      title: item.title || item.name,
+      name: item.name || item.title,
+      poster: item.poster || item.thumbnail,
+      imdb_id: item.imdb_id || item.id,
+    };
+    
+    this._selectedItem = normalizedItem;
   }
 
   /**

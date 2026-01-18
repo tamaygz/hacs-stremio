@@ -286,12 +286,16 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         if entry:
             addon_order_raw = entry.options.get(CONF_ADDON_STREAM_ORDER)
             if addon_order_raw:
-                # Parse multiline text to list
-                addon_order = [
-                    line.strip()
-                    for line in addon_order_raw.split("\n")
-                    if line.strip()
-                ]
+                # Handle both list (from new selector) and string (legacy) formats
+                if isinstance(addon_order_raw, list):
+                    addon_order = addon_order_raw
+                else:
+                    # Parse multiline text to list (legacy format)
+                    addon_order = [
+                        line.strip()
+                        for line in addon_order_raw.split("\n")
+                        if line.strip()
+                    ]
             quality_preference = entry.options.get(
                 CONF_STREAM_QUALITY_PREFERENCE, DEFAULT_STREAM_QUALITY_PREFERENCE
             )

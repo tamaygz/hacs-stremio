@@ -29,15 +29,13 @@ Access via: Settings → Devices & Services → Stremio → Configure
   - Default: `cinemeta` (Stremio's default metadata addon)
   - Options: `cinemeta`, `tmdb`
 
-- **Stream Addon Order**: Enter addon names (one per line) in your preferred order
+- **Stream Addon Order**: Select addons in your preferred order
+  - Uses a dynamic list fetched from your configured Stremio addons
+  - Drag to reorder addons (your preferred order)
   - Streams from addons listed first will appear at the top
   - Leave empty to use Stremio's default order
-  - Example:
-    ```
-    Torrentio
-    CinemetaStreams
-    OpenSubtitles
-    ```
+  - New **Reset to default** checkbox: Check to clear custom order
+  - Displays addon names and versions for clarity
 
 - **Stream Quality Preference**: Preferred stream quality
   - Options: `any`, `4k`, `1080p`, `720p`, `480p`

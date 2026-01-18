@@ -93,7 +93,12 @@ columns: 4
 - **Search**: Filter library by title as you type
 - **Filters**: Filter by type (Movies, Series)
 - **Sorting**: Sort by recent, title A-Z, or progress
-- **Click Actions**: Click any item for details and actions
+- **Inline Detail View**: Click any item for details and actions
+- **Quick Actions**:
+  - **Select/Change Episode**: For TV series (side-by-side with Find Similar)
+  - **Find Similar**: Discover similar content in a grid view within the card
+  - **Open in Stremio**: Play directly in Stremio
+  - **Get Streams**: View available streams for the selected media
 - **Lazy Loading**: Efficient loading for large libraries
 
 ---
@@ -199,8 +204,13 @@ poster_aspect_ratio: '2/3'
 - **Media Types**: Switch between Movies and TV Shows
 - **Genre Filtering**: Filter content by genre (Action, Drama, Comedy, etc.)
 - **Inline Detail View**: Click any item to see details within the card (consistent with Library Card)
-- **Episode Picker**: For TV shows, a dialog appears to select season/episode before viewing details
-- **Quick Actions**: Open in Stremio, Get Streams, Add to Library, Find Similar
+- **Episode Picker**: For TV shows, select season/episode before viewing details
+- **Quick Actions**: 
+  - **Change Episode** / **Select Episode**: For TV shows (side-by-side with Find Similar)
+  - **Find Similar**: Discover similar content in a grid view within the card
+  - **Open in Stremio**: Play directly in Stremio
+  - **Get Streams**: View available streams for the selected media
+  - **Add to Library**: Add to your library
 - **Responsive**: Adapts to mobile and desktop screens
 - **Direct Integration**: Uses Stremio's catalog API via media browser
 
@@ -260,7 +270,11 @@ default_sort: recent
 - **Progress Tracking**: Visual progress bars for each item
 - **Quick Resume**: One-click resume in Stremio
 - **Episode Picker**: Select different episodes for TV series
-- **Find Similar**: Discover similar content (configurable)
+- **Quick Actions**:
+  - **Change Episode**: For TV series (side-by-side with Find Similar)
+  - **Find Similar**: Discover similar content in a grid view within the card
+  - **Resume in Stremio**: Resume playback
+  - **Get Streams**: View available streams for the selected media
 - **Responsive Layout**: Grid or horizontal carousel mode
 
 ---

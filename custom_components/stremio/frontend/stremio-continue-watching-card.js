@@ -82,6 +82,7 @@ class StremioContinueWatchingCard extends LitElement {
         padding: 16px;
         max-height: 500px;
         overflow-y: auto;
+        align-items: start;
       }
 
       .items-grid.horizontal {
@@ -91,6 +92,7 @@ class StremioContinueWatchingCard extends LitElement {
         overflow-y: hidden;
         scroll-snap-type: x mandatory;
         -webkit-overflow-scrolling: touch;
+        align-items: stretch;
       }
 
       .items-grid.horizontal .item {
@@ -114,6 +116,7 @@ class StremioContinueWatchingCard extends LitElement {
         position: relative;
         display: flex;
         flex-direction: column;
+        align-self: start;
       }
 
       .item:hover {
@@ -1105,7 +1108,18 @@ class StremioContinueWatchingCard extends LitElement {
     // Clear similar view and show detail for this item
     this._similarItems = null;
     this._similarSourceItem = null;
-    this._selectedItem = item;
+    
+    // Normalize item properties for consistent handling
+    // Similar items from API have poster/name/type/imdb_id directly
+    const normalizedItem = {
+      ...item,
+      title: item.title || item.name,
+      name: item.name || item.title,
+      poster: item.poster || item.thumbnail,
+      imdb_id: item.imdb_id || item.id,
+    };
+    
+    this._selectedItem = normalizedItem;
   }
 
   /**

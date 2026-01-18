@@ -144,9 +144,30 @@ async def test_options_flow_init(hass: HomeAssistant, mock_config_entry):
 
 @pytest.mark.asyncio
 async def test_options_flow_update(hass: HomeAssistant, mock_config_entry):
-    """Test updating options."""
+    """Test updating options with new addon order selector."""
     options_flow = OptionsFlowHandler(mock_config_entry)
     options_flow.hass = hass
+
+    # Mock the addon fetching
+    mock_client = AsyncMock()
+    mock_client.async_get_addon_collection = AsyncMock(
+        return_value=[
+            {
+                "transportName": "Torrentio",
+                "manifest": {"id": "torrentio", "name": "Torrentio", "version": "1.0.0"},
+            },
+            {
+                "transportName": "CinemetaStreams",
+                "manifest": {
+                    "id": "cinemeta-streams",
+                    "name": "CinemetaStreams",
+                    "version": "1.0.0",
+                },
+            },
+        ]
+    )
+
+    hass.data[DOMAIN] = {mock_config_entry.entry_id: {"client": mock_client}}
 
     new_options = {
         "player_scan_interval": 60,
@@ -155,14 +176,55 @@ async def test_options_flow_update(hass: HomeAssistant, mock_config_entry):
         "handover_method": "airplay",
         "show_copy_url": True,
         "default_catalog_source": "cinemeta",
-        "addon_stream_order": "Torrentio\nCinemetaStreams",
+        "addon_stream_order": ["Torrentio", "CinemetaStreams"],  # List instead of string
+        "reset_addon_order": False,
         "stream_quality_preference": "1080p",
     }
 
     result = await options_flow.async_step_init(new_options)
 
     assert result["type"] == FlowResultType.CREATE_ENTRY  # type: ignore[index]
-    assert result["data"] == new_options  # type: ignore[index]
+    assert result["data"]["addon_stream_order"] == [
+        "Torrentio",
+        "CinemetaStreams",
+    ]  # type: ignore[index]
+
+
+@pytest.mark.asyncio
+async def test_options_flow_reset_addon_order(hass: HomeAssistant, mock_config_entry):
+    """Test resetting addon order to default."""
+    options_flow = OptionsFlowHandler(mock_config_entry)
+    options_flow.hass = hass
+
+    # Mock the addon fetching
+    mock_client = AsyncMock()
+    mock_client.async_get_addon_collection = AsyncMock(
+        return_value=[
+            {
+                "transportName": "Torrentio",
+                "manifest": {"id": "torrentio", "name": "Torrentio", "version": "1.0.0"},
+            },
+        ]
+    )
+
+    hass.data[DOMAIN] = {mock_config_entry.entry_id: {"client": mock_client}}
+
+    new_options = {
+        "player_scan_interval": 30,
+        "library_scan_interval": 300,
+        "enable_apple_tv_handover": False,
+        "handover_method": "auto",
+        "show_copy_url": True,
+        "default_catalog_source": "cinemeta",
+        "addon_stream_order": ["Torrentio"],
+        "reset_addon_order": True,  # Reset to default
+        "stream_quality_preference": "any",
+    }
+
+    result = await options_flow.async_step_init(new_options)
+
+    assert result["type"] == FlowResultType.CREATE_ENTRY  # type: ignore[index]
+    assert result["data"]["addon_stream_order"] == []  # type: ignore[index]
 
 
 @pytest.mark.asyncio
