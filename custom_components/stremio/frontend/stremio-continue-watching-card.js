@@ -324,7 +324,7 @@ class StremioContinueWatchingCard extends LitElement {
     }
     this.config = {
       title: 'Continue Watching',
-      entity: 'sensor.stremio_continue_watching_count',
+      // Note: entity is NOT defaulted here - _resolveEntity will auto-discover
       show_filters: true,
       max_items: 20,
       columns: 4,
@@ -343,15 +343,14 @@ class StremioContinueWatchingCard extends LitElement {
       return;
     }
     
-    // Only update if relevant entity state changed
-    if (this.config?.entity) {
-      const oldState = oldHass?.states?.[this.config.entity];
-      const newState = hass?.states?.[this.config.entity];
-      
-      if (oldState !== newState) {
-        this._updateContinueWatchingItems();
-        this.requestUpdate();
-      }
+    // Check if the resolved entity state changed (handles auto-discovered entities)
+    const resolvedEntity = this._resolveEntity(this.config);
+    const oldState = oldHass?.states?.[resolvedEntity];
+    const newState = hass?.states?.[resolvedEntity];
+    
+    if (oldState !== newState) {
+      this._updateContinueWatchingItems();
+      this.requestUpdate();
     }
   }
 
@@ -381,9 +380,9 @@ class StremioContinueWatchingCard extends LitElement {
     const entity = this._hass.states[sensorEntity];
     
     console.log('[Continue Watching Card] Looking for entity:', sensorEntity);
-    console.log('[Continue Watching Card] Entity found:', entity);
-    console.log('[Continue Watching Card] Entity attributes:', entity?.attributes);
-    console.log('[Continue Watching Card] Items in attributes:', entity?.attributes?.items);
+    console.log('[Continue Watching Card] Entity found:', entity ? 'yes' : 'no');
+    console.log('[Continue Watching Card] Entity state:', entity?.state);
+    console.log('[Continue Watching Card] Items in attributes:', entity?.attributes?.items?.length || 0);
 
     if (!entity?.attributes?.items) {
       this._continueWatchingItems = [];
@@ -397,35 +396,55 @@ class StremioContinueWatchingCard extends LitElement {
 
   _resolveEntity(config) {
     // Helper to resolve entity from config - supports both entity ID and device name
-    if (!config.entity) {
-      return 'sensor.stremio_continue_watching_count'; // default
-    }
+    // Also auto-discovers entities when default doesn't exist
     
-    // If it starts with sensor., it's already an entity ID
-    if (config.entity.startsWith('sensor.')) {
-      return config.entity;
-    }
-    
-    // Otherwise, treat it as a device name and try to find matching entity
-    if (this._hass) {
-      const deviceName = config.entity.toLowerCase();
-      // Look for entities that match the device name pattern
-      for (const entityId in this._hass.states) {
-        if (entityId.includes('continue_watching_count')) {
-          const entity = this._hass.states[entityId];
-          // Check if device name is in the entity ID (normalized)
-          const normalizedEntityId = entityId.toLowerCase().replace(/_/g, '');
-          const normalizedDeviceName = deviceName.replace(/[^a-z0-9]/g, '');
-          if (normalizedEntityId.includes(normalizedDeviceName)) {
-            console.log('[Continue Watching Card] Resolved device name to entity:', deviceName, '->', entityId);
-            return entityId;
+    if (config.entity) {
+      // If it starts with sensor., it's already an entity ID - check if it exists
+      if (config.entity.startsWith('sensor.')) {
+        if (this._hass?.states?.[config.entity]) {
+          console.log('[Continue Watching Card] Using configured entity:', config.entity);
+          return config.entity;
+        }
+        // Configured entity doesn't exist, fall through to auto-discovery
+        console.log('[Continue Watching Card] Configured entity not found:', config.entity);
+      } else {
+        // Treat it as a device name and try to find matching entity
+        if (this._hass) {
+          const deviceName = config.entity.toLowerCase();
+          for (const entityId in this._hass.states) {
+            if (entityId.includes('continue_watching_count')) {
+              const normalizedEntityId = entityId.toLowerCase().replace(/_/g, '');
+              const normalizedDeviceName = deviceName.replace(/[^a-z0-9]/g, '');
+              if (normalizedEntityId.includes(normalizedDeviceName)) {
+                console.log('[Continue Watching Card] Resolved device name to entity:', deviceName, '->', entityId);
+                return entityId;
+              }
+            }
           }
         }
       }
     }
     
-    // Fallback to treating it as entity ID directly
-    return config.entity;
+    // Auto-discover: find ANY stremio continue_watching_count sensor in the system
+    if (this._hass) {
+      for (const entityId in this._hass.states) {
+        if (entityId.startsWith('sensor.stremio') && entityId.endsWith('_continue_watching_count')) {
+          console.log('[Continue Watching Card] Auto-discovered continue watching sensor:', entityId);
+          return entityId;
+        }
+      }
+      // Also check for sensors containing stremio and continue_watching_count (different naming patterns)
+      for (const entityId in this._hass.states) {
+        if (entityId.includes('stremio') && entityId.includes('continue_watching_count')) {
+          console.log('[Continue Watching Card] Auto-discovered continue watching sensor (pattern match):', entityId);
+          return entityId;
+        }
+      }
+    }
+    
+    // Last resort fallback
+    console.log('[Continue Watching Card] No continue watching sensor found, using default');
+    return 'sensor.stremio_continue_watching_count';
   }
 
   _getFilteredItems() {
