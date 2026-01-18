@@ -7,7 +7,7 @@
  * @customElement stremio-browse-card
  * @extends LitElement
  * @version 0.4.0
- * @cacheBust 20260118d
+ * @cacheBust 20260119a
  */
 
 // Safe LitElement access - wait for HA frontend to be ready
@@ -105,7 +105,6 @@ class StremioBrowseCard extends LitElement {
         gap: 12px;
         padding: 16px;
         overflow-y: auto;
-        align-items: start;
         flex: 1;
         min-height: 0;
       }
@@ -140,9 +139,6 @@ class StremioBrowseCard extends LitElement {
         overflow: hidden;
         transition: transform 0.2s;
         position: relative;
-        display: flex;
-        flex-direction: column;
-        align-self: start;
       }
 
       .catalog-item:hover {
