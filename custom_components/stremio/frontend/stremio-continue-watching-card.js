@@ -482,6 +482,18 @@ class StremioContinueWatchingCard extends LitElement {
   }
 
   _handleItemClick(item) {
+    // For TV series, show episode picker first to select season/episode
+    if (item.type === 'series') {
+      console.log('[Continue Watching Card] TV Series clicked, showing episode picker first');
+      this._showEpisodePicker(item, 'detail');
+      return;
+    }
+    
+    // For movies, go directly to detail view
+    this._showDetailView(item);
+  }
+  
+  _showDetailView(item) {
     this._selectedItem = item;
     
     // Fire event for external listeners (media details card integration)
@@ -540,7 +552,7 @@ class StremioContinueWatchingCard extends LitElement {
     // For series, show episode picker first (but pre-select current episode)
     if (item.type === 'series') {
       console.log('[Continue Watching Card] TV Show detected, opening episode picker');
-      this._showEpisodePicker(item);
+      this._showEpisodePicker(item, 'streams');
       return;
     }
 
@@ -548,7 +560,23 @@ class StremioContinueWatchingCard extends LitElement {
     this._fetchStreams(item, null, null);
   }
 
-  _showEpisodePicker(item) {
+  _showEpisodePicker(item, mode = 'streams') {
+    const onEpisodeSelected = (season, episode) => {
+      console.log('[Continue Watching Card] Episode selected:', { season, episode, mode });
+      if (mode === 'detail') {
+        // Create a modified item with selected episode info and show detail
+        const itemWithEpisode = {
+          ...item,
+          selectedSeason: season,
+          selectedEpisode: episode,
+        };
+        this._showDetailView(itemWithEpisode);
+      } else {
+        // Default: fetch streams for the selected episode
+        this._fetchStreams(item, season, episode);
+      }
+    };
+    
     // Use the global helper if available
     if (window.StremioEpisodePicker) {
       window.StremioEpisodePicker.show(
@@ -565,13 +593,12 @@ class StremioContinueWatchingCard extends LitElement {
           watched_episodes: item.watched_episodes || [],
         },
         (selection) => {
-          console.log('[Continue Watching Card] Episode selected:', selection);
-          this._fetchStreams(item, selection.season, selection.episode);
+          onEpisodeSelected(selection.season, selection.episode);
         }
       );
     } else {
       // Fallback: Use current season/episode directly
-      this._fetchStreams(item, item.season, item.episode);
+      onEpisodeSelected(item.season, item.episode);
     }
   }
 
@@ -793,6 +820,13 @@ class StremioContinueWatchingCard extends LitElement {
     const item = this._selectedItem;
     const title = item.title || 'Unknown';
     const progress = typeof item.progress_percent === 'number' ? item.progress_percent : 0;
+    // For continue watching, use selectedSeason/Episode if changed, otherwise use original season/episode
+    const displaySeason = item.selectedSeason || item.season;
+    const displayEpisode = item.selectedEpisode || item.episode;
+    const hasEpisodeInfo = item.type === 'series' && displaySeason && displayEpisode;
+    const episodeLabel = hasEpisodeInfo 
+      ? `S${String(displaySeason).padStart(2, '0')}E${String(displayEpisode).padStart(2, '0')}`
+      : null;
 
     return html`
       <div class="item-detail-view">
@@ -807,6 +841,7 @@ class StremioContinueWatchingCard extends LitElement {
           <div class="detail-info">
             <h3>${title}</h3>
             <p class="detail-type">${item.type === 'series' ? 'TV Series' : 'Movie'}</p>
+            ${episodeLabel ? html`<p class="detail-episode">Episode: ${episodeLabel}</p>` : ''}
             ${item.year ? html`<p class="detail-meta">Year: ${item.year}</p>` : ''}
             ${progress > 0 ? html`
               <div class="detail-progress-container">
@@ -819,18 +854,48 @@ class StremioContinueWatchingCard extends LitElement {
           </div>
         </div>
 
+        ${item.type === 'series' ? html`
+          <div class="detail-actions">
+            <button class="detail-button tertiary" @click=${() => this._showEpisodePicker(item, 'detail')}>
+              <ha-icon icon="mdi:playlist-play"></ha-icon>
+              Change Episode
+            </button>
+          </div>
+        ` : ''}
+
         <div class="detail-actions">
           <button class="detail-button primary" @click=${() => this._resumeInStremio(item)}>
             <ha-icon icon="mdi:play"></ha-icon>
             Resume in Stremio
           </button>
-          <button class="detail-button secondary" @click=${() => this._getStreams(item)}>
+          <button class="detail-button secondary" @click=${() => this._getStreamsForDetailItem(item)}>
             <ha-icon icon="mdi:format-list-bulleted"></ha-icon>
             Get Streams
           </button>
         </div>
       </div>
     `;
+  }
+
+  /**
+   * Get streams for the item shown in detail view.
+   * For series, use the selected/current episode. Otherwise, prompt for episode.
+   */
+  _getStreamsForDetailItem(item) {
+    if (item.type === 'series') {
+      const season = item.selectedSeason || item.season;
+      const episode = item.selectedEpisode || item.episode;
+      if (season && episode) {
+        // Episode already selected/known, fetch streams directly
+        this._fetchStreams(item, season, episode);
+      } else {
+        // No episode info, show picker
+        this._showEpisodePicker(item, 'streams');
+      }
+    } else {
+      // Movie - fetch directly
+      this._fetchStreams(item, null, null);
+    }
   }
 
   getCardSize() {
