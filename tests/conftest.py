@@ -8,7 +8,21 @@ See docs/testing.md for details.
 
 from __future__ import annotations
 
+import socket
 import sys
+
+# On Windows, we need to enable socket BEFORE pytest-socket patches it.
+# This must happen at module import time, before pytest plugins load.
+if sys.platform == "win32":
+    # Store the real socket class before pytest-socket can patch it
+    _real_socket = socket.socket
+    
+    # We'll use this to patch back after pytest-socket disables it
+    def _enable_socket():
+        """Re-enable socket after pytest-socket blocks it."""
+        socket.socket = _real_socket
+
+
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -25,17 +39,16 @@ def pytest_configure(config):
     for internal event loop operations (socketpair for self-pipe).
     """
     if sys.platform == "win32":
-        # On Windows, we need to enable socket before pytest-socket blocks it
-        import socket as socket_module
-        # Store original socket class
-        config._original_socket = socket_module.socket
-        
-        # Try to re-enable socket if pytest-socket has already blocked it
-        try:
-            import pytest_socket
-            pytest_socket.enable_socket()
-        except (ImportError, AttributeError):
-            pass
+        # Restore the real socket class
+        _enable_socket()
+
+
+@pytest.fixture(autouse=True)
+def enable_socket_for_windows():
+    """Ensure socket is enabled for each test on Windows."""
+    if sys.platform == "win32":
+        _enable_socket()
+    yield
 
 
 # Import fixtures from pytest-homeassistant-custom-component
