@@ -410,6 +410,10 @@ class StremioLibraryCard extends LitElement {
     this._similarSourceItem = null;
     this._loadingSimilar = false;
     this._viewMode = 'library'; // 'library' or 'catalog'
+    
+    // Bind methods that are used as event handlers
+    this._closeSimilarView = this._closeSimilarView.bind(this);
+    this._closeDetail = this._closeDetail.bind(this);
   }
 
   setConfig(config) {
