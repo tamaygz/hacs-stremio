@@ -259,6 +259,28 @@ class StremioStreamDialog extends LitElement {
     this.streams = [];
     this._loading = false;
     this._copiedIndex = -1;
+    // Bind keyboard handler for cleanup
+    this._handleKeyDown = this._handleKeyDown.bind(this);
+  }
+
+  connectedCallback() {
+    super.connectedCallback();
+    document.addEventListener('keydown', this._handleKeyDown);
+  }
+
+  // Lifecycle: cleanup timers and event listeners when element is removed
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    document.removeEventListener('keydown', this._handleKeyDown);
+    if (this._copiedTimeout) {
+      clearTimeout(this._copiedTimeout);
+    }
+  }
+
+  _handleKeyDown(e) {
+    if (this.open && e.key === 'Escape') {
+      this._close();
+    }
   }
 
   async _copyToClipboard(url, index) {
@@ -415,7 +437,7 @@ class StremioStreamDialog extends LitElement {
 
   _renderStreams() {
     return html`
-      <div class="stream-list">
+      <div class="stream-list" role="list" aria-label="Available streams">
         ${this.streams.map((stream, index) => this._renderStreamItem(stream, index))}
       </div>
     `;
@@ -423,12 +445,13 @@ class StremioStreamDialog extends LitElement {
 
   _renderStreamItem(stream, index) {
     const isCopied = this._copiedIndex === index;
+    const streamName = stream.name || stream.title || `Stream ${index + 1}`;
 
     return html`
-      <div class="stream-item">
+      <div class="stream-item" role="listitem">
         <div class="stream-info">
           <div class="stream-name">
-            ${stream.name || stream.title || `Stream ${index + 1}`}
+            ${streamName}
             ${stream.quality ? html`
               <span class="quality-badge ${this._getQualityClass(stream.quality)}">
                 ${stream.quality}
@@ -451,11 +474,11 @@ class StremioStreamDialog extends LitElement {
           </div>
         </div>
 
-        <div class="stream-actions">
+        <div class="stream-actions" role="group" aria-label="Stream actions">
           <button 
             class="action-btn secondary ${isCopied ? 'success' : ''}"
             @click=${() => this._copyToClipboard(stream.url, index)}
-            title="Copy URL"
+            aria-label="${isCopied ? 'Copied to clipboard' : `Copy ${streamName} URL to clipboard`}"
           >
             <ha-icon icon="${isCopied ? 'mdi:check' : 'mdi:content-copy'}"></ha-icon>
             ${isCopied ? 'Copied!' : 'Copy'}
@@ -463,7 +486,7 @@ class StremioStreamDialog extends LitElement {
           <button 
             class="action-btn"
             @click=${() => this._playOnAppleTv(stream)}
-            title="Send to Apple TV"
+            aria-label="Send ${streamName} to Apple TV"
           >
             <ha-icon icon="mdi:apple"></ha-icon>
           </button>
