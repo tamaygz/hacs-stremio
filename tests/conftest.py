@@ -8,15 +8,17 @@ See docs/testing.md for details.
 
 from __future__ import annotations
 
-import sys
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
 from homeassistant.core import HomeAssistant
-from homeassistant.setup import async_setup_component
 
 from custom_components.stremio.const import DOMAIN
+
+# Import fixtures from pytest-homeassistant-custom-component
+# These provide properly mocked HomeAssistant instances that work with pytest-socket
+pytest_plugins = "pytest_homeassistant_custom_component"
 
 # ============================================================================
 # Mock Data
@@ -170,50 +172,34 @@ def mock_coordinator(mock_stremio_client):
 
 
 @pytest.fixture
-def mock_config_entry():
+def mock_config_entry(hass: HomeAssistant):
     """Create a mock config entry."""
-    from homeassistant.config_entries import ConfigEntry
+    from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-    entry = MagicMock(spec=ConfigEntry)
-    entry.entry_id = "test_entry_id"
-    entry.domain = DOMAIN
-    entry.data = MOCK_CONFIG_ENTRY
-    entry.options = {
-        "player_update_interval": 30,
-        "library_update_interval": 300,
-        "enable_apple_tv_handover": False,
-        "handover_method": "auto",
-    }
-    entry.unique_id = "test@example.com"
-    entry.title = "Stremio - test@example.com"
-
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data=MOCK_CONFIG_ENTRY,
+        options={
+            "player_update_interval": 30,
+            "library_update_interval": 300,
+            "enable_apple_tv_handover": False,
+            "handover_method": "auto",
+        },
+        unique_id="test@example.com",
+        title="Stremio - test@example.com",
+    )
+    entry.add_to_hass(hass)
     return entry
 
 
 @pytest.fixture
-def hass(event_loop, tmp_path):
-    """Create a Home Assistant instance for testing."""
-    from homeassistant.core import HomeAssistant
-
-    hass = HomeAssistant(config_dir=str(tmp_path))
-    hass.config.components.add("stremio")
-
-    yield hass
-
-    event_loop.run_until_complete(hass.async_stop())
-
-
-@pytest.fixture
-def mock_hass():
-    """Create a minimal mock HomeAssistant instance."""
-    hass = MagicMock()
-    hass.data = {}
-    hass.states = MagicMock()
-    hass.bus = MagicMock()
-    hass.bus.async_fire = MagicMock()
-    hass.services = MagicMock()
-    hass.config_entries = MagicMock()
-
+def mock_hass(hass: HomeAssistant):
+    """Create a mock HomeAssistant instance using pytest-homeassistant-custom-component.
+    
+    This fixture wraps the 'hass' fixture from pytest-homeassistant-custom-component
+    and adds additional mock data structures needed by the Stremio integration tests.
+    """
+    hass.data = hass.data if hass.data else {}
     return hass
 
 
@@ -258,7 +244,9 @@ def create_mock_entity(entity_id: str, state: str, attributes: dict | None = Non
 
 async def setup_integration(hass: HomeAssistant, config_entry):
     """Set up the Stremio integration for testing."""
-    config_entry.add_to_hass(hass)
+    # Entry should already be added via mock_config_entry fixture
+    if config_entry.entry_id not in [e.entry_id for e in hass.config_entries.async_entries(DOMAIN)]:
+        config_entry.add_to_hass(hass)
 
     with patch(
         "custom_components.stremio.StremioClient",

@@ -4,10 +4,10 @@
         {
             "label": "Disable HACS",
             "type": "shell",
-            "command": "bash",
+            "command": "${command:python.interpreterPath}",
             "args": [
-                "-c",
-                "if [ -d '${workspaceFolder}/config/custom_components/hacs' ]; then mv '${workspaceFolder}/config/custom_components/hacs' '${workspaceFolder}/config/custom_components/hacs.disabled' && echo '✅ HACS disabled (renamed to hacs.disabled)'; else echo '✅ HACS already disabled'; fi"
+                "${workspaceFolder}/scripts/manage_hacs.py",
+                "disable"
             ],
             "presentation": {
                 "reveal": "silent",
@@ -18,10 +18,10 @@
         {
             "label": "Restore HACS",
             "type": "shell",
-            "command": "bash",
+            "command": "${command:python.interpreterPath}",
             "args": [
-                "-c",
-                "if [ -d '${workspaceFolder}/config/custom_components/hacs.disabled' ]; then mv '${workspaceFolder}/config/custom_components/hacs.disabled' '${workspaceFolder}/config/custom_components/hacs' && echo '✅ HACS restored (renamed from hacs.disabled)'; else echo '✅ HACS already enabled'; fi"
+                "${workspaceFolder}/scripts/manage_hacs.py",
+                "restore"
             ],
             "presentation": {
                 "reveal": "silent",
@@ -32,10 +32,9 @@
         {
             "label": "Clean Home Assistant Cache",
             "type": "shell",
-            "command": "bash",
+            "command": "${command:python.interpreterPath}",
             "args": [
-                "-c",
-                "rm -rf '${workspaceFolder}/config/.storage' '${workspaceFolder}/config/home-assistant_v2.db'* && echo '✅ Home Assistant cache and database cleaned'"
+                "${workspaceFolder}/scripts/clean_cache.py"
             ],
             "presentation": {
                 "reveal": "always",
@@ -46,10 +45,13 @@
         {
             "label": "Install Dependencies",
             "type": "shell",
-            "command": "bash",
+            "command": "${command:python.interpreterPath}",
             "args": [
-                "-c",
-                "cd '${workspaceFolder}' && source .venv/bin/activate && pip install -r requirements_dev.txt && echo '✅ Development dependencies installed'"
+                "-m",
+                "pip",
+                "install",
+                "-r",
+                "${workspaceFolder}/requirements_dev.txt"
             ],
             "presentation": {
                 "reveal": "always",
@@ -60,10 +62,9 @@
         {
             "label": "Run Linter",
             "type": "shell",
-            "command": "bash",
+            "command": "${command:python.interpreterPath}",
             "args": [
-                "-c",
-                "cd '${workspaceFolder}' && source .venv/bin/activate && python scripts/run_lint.py"
+                "${workspaceFolder}/scripts/run_lint.py"
             ],
             "presentation": {
                 "reveal": "always",
@@ -74,10 +75,9 @@
         {
             "label": "Validate Integration",
             "type": "shell",
-            "command": "bash",
+            "command": "${command:python.interpreterPath}",
             "args": [
-                "-c",
-                "cd '${workspaceFolder}' && source .venv/bin/activate && python scripts/validate_integration.py"
+                "${workspaceFolder}/scripts/validate_integration.py"
             ],
             "presentation": {
                 "reveal": "always",
