@@ -367,7 +367,6 @@ class StremioMediaSource(MediaSource):
         title = movie_item.get("title") or movie_item.get("name") or "Unknown Movie"
         poster = movie_item.get("poster") or movie_item.get("thumbnail")
         year = movie_item.get("year")
-        description = movie_item.get("description") or movie_item.get("overview")
 
         if year:
             title = f"{title} ({year})"

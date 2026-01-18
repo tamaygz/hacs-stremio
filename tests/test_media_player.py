@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-import pytest
 from unittest.mock import MagicMock
 
+import pytest
 from homeassistant.components.media_player import MediaPlayerState, MediaType
 
 from custom_components.stremio.const import DOMAIN
@@ -224,6 +224,13 @@ class TestMediaPlayerBrowse:
         self, mock_hass, mock_media_coordinator, mock_config_entry
     ):
         """Test browsing media at root level."""
+        # Set up hass.data with coordinator
+        mock_hass.data[DOMAIN] = {
+            mock_config_entry.entry_id: {
+                "coordinator": mock_media_coordinator,
+            }
+        }
+
         player = StremioMediaPlayer(mock_media_coordinator, mock_config_entry)
         player.hass = mock_hass
 
@@ -243,6 +250,13 @@ class TestMediaPlayerBrowse:
         self, mock_hass, mock_media_coordinator, mock_config_entry
     ):
         """Test browsing library section."""
+        # Set up hass.data with coordinator
+        mock_hass.data[DOMAIN] = {
+            mock_config_entry.entry_id: {
+                "coordinator": mock_media_coordinator,
+            }
+        }
+
         player = StremioMediaPlayer(mock_media_coordinator, mock_config_entry)
         player.hass = mock_hass
 
