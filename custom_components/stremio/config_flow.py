@@ -46,6 +46,7 @@ from .const import (
     HANDOVER_METHODS,
     STREAM_QUALITY_OPTIONS,
 )
+from .dashboard_helper import async_create_testing_dashboard
 from .stremio_client import StremioAuthError, StremioClient, StremioConnectionError
 
 _LOGGER = logging.getLogger(__name__)
@@ -181,6 +182,8 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         # Available addons fetched from API
         self._available_addons: list[dict[str, Any]] = []
         self._addon_names: list[str] = []
+        # Track if user wants to create testing dashboard
+        self._create_dashboard: bool = False
 
     async def _fetch_available_addons(self) -> None:
         """Fetch available addons from the Stremio API."""
@@ -268,6 +271,9 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 # Handle empty selection which may be omitted from user_input
                 if CONF_ADDON_STREAM_ORDER not in user_input:
                     self._pending_options[CONF_ADDON_STREAM_ORDER] = []
+
+            # Check if user wants to create testing dashboard
+            self._create_dashboard = user_input.pop("create_testing_dashboard", False)
 
             # Check if we need to configure Apple TV
             enable_handover = user_input.get(
@@ -388,9 +394,16 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                             DEFAULT_STREAM_QUALITY_PREFERENCE,
                         ),
                     ): vol.In(STREAM_QUALITY_OPTIONS),
+                    vol.Optional(
+                        "create_testing_dashboard",
+                        default=False,
+                    ): bool,
                 }
             ),
             errors=errors,
+            description_placeholders={
+                "dashboard_info": "Creates a comprehensive testing dashboard with all Stremio card types"
+            },
         )
 
     async def async_step_pyatv_missing(
@@ -704,4 +717,36 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
 
     def _create_options_entry(self) -> FlowResult:
         """Create the options entry with all collected data."""
+        # If user requested dashboard creation, do it now
+        if self._create_dashboard:
+            # Try to find the media player entity
+            try:
+                from homeassistant.helpers import entity_registry as er
+                
+                entity_registry = er.async_get(self.hass)
+                entity_id = None
+                
+                for entity in entity_registry.entities.values():
+                    if (
+                        entity.config_entry_id == self._config_entry.entry_id
+                        and entity.domain == "media_player"
+                    ):
+                        entity_id = entity.entity_id
+                        break
+
+                if entity_id:
+                    _LOGGER.info(
+                        "Creating testing dashboard for entity: %s", entity_id
+                    )
+                    # Schedule the dashboard creation
+                    self.hass.async_create_task(
+                        async_create_testing_dashboard(self.hass, entity_id)
+                    )
+                else:
+                    _LOGGER.warning(
+                        "Could not find media player entity ID for dashboard creation"
+                    )
+            except Exception as err:
+                _LOGGER.error("Error setting up dashboard creation: %s", err)
+
         return self.async_create_entry(title="", data=self._pending_options)

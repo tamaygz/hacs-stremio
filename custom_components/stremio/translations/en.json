@@ -107,7 +107,8 @@
           "default_catalog_source": "Default catalog source",
           "addon_stream_order": "Stream addon priority order",
           "reset_addon_order": "Reset to default addon order",
-          "stream_quality_preference": "Stream quality preference"
+          "stream_quality_preference": "Stream quality preference",
+          "create_testing_dashboard": "Create testing dashboard"
         },
         "data_description": {
           "player_scan_interval": "How often to check for player state changes (10-300 seconds)",
@@ -120,7 +121,8 @@
           "default_catalog_source": "The addon to use for fetching metadata (e.g., 'cinemeta', 'tmdb'). Leave as 'cinemeta' for default.",
           "addon_stream_order": "Select addons in your preferred order. Streams from addons listed first will appear at the top. Leave empty to use Stremio's default order.",
           "reset_addon_order": "Check this box to clear the custom addon order and use Stremio's default order.",
-          "stream_quality_preference": "Preferred stream quality. Matching streams will be shown first. Select 'any' to show all streams without filtering."
+          "stream_quality_preference": "Preferred stream quality. Matching streams will be shown first. Select 'any' to show all streams without filtering.",
+          "create_testing_dashboard": "Check this box to create a comprehensive testing dashboard with all Stremio card types. The dashboard will be accessible from the sidebar."
         }
       },
       "pyatv_missing": {
