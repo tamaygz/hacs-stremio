@@ -17,7 +17,7 @@ import './stremio-browse-card.js';
 import './stremio-continue-watching-card.js';
 
 // Card registration info - should match manifest.json version
-const CARD_VERSION = '0.2.30';
+const CARD_VERSION = '0.2.31';
 
 console.info(
   `%c STREMIO CARDS %c ${CARD_VERSION} `,
