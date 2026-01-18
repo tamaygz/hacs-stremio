@@ -701,11 +701,14 @@ class StremioBrowseCard extends LitElement {
   }
 
   _extractMediaId(item) {
+    console.log('[Browse Card] _extractMediaId called with item:', item);
     // Extract IMDb ID from item - check direct properties first (from similar content API)
     if (item.imdb_id) {
+      console.log('[Browse Card] Found imdb_id:', item.imdb_id);
       return item.imdb_id;
     }
     if (item.id && item.id.startsWith('tt')) {
+      console.log('[Browse Card] Found id starting with tt:', item.id);
       return item.id;
     }
     // Try to extract from media_content_id
@@ -713,12 +716,14 @@ class StremioBrowseCard extends LitElement {
     // - "media-source://stremio/movie/tt1234567" (from browse_media)
     // - "movie/tt1234567" (simple format)
     if (item.media_content_id) {
+      console.log('[Browse Card] Processing media_content_id:', item.media_content_id);
       // Handle media-source:// URLs
       if (item.media_content_id.includes('media-source://stremio/')) {
         const path = item.media_content_id.replace('media-source://stremio/', '');
         const parts = path.split('/');
         // Path is now "movie/tt1234567" or "series/tt1234567"
         if (parts.length > 1) {
+          console.log('[Browse Card] Extracted ID from media-source URL:', parts[1]);
           return parts[1]; // Return the IMDB ID
         }
         return parts[0];
@@ -726,10 +731,12 @@ class StremioBrowseCard extends LitElement {
       // Simple format: "type/id"
       const parts = item.media_content_id.split('/');
       if (parts.length > 1) {
+        console.log('[Browse Card] Extracted ID from simple format:', parts[1]);
         return parts[1];
       }
       return parts[0];
     }
+    console.log('[Browse Card] Falling back to item.id:', item.id);
     return item.id;
   }
 
