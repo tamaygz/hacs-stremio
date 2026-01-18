@@ -171,11 +171,26 @@ class JSModuleRegistration:
 
     async def _async_wait_for_lovelace_resources(self) -> None:
         """Wait for Lovelace resources to load before registering modules."""
-        if not self.lovelace:
+        resources = self.lovelace_resources
+        if resources is None:
+            _LOGGER.debug("Lovelace resources not available")
             return
 
         async def _check_loaded(_now: Any) -> None:
-            if self.lovelace and self.lovelace.resources.loaded:
+            resources = self.lovelace_resources
+            if resources is None:
+                _LOGGER.debug("Lovelace resources became unavailable")
+                return
+
+            # Check if resources are loaded - handle both attribute and method
+            loaded = False
+            if hasattr(resources, "loaded"):
+                loaded = resources.loaded
+            else:
+                # Assume loaded if no loaded attribute
+                loaded = True
+
+            if loaded:
                 await self._async_register_modules()
             else:
                 _LOGGER.debug("Lovelace resources not loaded, retrying in 5s")
@@ -185,17 +200,23 @@ class JSModuleRegistration:
 
     async def _async_register_modules(self) -> None:
         """Register or update JavaScript modules in Lovelace resources."""
-        if not self.lovelace:
+        resources = self.lovelace_resources
+        if resources is None:
+            _LOGGER.debug("Lovelace resources not available for module registration")
             return
 
-        _LOGGER.debug("Installing Stremio JavaScript modules")
+        _LOGGER.info("Installing Stremio JavaScript modules v%s", INTEGRATION_VERSION)
 
         # Get existing resources from this integration
-        existing_resources = [
-            r
-            for r in self.lovelace.resources.async_items()
-            if r["url"].startswith(URL_BASE)
-        ]
+        try:
+            existing_resources = [
+                r
+                for r in resources.async_items()
+                if r["url"].startswith(URL_BASE)
+            ]
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.error("Failed to get existing resources: %s", err)
+            return
 
         for module in JSMODULES:
             url = f"{URL_BASE}/{module['filename']}"
@@ -211,13 +232,16 @@ class JSModuleRegistration:
                             module["name"],
                             module["version"],
                         )
-                        await self.lovelace.resources.async_update_item(
-                            resource["id"],
-                            {
-                                "res_type": "module",
-                                "url": f"{url}?v={module['version']}",
-                            },
-                        )
+                        try:
+                            await resources.async_update_item(
+                                resource["id"],
+                                {
+                                    "res_type": "module",
+                                    "url": f"{url}?v={module['version']}",
+                                },
+                            )
+                        except Exception as err:  # noqa: BLE001
+                            _LOGGER.error("Failed to update resource %s: %s", module["name"], err)
                     break
 
             if not registered:
@@ -226,12 +250,15 @@ class JSModuleRegistration:
                     module["name"],
                     module["version"],
                 )
-                await self.lovelace.resources.async_create_item(
-                    {
-                        "res_type": "module",
-                        "url": f"{url}?v={module['version']}",
-                    }
-                )
+                try:
+                    await resources.async_create_item(
+                        {
+                            "res_type": "module",
+                            "url": f"{url}?v={module['version']}",
+                        }
+                    )
+                except Exception as err:  # noqa: BLE001
+                    _LOGGER.error("Failed to register resource %s: %s", module["name"], err)
 
     def _get_path(self, url: str) -> str:
         """Extract path without query parameters.
@@ -260,16 +287,20 @@ class JSModuleRegistration:
 
     async def async_unregister(self) -> None:
         """Remove Lovelace resources from this integration."""
-        if self.lovelace is None or self.lovelace_mode != "storage":
+        resources = self.lovelace_resources
+        if resources is None or self.lovelace_mode != "storage":
             return
 
         for module in JSMODULES:
             url = f"{URL_BASE}/{module['filename']}"
-            resources = [
-                r
-                for r in self.lovelace.resources.async_items()
-                if r["url"].startswith(url)
-            ]
-            for resource in resources:
-                await self.lovelace.resources.async_delete_item(resource["id"])
-                _LOGGER.info("Unregistered resource: %s", module["name"])
+            try:
+                resource_list = [
+                    r
+                    for r in resources.async_items()
+                    if r["url"].startswith(url)
+                ]
+                for resource in resource_list:
+                    await resources.async_delete_item(resource["id"])
+                    _LOGGER.info("Unregistered resource: %s", module["name"])
+            except Exception as err:  # noqa: BLE001
+                _LOGGER.error("Failed to unregister resource %s: %s", module["name"], err)
