@@ -282,6 +282,67 @@ class StremioDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.data["current_watching"]["stream_url"] = stream_url
             self.async_set_updated_data(self.data)
 
+    def set_current_media(
+        self,
+        media_info: dict[str, Any] | None,
+        stream_url: str | None = None,
+    ) -> None:
+        """Set the current media being played on the Stremio device.
+
+        This is called when a handover is performed to update the current_watching
+        state with the media that was handed over. This ensures the media player
+        entity reflects the correct state after handover.
+
+        Args:
+            media_info: Dictionary containing media details (title, type, imdb_id,
+                       season, episode, poster, etc.), or None to clear
+            stream_url: The stream URL being played, or None
+        """
+        self._current_stream_url = stream_url
+
+        if media_info is None:
+            _LOGGER.debug("Clearing current media")
+            if self.data:
+                self.data["current_watching"] = None
+                self.async_set_updated_data(self.data)
+            return
+
+        # Build the current_watching entry from the media info
+        current_watching = {
+            "title": media_info.get("title"),
+            "type": media_info.get("type", "movie"),
+            "imdb_id": media_info.get("imdb_id") or media_info.get("media_id"),
+            "poster": media_info.get("poster"),
+            "year": media_info.get("year"),
+            "season": media_info.get("season"),
+            "episode": media_info.get("episode"),
+            "episode_title": media_info.get("episode_title"),
+            "progress": media_info.get("progress", 0),
+            "duration": media_info.get("duration", 0),
+            "progress_percent": media_info.get("progress_percent", 0),
+            "time_offset": media_info.get("time_offset", 0),
+            "stream_url": stream_url,
+            "handover_initiated": True,  # Flag to indicate this was from handover
+        }
+
+        _LOGGER.debug(
+            "Setting current media from handover: %s (type=%s, S%sE%s)",
+            current_watching.get("title"),
+            current_watching.get("type"),
+            current_watching.get("season"),
+            current_watching.get("episode"),
+        )
+
+        # Update coordinator data
+        if self.data is None:
+            self.data = {}
+
+        # Store previous watching state before updating
+        self._previous_watching = self.data.get("current_watching")
+
+        self.data["current_watching"] = current_watching
+        self.async_set_updated_data(self.data)
+
     async def async_shutdown(self) -> None:
         """Clean up resources on shutdown."""
         # Unsubscribe from state change events

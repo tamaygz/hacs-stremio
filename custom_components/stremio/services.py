@@ -319,6 +319,9 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             method,
         )
 
+        # Track media info for updating coordinator after handover
+        media_info: dict = {}
+
         # Get stream URL if not provided
         if not stream_url:
             if not media_id:
@@ -340,10 +343,29 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                 media_type = current.get("type", "movie")
                 season = current.get("season")
                 episode = current.get("episode")
+                # Copy existing media info
+                media_info = {
+                    "title": current.get("title"),
+                    "type": media_type,
+                    "imdb_id": media_id,
+                    "poster": current.get("poster"),
+                    "year": current.get("year"),
+                    "season": season,
+                    "episode": episode,
+                    "episode_title": current.get("episode_title"),
+                    "progress": current.get("progress", 0),
+                    "duration": current.get("duration", 0),
+                    "progress_percent": current.get("progress_percent", 0),
+                    "time_offset": current.get("time_offset", 0),
+                }
             else:
                 media_type = "movie"  # Default assumption
                 season = None
                 episode = None
+                media_info = {
+                    "imdb_id": media_id,
+                    "type": media_type,
+                }
 
             try:
                 streams = await client.async_get_streams(
@@ -356,6 +378,12 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                     stream_url = streams[0].get("url")
             except StremioConnectionError as err:
                 raise HomeAssistantError(f"Failed to get stream URL: {err}") from err
+        else:
+            # Stream URL was provided directly, build minimal media info
+            media_info = {
+                "imdb_id": media_id,
+                "type": "movie",  # Default assumption
+            }
 
         if not stream_url:
             raise ServiceValidationError(
@@ -365,11 +393,14 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             )
 
         # Get current watching title for display
-        title = None
-        if coordinator.data:
+        title = media_info.get("title")
+        if not title and coordinator.data:
             current = coordinator.data.get("current_watching")
             if current:
                 title = current.get("title")
+                # Update media_info with title if we found it
+                if title:
+                    media_info["title"] = title
 
         # Get stored Apple TV credentials from config entry options
         entry = hass.config_entries.async_get_entry(entry_id)
@@ -396,8 +427,8 @@ async def async_setup_services(hass: HomeAssistant) -> None:
 
             _LOGGER.info("Handover result: %s", result)
 
-            # Track the stream URL in the coordinator
-            coordinator.set_current_stream_url(stream_url)
+            # Update the current media on the Stremio device coordinator
+            coordinator.set_current_media(media_info, stream_url)
 
         except HandoverError as err:
             raise HomeAssistantError(f"Handover failed: {err}") from err
