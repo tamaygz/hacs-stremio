@@ -38,6 +38,7 @@ CONF_APPLE_TV_DEVICE: Final = "apple_tv_device"
 CONF_APPLE_TV_ENTITY_ID: Final = "apple_tv_entity_id"
 CONF_APPLE_TV_CREDENTIALS: Final = "apple_tv_credentials"
 CONF_APPLE_TV_IDENTIFIER: Final = "apple_tv_identifier"
+CONF_POLLING_GATE_ENTITIES: Final = "polling_gate_entities"
 
 # Options defaults
 DEFAULT_PLAYER_SCAN_INTERVAL: Final = 30  # seconds
@@ -46,6 +47,11 @@ DEFAULT_ENABLE_APPLE_TV_HANDOVER: Final = False
 DEFAULT_HANDOVER_METHOD: Final = "auto"
 DEFAULT_APPLE_TV_DEVICE: Final = ""
 DEFAULT_APPLE_TV_ENTITY_ID: Final = ""
+DEFAULT_POLLING_GATE_ENTITIES: Final[list[str]] = []
+
+# Polling gate intervals (seconds)
+POLLING_GATE_ACTIVE_INTERVAL: Final = None  # Use configured interval
+POLLING_GATE_IDLE_INTERVAL: Final = 86400  # 24 hours when all gate entities are off
 
 # Handover methods
 # Note: VLC deep links do NOT work on tvOS - kept for reference but will fail

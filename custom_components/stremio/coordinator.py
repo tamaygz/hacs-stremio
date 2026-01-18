@@ -8,16 +8,21 @@ from datetime import timedelta
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.const import STATE_OFF, STATE_STANDBY, STATE_UNAVAILABLE, STATE_UNKNOWN
+from homeassistant.core import Event, EventStateChangedData, HomeAssistant, callback
+from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import (
     CONF_PLAYER_SCAN_INTERVAL,
+    CONF_POLLING_GATE_ENTITIES,
     DEFAULT_PLAYER_SCAN_INTERVAL,
+    DEFAULT_POLLING_GATE_ENTITIES,
     DOMAIN,
     EVENT_NEW_CONTENT,
     EVENT_PLAYBACK_STARTED,
     EVENT_PLAYBACK_STOPPED,
+    POLLING_GATE_IDLE_INTERVAL,
 )
 from .stremio_client import StremioAuthError, StremioClient, StremioConnectionError
 
@@ -50,18 +55,196 @@ class StremioDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._previous_watching: dict[str, Any] | None = None
         self._previous_library_count: int = 0
         self._consecutive_failures: int = 0
+        self._state_change_unsub: list[Any] = []
+        self._is_polling_gated: bool = False
 
         # Get scan interval from options or use default
-        scan_interval_seconds = entry.options.get(
+        self._configured_scan_interval = entry.options.get(
             CONF_PLAYER_SCAN_INTERVAL, DEFAULT_PLAYER_SCAN_INTERVAL
         )
+
+        # Get polling gate entities from options
+        self._polling_gate_entities: list[str] = entry.options.get(
+            CONF_POLLING_GATE_ENTITIES, DEFAULT_POLLING_GATE_ENTITIES
+        )
+
+        # Determine initial update interval based on gate entity states
+        initial_interval = self._calculate_update_interval()
 
         super().__init__(
             hass,
             _LOGGER,
             name=DOMAIN,
-            update_interval=timedelta(seconds=scan_interval_seconds),
+            update_interval=initial_interval,
         )
+
+        # Set up state change listeners for gate entities
+        self._setup_gate_entity_listeners()
+
+    def _setup_gate_entity_listeners(self) -> None:
+        """Set up state change listeners for polling gate entities."""
+        # Clean up any existing listeners
+        for unsub in self._state_change_unsub:
+            unsub()
+        self._state_change_unsub.clear()
+
+        if not self._polling_gate_entities:
+            _LOGGER.debug("No polling gate entities configured")
+            return
+
+        _LOGGER.debug(
+            "Setting up state change listeners for polling gate entities: %s",
+            self._polling_gate_entities,
+        )
+
+        # Listen for state changes on all gate entities
+        unsub = async_track_state_change_event(
+            self.hass,
+            self._polling_gate_entities,
+            self._handle_gate_entity_state_change,
+        )
+        self._state_change_unsub.append(unsub)
+
+    @callback
+    def _handle_gate_entity_state_change(
+        self, event: Event[EventStateChangedData]
+    ) -> None:
+        """Handle state change of a polling gate entity."""
+        entity_id = event.data["entity_id"]
+        old_state = event.data["old_state"]
+        new_state = event.data["new_state"]
+
+        old_state_str = old_state.state if old_state else "unknown"
+        new_state_str = new_state.state if new_state else "unknown"
+
+        _LOGGER.debug(
+            "Polling gate entity %s changed from %s to %s",
+            entity_id,
+            old_state_str,
+            new_state_str,
+        )
+
+        # Recalculate and update the polling interval
+        self._update_polling_interval()
+
+    def _is_entity_active(self, entity_id: str) -> bool:
+        """Check if an entity is considered 'active' (on/playing).
+
+        Args:
+            entity_id: The entity ID to check
+
+        Returns:
+            True if the entity is active, False otherwise
+        """
+        state = self.hass.states.get(entity_id)
+        if state is None:
+            return False
+
+        # Inactive states
+        inactive_states = {
+            STATE_OFF,
+            STATE_UNAVAILABLE,
+            STATE_UNKNOWN,
+            STATE_STANDBY,
+            "idle",
+            "paused",
+        }
+
+        return state.state.lower() not in inactive_states
+
+    def _any_gate_entity_active(self) -> bool:
+        """Check if any polling gate entity is active.
+
+        Returns:
+            True if at least one gate entity is active, or if no gate entities
+            are configured (always poll in that case)
+        """
+        if not self._polling_gate_entities:
+            # No gate entities configured - always poll at normal interval
+            return True
+
+        for entity_id in self._polling_gate_entities:
+            if self._is_entity_active(entity_id):
+                _LOGGER.debug("Gate entity %s is active", entity_id)
+                return True
+
+        _LOGGER.debug("All gate entities are inactive")
+        return False
+
+    def _calculate_update_interval(self) -> timedelta:
+        """Calculate the appropriate update interval based on gate entity states.
+
+        Returns:
+            The update interval to use
+        """
+        if self._any_gate_entity_active():
+            self._is_polling_gated = False
+            return timedelta(seconds=self._configured_scan_interval)
+        else:
+            self._is_polling_gated = True
+            return timedelta(seconds=POLLING_GATE_IDLE_INTERVAL)
+
+    @callback
+    def _update_polling_interval(self) -> None:
+        """Update the polling interval based on current gate entity states."""
+        new_interval = self._calculate_update_interval()
+
+        if new_interval != self.update_interval:
+            was_gated = self._is_polling_gated
+            old_interval = self.update_interval
+
+            self.update_interval = new_interval
+
+            if self._is_polling_gated:
+                _LOGGER.info(
+                    "All polling gate entities are inactive. "
+                    "Reducing poll frequency from %s to %s (24h idle mode)",
+                    old_interval,
+                    new_interval,
+                )
+            else:
+                _LOGGER.info(
+                    "Polling gate entity became active. "
+                    "Restoring poll frequency from %s to %s",
+                    old_interval,
+                    new_interval,
+                )
+
+                # If we were gated and now active, trigger an immediate refresh
+                if was_gated:
+                    _LOGGER.debug("Triggering immediate refresh after gate activation")
+                    self.hass.async_create_task(self.async_request_refresh())
+
+    def update_options(self, entry: ConfigEntry) -> None:
+        """Update coordinator with new options.
+
+        Args:
+            entry: Updated config entry
+        """
+        self._configured_scan_interval = entry.options.get(
+            CONF_PLAYER_SCAN_INTERVAL, DEFAULT_PLAYER_SCAN_INTERVAL
+        )
+
+        new_gate_entities = entry.options.get(
+            CONF_POLLING_GATE_ENTITIES, DEFAULT_POLLING_GATE_ENTITIES
+        )
+
+        # Check if gate entities changed
+        if new_gate_entities != self._polling_gate_entities:
+            self._polling_gate_entities = new_gate_entities
+            self._setup_gate_entity_listeners()
+
+        # Recalculate interval with new settings
+        self._update_polling_interval()
+
+    async def async_shutdown(self) -> None:
+        """Clean up resources on shutdown."""
+        # Unsubscribe from state change events
+        for unsub in self._state_change_unsub:
+            unsub()
+        self._state_change_unsub.clear()
+
+        await super().async_shutdown()
 
     async def _async_fetch_with_retry(self, fetch_func, description: str) -> Any:
         """Execute a fetch function with exponential backoff retry.

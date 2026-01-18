@@ -653,14 +653,14 @@ class HandoverManager:
 
             if "404" in error_msg:
                 raise HandoverError(
-                    f"Direct handover failed: Stream URL not found (404). "
-                    f"Please verify the stream URL is accessible."
+                    "Direct handover failed: Stream URL not found (404). "
+                    "Please verify the stream URL is accessible."
                 ) from err
 
             if "timeout" in error_msg.lower():
                 raise HandoverError(
-                    f"Direct handover failed: Connection timeout. "
-                    f"The stream server may be slow or unreachable from Apple TV."
+                    "Direct handover failed: Connection timeout. "
+                    "The stream server may be slow or unreachable from Apple TV."
                 ) from err
 
             _LOGGER.error("Direct handover failed: %s", err)

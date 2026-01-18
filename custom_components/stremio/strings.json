@@ -23,10 +23,11 @@
     "step": {
       "init": {
         "title": "Stremio Options",
-        "description": "Configure update intervals and Apple TV handover settings.",
+        "description": "Configure update intervals, polling behavior, and Apple TV handover settings.",
         "data": {
           "player_scan_interval": "Player state update interval (seconds)",
           "library_scan_interval": "Library sync interval (seconds)",
+          "polling_gate_entities": "Polling gate entities",
           "enable_apple_tv_handover": "Enable Apple TV handover",
           "handover_method": "Handover method",
           "apple_tv_device": "Apple TV device name (for AirPlay)",
@@ -35,6 +36,7 @@
         "data_description": {
           "player_scan_interval": "How often to check for player state changes (10-300 seconds)",
           "library_scan_interval": "How often to sync library data (60-3600 seconds)",
+          "polling_gate_entities": "Select media players or other entities that control polling. When all selected entities are off/idle, polling is reduced to once per 24 hours. Leave empty to always poll at normal intervals.",
           "enable_apple_tv_handover": "Allow sending content to Apple TV",
           "handover_method": "Method to use: 'auto' or 'airplay' (recommended, requires pyatv), 'direct' (may work for HLS). Note: VLC deep links do NOT work on tvOS!",
           "apple_tv_device": "The name of your Apple TV for AirPlay (e.g., 'Living Room Apple TV'). Required for AirPlay method.",

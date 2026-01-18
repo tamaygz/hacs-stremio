@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from typing import Any
 
@@ -12,6 +11,7 @@ from homeassistant.const import CONF_EMAIL, CONF_PASSWORD, CONF_PIN
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import selector
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .const import (
@@ -24,12 +24,14 @@ from .const import (
     CONF_HANDOVER_METHOD,
     CONF_LIBRARY_SCAN_INTERVAL,
     CONF_PLAYER_SCAN_INTERVAL,
+    CONF_POLLING_GATE_ENTITIES,
     DEFAULT_APPLE_TV_DEVICE,
     DEFAULT_APPLE_TV_ENTITY_ID,
     DEFAULT_ENABLE_APPLE_TV_HANDOVER,
     DEFAULT_HANDOVER_METHOD,
     DEFAULT_LIBRARY_SCAN_INTERVAL,
     DEFAULT_PLAYER_SCAN_INTERVAL,
+    DEFAULT_POLLING_GATE_ENTITIES,
     DOMAIN,
     HANDOVER_METHOD_AIRPLAY,
     HANDOVER_METHODS,
@@ -42,7 +44,6 @@ _LOGGER = logging.getLogger(__name__)
 try:
     import pyatv
     from pyatv.const import PairingRequirement, Protocol
-    from pyatv.interface import BaseConfig, PairingHandler
 
     PYATV_AVAILABLE = True
 except ImportError:
@@ -210,6 +211,17 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                             CONF_LIBRARY_SCAN_INTERVAL, DEFAULT_LIBRARY_SCAN_INTERVAL
                         ),
                     ): vol.All(vol.Coerce(int), vol.Range(min=60, max=3600)),
+                    vol.Optional(
+                        CONF_POLLING_GATE_ENTITIES,
+                        default=self._config_entry.options.get(
+                            CONF_POLLING_GATE_ENTITIES, DEFAULT_POLLING_GATE_ENTITIES
+                        ),
+                    ): selector.EntitySelector(
+                        selector.EntitySelectorConfig(
+                            domain=["media_player", "binary_sensor", "switch", "input_boolean"],
+                            multiple=True,
+                        ),
+                    ),
                     vol.Optional(
                         CONF_ENABLE_APPLE_TV_HANDOVER,
                         default=self._config_entry.options.get(

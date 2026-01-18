@@ -182,11 +182,26 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 
 async def async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    """Reload config entry when options change.
+    """Handle options update for config entry.
+
+    This method is called when the user updates options through the UI.
+    Instead of fully reloading, we update the coordinator with new options.
 
     Args:
         hass: Home Assistant instance
-        entry: Config entry to reload
+        entry: Config entry with updated options
     """
-    _LOGGER.info("Reloading Stremio integration for %s", entry.unique_id)
+    _LOGGER.info("Updating Stremio integration options for %s", entry.unique_id)
+
+    # Get the coordinator and update its options
+    data = hass.data.get(DOMAIN, {}).get(entry.entry_id)
+    if data:
+        coordinator = data.get("coordinator")
+        if coordinator and hasattr(coordinator, "update_options"):
+            coordinator.update_options(entry)
+            _LOGGER.debug("Coordinator options updated successfully")
+            return
+
+    # If we couldn't update dynamically, fall back to full reload
+    _LOGGER.debug("Falling back to full reload")
     await hass.config_entries.async_reload(entry.entry_id)

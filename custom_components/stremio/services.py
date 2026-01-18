@@ -94,14 +94,14 @@ HANDOVER_SCHEMA = vol.Schema(
 
 def _get_entry_data(
     hass: HomeAssistant,
-) -> tuple[StremioDataUpdateCoordinator, StremioClient]:
-    """Get coordinator and client from first config entry.
+) -> tuple[StremioDataUpdateCoordinator, StremioClient, str]:
+    """Get coordinator, client, and entry_id from first config entry.
 
     Args:
         hass: Home Assistant instance
 
     Returns:
-        Tuple of coordinator and client
+        Tuple of coordinator, client, and entry_id
 
     Raises:
         ServiceValidationError: If no Stremio integration configured
@@ -116,7 +116,7 @@ def _get_entry_data(
     # Get the first entry's data
     entry_id = next(iter(hass.data[DOMAIN]))
     entry_data = hass.data[DOMAIN][entry_id]
-    return entry_data["coordinator"], entry_data["client"]
+    return entry_data["coordinator"], entry_data["client"], entry_id
 
 
 async def async_setup_services(hass: HomeAssistant) -> None:
@@ -233,7 +233,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
 
     async def handle_add_to_library(call: ServiceCall) -> None:
         """Handle add_to_library service call."""
-        coordinator, client = _get_entry_data(hass)
+        coordinator, client, _ = _get_entry_data(hass)
 
         media_id = call.data[ATTR_MEDIA_ID]
         media_type = call.data[ATTR_MEDIA_TYPE]
@@ -261,7 +261,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
 
     async def handle_remove_from_library(call: ServiceCall) -> None:
         """Handle remove_from_library service call."""
-        coordinator, client = _get_entry_data(hass)
+        coordinator, client, _ = _get_entry_data(hass)
 
         media_id = call.data[ATTR_MEDIA_ID]
 
@@ -287,7 +287,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
 
     async def handle_refresh_library(call: ServiceCall) -> None:
         """Handle refresh_library service call."""
-        coordinator, _ = _get_entry_data(hass)
+        coordinator, _, _ = _get_entry_data(hass)
 
         _LOGGER.info("Refreshing library data")
 
@@ -295,7 +295,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
 
     async def handle_handover_to_apple_tv(call: ServiceCall) -> None:
         """Handle handover_to_apple_tv service call."""
-        coordinator, client = _get_entry_data(hass)
+        coordinator, client, entry_id = _get_entry_data(hass)
 
         device_id = call.data[ATTR_DEVICE_ID]
         media_id = call.data.get(ATTR_MEDIA_ID)

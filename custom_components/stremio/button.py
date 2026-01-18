@@ -16,8 +16,10 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .apple_tv_handover import HandoverError, HandoverManager
 from .const import (
+    CONF_APPLE_TV_CREDENTIALS,
     CONF_APPLE_TV_DEVICE,
     CONF_APPLE_TV_ENTITY_ID,
+    CONF_APPLE_TV_IDENTIFIER,
     CONF_ENABLE_APPLE_TV_HANDOVER,
     CONF_HANDOVER_METHOD,
     DEFAULT_HANDOVER_METHOD,
@@ -244,7 +246,15 @@ class StremioAppleTVHandoverButton(
             return
 
         # Use HandoverManager to discover and handover
-        handover_manager = HandoverManager(self.hass)
+        # Pass credentials from config entry options for AirPlay authentication
+        credentials = self._entry.options.get(CONF_APPLE_TV_CREDENTIALS)
+        device_identifier = self._entry.options.get(CONF_APPLE_TV_IDENTIFIER)
+
+        handover_manager = HandoverManager(
+            self.hass,
+            credentials=credentials,
+            device_identifier=device_identifier,
+        )
 
         # Get configuration
         configured_device = self._entry.options.get(CONF_APPLE_TV_DEVICE, "")
