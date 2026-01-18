@@ -5,7 +5,7 @@
  * Cards are auto-registered when the integration loads.
  * 
  * @author @tamaygz
- * @version 0.2.33
+ * @version 0.3.0
  */
 
 // Import card components (relative paths - all in frontend/ folder)
@@ -17,7 +17,7 @@ import './stremio-player-card.js';
 import './stremio-stream-dialog.js';
 
 // Card registration info - should match manifest.json version
-const CARD_VERSION = '0.2.33';
+const CARD_VERSION = '0.3.0';
 
 console.info(
   `%c STREMIO CARDS %c ${CARD_VERSION} `,
