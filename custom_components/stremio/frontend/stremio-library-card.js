@@ -186,28 +186,28 @@ class StremioLibraryCard extends LitElement {
         margin-left: 8px;
       }
 
-      /* Item detail overlay */
-      .item-detail-overlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: rgba(0, 0, 0, 0.7);
+      /* Back button */
+      .back-button {
+        background: transparent;
+        border: none;
+        color: var(--primary-color);
+        cursor: pointer;
+        padding: 12px 16px;
         display: flex;
         align-items: center;
-        justify-content: center;
-        z-index: 1000;
+        gap: 8px;
+        font-size: 0.95em;
+        font-weight: 500;
+        transition: background-color 0.2s;
       }
 
-      .item-detail {
-        background: var(--card-background-color);
-        border-radius: 12px;
-        padding: 20px;
-        max-width: 400px;
-        width: 90%;
-        max-height: 80vh;
-        overflow-y: auto;
+      .back-button:hover {
+        background-color: var(--secondary-background-color);
+      }
+
+      /* Inline detail view */
+      .item-detail-view {
+        padding: 16px;
       }
 
       .detail-header {
@@ -217,21 +217,70 @@ class StremioLibraryCard extends LitElement {
       }
 
       .detail-poster {
-        width: 100px;
-        height: 150px;
+        width: 120px;
+        height: 180px;
         object-fit: cover;
         border-radius: 8px;
+        flex-shrink: 0;
+      }
+
+      .detail-poster-placeholder {
+        width: 120px;
+        height: 180px;
+        background: var(--secondary-background-color);
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+      }
+
+      .detail-poster-placeholder ha-icon {
+        width: 48px;
+        height: 48px;
+        color: var(--disabled-text-color);
+      }
+
+      .detail-info {
+        flex: 1;
       }
 
       .detail-info h3 {
         margin: 0 0 8px 0;
         color: var(--primary-text-color);
+        font-size: 1.3em;
       }
 
-      .detail-info p {
+      .detail-type {
+        margin: 4px 0;
+        font-size: 0.95em;
+        color: var(--primary-color);
+        font-weight: 500;
+      }
+
+      .detail-meta {
         margin: 4px 0;
         font-size: 0.9em;
         color: var(--secondary-text-color);
+      }
+
+      .detail-progress-container {
+        margin-top: 12px;
+      }
+
+      .detail-progress-bar {
+        width: 100%;
+        height: 6px;
+        background: var(--divider-color);
+        border-radius: 3px;
+        overflow: hidden;
+        margin-top: 4px;
+      }
+
+      .detail-progress-fill {
+        height: 100%;
+        background: var(--primary-color);
+        transition: width 0.3s ease;
       }
 
       .detail-actions {
@@ -242,7 +291,7 @@ class StremioLibraryCard extends LitElement {
 
       .detail-button {
         flex: 1;
-        padding: 10px 16px;
+        padding: 12px 16px;
         border: none;
         border-radius: 6px;
         cursor: pointer;
@@ -251,6 +300,11 @@ class StremioLibraryCard extends LitElement {
         align-items: center;
         justify-content: center;
         gap: 6px;
+        transition: opacity 0.2s;
+      }
+
+      .detail-button:hover {
+        opacity: 0.9;
       }
 
       .detail-button.primary {
@@ -261,21 +315,6 @@ class StremioLibraryCard extends LitElement {
       .detail-button.secondary {
         background: var(--secondary-background-color);
         color: var(--primary-text-color);
-      }
-
-      .close-button {
-        position: absolute;
-        top: 10px;
-        right: 10px;
-        background: var(--secondary-background-color);
-        border: none;
-        border-radius: 50%;
-        width: 32px;
-        height: 32px;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
       }
     `;
   }
@@ -522,30 +561,6 @@ class StremioLibraryCard extends LitElement {
     }
   }
 
-  _openFullDetails(item) {
-    console.log('[Library Card] Opening full details for:', item.title || item.name);
-    
-    // Fire event to open in stremio-media-details-card or browser_mod popup
-    this.dispatchEvent(
-      new CustomEvent('stremio-open-media-details', {
-        bubbles: true,
-        composed: true,
-        detail: { 
-          item,
-          mediaId: item.imdb_id || item.id,
-          title: item.title || item.name,
-          type: item.type,
-          poster: item.poster,
-          year: item.year,
-          progress: item.progress_percent,
-        },
-      })
-    );
-    
-    // Show toast notification
-    this._showToast(`Opening details for "${item.title || item.name}"`);
-  }
-
   _getStreams(item) {
     const id = item.imdb_id || item.id;
     if (!id || !this._hass) {
@@ -600,6 +615,22 @@ class StremioLibraryCard extends LitElement {
     try {
       const filteredItems = this._getFilteredItems();
 
+      // If an item is selected, show detail view instead of grid
+      if (this._selectedItem) {
+        return html`
+          <ha-card>
+            <div class="header">
+              <button class="back-button" @click=${this._closeDetail} aria-label="Back to library">
+                <ha-icon icon="mdi:arrow-left"></ha-icon>
+                Back to Library
+              </button>
+            </div>
+            ${this._renderDetailView()}
+          </ha-card>
+        `;
+      }
+
+      // Normal grid view
       return html`
         <ha-card>
           <div class="header">
@@ -655,8 +686,6 @@ class StremioLibraryCard extends LitElement {
               <div>No items found</div>
             </div>
           `}
-
-          ${this._selectedItem ? this._renderDetailOverlay() : ''}
         </ha-card>
       `;
     } catch (error) {
@@ -670,6 +699,49 @@ class StremioLibraryCard extends LitElement {
         </ha-card>
       `;
     }
+  }
+
+  _renderDetailView() {
+    const item = this._selectedItem;
+    const title = item.title || item.name || 'Unknown';
+
+    return html`
+      <div class="item-detail-view">
+        <div class="detail-header">
+          ${item.poster ? html`
+            <img class="detail-poster" src="${item.poster}" alt="${title}" />
+          ` : html`
+            <div class="detail-poster-placeholder">
+              <ha-icon icon="mdi:movie-outline"></ha-icon>
+            </div>
+          `}
+          <div class="detail-info">
+            <h3>${title}</h3>
+            <p class="detail-type">${item.type === 'series' ? 'TV Series' : 'Movie'}</p>
+            ${item.year ? html`<p class="detail-meta">Year: ${item.year}</p>` : ''}
+            ${item.progress_percent ? html`
+              <div class="detail-progress-container">
+                <p class="detail-meta">Progress: ${item.progress_percent.toFixed(0)}%</p>
+                <div class="detail-progress-bar">
+                  <div class="detail-progress-fill" style="width: ${item.progress_percent}%"></div>
+                </div>
+              </div>
+            ` : ''}
+          </div>
+        </div>
+
+        <div class="detail-actions">
+          <button class="detail-button primary" @click=${() => this._openInStremio(item)}>
+            <ha-icon icon="mdi:play"></ha-icon>
+            Open in Stremio
+          </button>
+          <button class="detail-button secondary" @click=${() => this._getStreams(item)}>
+            <ha-icon icon="mdi:format-list-bulleted"></ha-icon>
+            Get Streams
+          </button>
+        </div>
+      </div>
+    `;
   }
 
   _renderItem(item) {
@@ -698,50 +770,6 @@ class StremioLibraryCard extends LitElement {
             <div class="item-progress-fill" style="width: ${progress}%"></div>
           </div>
         ` : ''}
-      </div>
-    `;
-  }
-
-  _renderDetailOverlay() {
-    const item = this._selectedItem;
-    const title = item.title || item.name || 'Unknown';
-
-    return html`
-      <div class="item-detail-overlay" @click=${this._closeDetail}>
-        <div class="item-detail" @click=${e => e.stopPropagation()}>
-          <div class="detail-header">
-            ${item.poster ? html`
-              <img class="detail-poster" src="${item.poster}" alt="${title}" />
-            ` : ''}
-            <div class="detail-info">
-              <h3>${title}</h3>
-              <p>${item.type === 'series' ? 'TV Series' : 'Movie'}</p>
-              ${item.year ? html`<p>Year: ${item.year}</p>` : ''}
-              ${item.progress_percent ? html`<p>Progress: ${item.progress_percent.toFixed(0)}%</p>` : ''}
-            </div>
-          </div>
-
-          <div class="detail-actions">
-            <button class="detail-button primary" @click=${() => this._openInStremio(item)}>
-              <ha-icon icon="mdi:play"></ha-icon>
-              Open in Stremio
-            </button>
-            <button class="detail-button secondary" @click=${() => this._getStreams(item)}>
-              <ha-icon icon="mdi:format-list-bulleted"></ha-icon>
-              Get Streams
-            </button>
-          </div>
-
-          <div class="detail-actions">
-            <button class="detail-button secondary" @click=${() => this._openFullDetails(item)}>
-              <ha-icon icon="mdi:information-outline"></ha-icon>
-              Full Details
-            </button>
-            <button class="detail-button secondary" @click=${this._closeDetail}>
-              Close
-            </button>
-          </div>
-        </div>
       </div>
     `;
   }
