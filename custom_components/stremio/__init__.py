@@ -11,29 +11,18 @@ This integration connects to Stremio and provides:
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_EMAIL, CONF_PASSWORD, Platform
-from homeassistant.core import HomeAssistant
+from homeassistant.core import CoreState, EVENT_HOMEASSISTANT_STARTED, HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.typing import ConfigType
 
-# Try to import StaticPathConfig for modern HA versions (2024.6+)
-try:
-    from homeassistant.components.http import (  # type: ignore[import, attr-defined]
-        StaticPathConfig,
-    )
-
-    HAS_STATIC_PATH_CONFIG = True
-except ImportError:
-    HAS_STATIC_PATH_CONFIG = False
-    StaticPathConfig = None  # type: ignore[assignment, misc]
-
 from .const import DOMAIN
 from .coordinator import StremioDataUpdateCoordinator
+from .frontend import JSModuleRegistration
 from .services import async_setup_services, async_unload_services
 from .stremio_client import StremioAuthError, StremioClient, StremioConnectionError
 
@@ -49,11 +38,16 @@ PLATFORMS: list[Platform] = [
     Platform.MEDIA_PLAYER,
 ]
 
-# Frontend resources
-LOVELACE_CARD_URL = "/stremio_cards/stremio-card-bundle.js"
-LOVELACE_PLAYER_CARD_URL = "/stremio_cards/stremio-player-card.js"
-LOVELACE_LIBRARY_CARD_URL = "/stremio_cards/stremio-library-card.js"
-LOVELACE_DIALOG_URL = "/stremio_cards/stremio-stream-dialog.js"
+
+async def _async_register_frontend(hass: HomeAssistant) -> None:
+    """Register frontend modules after Home Assistant startup.
+    
+    Args:
+        hass: Home Assistant instance
+    """
+    module_register = JSModuleRegistration(hass)
+    await module_register.async_register()
+    _LOGGER.info("Stremio frontend resources registered")
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
@@ -68,109 +62,18 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """
     hass.data.setdefault(DOMAIN, {})
 
-    # Register frontend resources
-    await _async_register_frontend(hass)
+    async def _setup_frontend(_event: object = None) -> None:
+        """Set up frontend after HA is started."""
+        await _async_register_frontend(hass)
+
+    # If HA is already running, register immediately
+    if hass.state == CoreState.running:
+        await _setup_frontend()
+    else:
+        # Otherwise, wait for STARTED event
+        hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STARTED, _setup_frontend)
 
     return True
-
-
-async def _async_register_frontend(hass: HomeAssistant) -> None:
-    """Register frontend resources for Lovelace cards.
-
-    Supports multiple Home Assistant versions by attempting to use the modern
-    StaticPathConfig API (HA 2024.6+) and falling back to the legacy method.
-
-    Args:
-        hass: Home Assistant instance
-    """
-    # Get path to www folder
-    www_path = Path(__file__).parent / "www"
-
-    if not www_path.exists():
-        _LOGGER.warning("Frontend resources not found at %s", www_path)
-        return
-
-    # Register static path for card resources
-    # Try modern approach first (HA 2024.6+)
-    if HAS_STATIC_PATH_CONFIG and StaticPathConfig is not None:
-        try:
-            _LOGGER.debug(
-                "Using modern StaticPathConfig for HA 2024.6+ to register frontend resources"
-            )
-            # For modern HA versions, use async_register_static_paths
-            if hasattr(hass.http, "async_register_static_paths"):
-                await hass.http.async_register_static_paths(  # type: ignore[attr-defined]
-                    [
-                        StaticPathConfig(  # type: ignore[name-defined]
-                            url_path="/stremio_cards",
-                            path=str(www_path),
-                        )
-                    ]
-                )
-                _LOGGER.info(
-                    "Registered static path for Stremio frontend (async method)"
-                )
-            else:
-                # Fallback to sync method if available
-                if hasattr(hass.http, "register_static_path"):
-                    hass.http.register_static_path(
-                        "/stremio_cards",
-                        str(www_path),
-                    )
-                    _LOGGER.info(
-                        "Registered static path for Stremio frontend (sync method)"
-                    )
-                else:
-                    _LOGGER.warning(
-                        "No suitable static path registration method found in HA"
-                    )
-        except Exception as err:
-            _LOGGER.warning(
-                "Failed to register static path using modern method: %s, trying fallback",
-                err,
-            )
-            # Try fallback method
-            try:
-                hass.http.register_static_path(
-                    "/stremio_cards",
-                    str(www_path),
-                )
-                _LOGGER.info(
-                    "Registered static path for Stremio frontend (fallback method)"
-                )
-            except Exception as fallback_err:
-                _LOGGER.error(
-                    "Failed to register static path with both methods: %s",
-                    fallback_err,
-                )
-    else:
-        # Use legacy method for older HA versions
-        try:
-            _LOGGER.debug("Using legacy method for older Home Assistant versions")
-            hass.http.register_static_path(
-                "/stremio_cards",
-                str(www_path),
-            )
-            _LOGGER.info("Registered static path for Stremio frontend (legacy method)")
-        except Exception as err:
-            _LOGGER.error("Failed to register static path in legacy mode: %s", err)
-
-    # Register Lovelace resources
-    # This uses the frontend component's resource registration
-    hass.data.setdefault("lovelace_resources", set())
-
-    resources = [
-        LOVELACE_PLAYER_CARD_URL,
-        LOVELACE_LIBRARY_CARD_URL,
-        LOVELACE_DIALOG_URL,
-    ]
-
-    for resource_url in resources:
-        if resource_url not in hass.data["lovelace_resources"]:
-            hass.data["lovelace_resources"].add(resource_url)
-            _LOGGER.debug("Registered Lovelace resource: %s", resource_url)
-
-    _LOGGER.info("Stremio frontend resources registered")
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

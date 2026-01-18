@@ -11,11 +11,18 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from homeassistant.components.http import StaticPathConfig
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.event import async_call_later
 
-from ..const import DOMAIN, INTEGRATION_VERSION, JSMODULES, URL_BASE
+# Try to import StaticPathConfig for modern HA versions (2024.6+)
+try:
+    from homeassistant.components.http import StaticPathConfig  # type: ignore[attr-defined]
+    HAS_STATIC_PATH_CONFIG = True
+except ImportError:
+    HAS_STATIC_PATH_CONFIG = False
+    StaticPathConfig = None  # type: ignore[assignment, misc]
+
+from ..const import INTEGRATION_VERSION, JSMODULES, URL_BASE
 
 if TYPE_CHECKING:
     from homeassistant.components.lovelace import LovelaceData
@@ -58,26 +65,31 @@ class JSModuleRegistration:
         """Register the static HTTP path for serving JS files."""
         frontend_path = Path(__file__).parent
         
+        # Try modern method first (HA 2024.6+)
+        if HAS_STATIC_PATH_CONFIG and StaticPathConfig is not None:
+            try:
+                await self.hass.http.async_register_static_paths(  # type: ignore[attr-defined]
+                    [StaticPathConfig(URL_BASE, str(frontend_path), False)]
+                )
+                _LOGGER.debug(
+                    "Static path registered: %s -> %s", URL_BASE, frontend_path
+                )
+                return
+            except (RuntimeError, AttributeError) as err:
+                _LOGGER.debug("Modern registration failed: %s, trying fallback", err)
+        
+        # Fallback for older Home Assistant versions
         try:
-            await self.hass.http.async_register_static_paths(
-                [StaticPathConfig(URL_BASE, str(frontend_path), False)]
-            )
+            self.hass.http.register_static_path(URL_BASE, str(frontend_path))  # type: ignore[attr-defined]
             _LOGGER.debug(
-                "Static path registered: %s -> %s", URL_BASE, frontend_path
+                "Static path registered (legacy): %s -> %s",
+                URL_BASE,
+                frontend_path,
             )
         except RuntimeError:
             _LOGGER.debug("Static path already registered: %s", URL_BASE)
-        except AttributeError:
-            # Fallback for older Home Assistant versions
-            try:
-                self.hass.http.register_static_path(URL_BASE, str(frontend_path))
-                _LOGGER.debug(
-                    "Static path registered (legacy): %s -> %s",
-                    URL_BASE,
-                    frontend_path,
-                )
-            except Exception as err:  # noqa: BLE001
-                _LOGGER.error("Failed to register static path: %s", err)
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.error("Failed to register static path: %s", err)
 
     async def _async_wait_for_lovelace_resources(self) -> None:
         """Wait for Lovelace resources to load before registering modules."""
