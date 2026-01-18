@@ -13,7 +13,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN
+from .apple_tv_handover import HandoverError, HandoverManager
+from .const import CONF_ENABLE_APPLE_TV_HANDOVER, DOMAIN
 from .coordinator import StremioDataUpdateCoordinator
 from .entity_helpers import get_device_info
 

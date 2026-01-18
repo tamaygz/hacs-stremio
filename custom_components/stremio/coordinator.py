@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import timedelta
 import logging
+from datetime import timedelta
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
@@ -87,10 +87,10 @@ class StremioDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
             # Determine current and last watched
             if continue_watching:
-                # Sort by watched_at if available
+                # Sort by watched_at if available (numeric timestamp, 0 as default)
                 sorted_watching = sorted(
                     continue_watching,
-                    key=lambda x: x.get("watched_at", ""),
+                    key=lambda x: x.get("watched_at") or 0,
                     reverse=True,
                 )
 
