@@ -41,6 +41,8 @@ NEW_MOVIES_IDENTIFIER = "new_movies"
 NEW_SERIES_IDENTIFIER = "new_series"
 MOVIE_GENRES_IDENTIFIER = "movie_genres"
 SERIES_GENRES_IDENTIFIER = "series_genres"
+RECOMMENDED_IDENTIFIER = "recommended"
+SIMILAR_IDENTIFIER = "similar"
 
 
 async def async_get_media_source(hass: HomeAssistant) -> StremioMediaSource:
@@ -221,6 +223,12 @@ class StremioMediaSource(MediaSource):
             return self._build_movie_genres_browse()
         if identifier == SERIES_GENRES_IDENTIFIER:
             return self._build_series_genres_browse()
+        if identifier == RECOMMENDED_IDENTIFIER:
+            return await self._build_recommended_browse()
+
+        # Handle similar content browsing (similar/type/imdb_id)
+        if identifier.startswith(f"{SIMILAR_IDENTIFIER}/"):
+            return await self._build_similar_browse(identifier)
 
         # Handle genre browsing with format: movie_genres/Genre or series_genres/Genre
         if identifier.startswith(f"{MOVIE_GENRES_IDENTIFIER}/"):
@@ -260,6 +268,16 @@ class StremioMediaSource(MediaSource):
                     media_class=MediaClass.DIRECTORY,
                     media_content_type="",
                     title="Continue Watching",
+                    can_play=False,
+                    can_expand=True,
+                    thumbnail=None,
+                ),
+                BrowseMediaSource(
+                    domain=DOMAIN,
+                    identifier=RECOMMENDED_IDENTIFIER,
+                    media_class=MediaClass.DIRECTORY,
+                    media_content_type="",
+                    title="⭐ Recommended For You",
                     can_play=False,
                     can_expand=True,
                     thumbnail=None,
@@ -456,19 +474,30 @@ class StremioMediaSource(MediaSource):
         if year:
             title = f"{title} ({year})"
 
-        # Create a child that leads to streams
+        # Create children: streams and similar
         streams_identifier = f"{STREAMS_IDENTIFIER}/movie/{media_id}"
+        similar_identifier = f"{SIMILAR_IDENTIFIER}/movie/{media_id}"
         children = [
             BrowseMediaSource(
                 domain=DOMAIN,
                 identifier=streams_identifier,
                 media_class=MediaClass.DIRECTORY,
                 media_content_type=MediaType.VIDEO,
-                title="Available Streams",
+                title="▶️ Get Streams",
                 can_play=False,
                 can_expand=True,
                 thumbnail=poster,
-            )
+            ),
+            BrowseMediaSource(
+                domain=DOMAIN,
+                identifier=similar_identifier,
+                media_class=MediaClass.DIRECTORY,
+                media_content_type=MediaType.VIDEO,
+                title="🎬 Show Similar",
+                can_play=False,
+                can_expand=True,
+                thumbnail=poster,
+            ),
         ]
 
         return BrowseMediaSource(
@@ -604,21 +633,32 @@ class StremioMediaSource(MediaSource):
             ep_title = ep_data.get("title") or f"Episode {episode}"
             ep_thumbnail = ep_data.get("thumbnail") or poster
 
-            # Create streams child for the episode
+            # Create children: streams and similar (similar is based on the series)
             streams_identifier = (
                 f"{STREAMS_IDENTIFIER}/series/{media_id}/{season}/{episode}"
             )
+            similar_identifier = f"{SIMILAR_IDENTIFIER}/series/{media_id}"
             children = [
                 BrowseMediaSource(
                     domain=DOMAIN,
                     identifier=streams_identifier,
                     media_class=MediaClass.DIRECTORY,
                     media_content_type=MediaType.VIDEO,
-                    title="Available Streams",
+                    title="▶️ Get Streams",
                     can_play=False,
                     can_expand=True,
                     thumbnail=ep_thumbnail,
-                )
+                ),
+                BrowseMediaSource(
+                    domain=DOMAIN,
+                    identifier=similar_identifier,
+                    media_class=MediaClass.DIRECTORY,
+                    media_content_type=MediaType.TVSHOW,
+                    title="📺 Show Similar Series",
+                    can_play=False,
+                    can_expand=True,
+                    thumbnail=poster,
+                ),
             ]
 
             return BrowseMediaSource(
@@ -1190,6 +1230,141 @@ class StremioMediaSource(MediaSource):
             can_expand=True,
             children=children,
         )
+
+    async def _build_recommended_browse(self) -> BrowseMediaSource:
+        """Build recommended content browse view based on user's library.
+
+        Returns:
+            BrowseMediaSource with personalized recommendations
+        """
+        coordinator = self._get_coordinator()
+        if not coordinator:
+            return self._build_empty_browse(
+                RECOMMENDED_IDENTIFIER, "Recommended For You"
+            )
+
+        try:
+            client = coordinator.client
+            # Get recommendations (mix of movies and series based on library)
+            recommendations = await client.async_get_recommendations(limit=30)
+
+            children = []
+            for item in recommendations:
+                child = self._build_catalog_item(item)
+                if child:
+                    # Add recommendation reason to title if available
+                    reason = item.get("recommendation_reason")
+                    if reason and child.title:
+                        child = BrowseMediaSource(
+                            domain=child.domain,
+                            identifier=child.identifier,
+                            media_class=child.media_class,
+                            media_content_type=child.media_content_type,
+                            title=f"{child.title}",
+                            can_play=child.can_play,
+                            can_expand=child.can_expand,
+                            thumbnail=child.thumbnail,
+                        )
+                    children.append(child)
+
+            return BrowseMediaSource(
+                domain=DOMAIN,
+                identifier=RECOMMENDED_IDENTIFIER,
+                media_class=MediaClass.DIRECTORY,
+                media_content_type="",
+                title="⭐ Recommended For You",
+                can_play=False,
+                can_expand=True,
+                children=children,
+            )
+        except Exception as err:
+            _LOGGER.error("Error fetching recommendations: %s", err)
+            return self._build_empty_browse(
+                RECOMMENDED_IDENTIFIER, "Recommended For You"
+            )
+
+    async def _build_similar_browse(self, identifier: str) -> BrowseMediaSource:
+        """Build similar content browse view for a specific media item.
+
+        Args:
+            identifier: Format is similar/movie/imdb_id or similar/series/imdb_id
+
+        Returns:
+            BrowseMediaSource with similar content items
+        """
+        parts = identifier.split("/")
+        media_type = parts[1] if len(parts) > 1 else None
+        media_id = parts[2] if len(parts) > 2 else None
+
+        if not media_type or not media_id:
+            raise BrowseError("Invalid similar content identifier")
+
+        coordinator = self._get_coordinator()
+        if not coordinator:
+            return self._build_empty_browse(identifier, "Similar Content")
+
+        # Try to get source item info for better title
+        title = "Similar Content"
+        poster = None
+        library_items = coordinator.data.get("library", [])
+        source_item = next(
+            (
+                item
+                for item in library_items
+                if item.get("imdb_id") == media_id or item.get("id") == media_id
+            ),
+            None,
+        )
+
+        if source_item:
+            source_title = source_item.get("title") or source_item.get("name")
+            poster = source_item.get("poster")
+            if source_title:
+                title = f"Similar to {source_title}"
+
+        try:
+            client = coordinator.client
+            similar_items = await client.async_get_similar_content(
+                media_id=media_id, limit=20
+            )
+
+            children = []
+            for item in similar_items:
+                child = self._build_catalog_item(item)
+                if child:
+                    children.append(child)
+
+            # If no similar items found, show a message
+            if not children:
+                children.append(
+                    BrowseMediaSource(
+                        domain=DOMAIN,
+                        identifier="",
+                        media_class=MediaClass.VIDEO,
+                        media_content_type="",
+                        title="No similar content found",
+                        can_play=False,
+                        can_expand=False,
+                        thumbnail=None,
+                    )
+                )
+
+            return BrowseMediaSource(
+                domain=DOMAIN,
+                identifier=identifier,
+                media_class=MediaClass.DIRECTORY,
+                media_content_type=(
+                    MediaType.MOVIE if media_type == "movie" else MediaType.TVSHOW
+                ),
+                title=title,
+                can_play=False,
+                can_expand=True,
+                thumbnail=poster,
+                children=children,
+            )
+        except Exception as err:
+            _LOGGER.error("Error fetching similar content for %s: %s", media_id, err)
+            return self._build_empty_browse(identifier, title)
 
     async def _build_genre_content_browse(
         self, identifier: str, media_type: str
