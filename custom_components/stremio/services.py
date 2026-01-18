@@ -16,10 +16,13 @@ from homeassistant.helpers import config_validation as cv
 
 from .apple_tv_handover import HandoverError, HandoverManager
 from .const import (
+    CONF_ADDON_STREAM_ORDER,
     CONF_APPLE_TV_CREDENTIALS,
     CONF_APPLE_TV_IDENTIFIER,
     CONF_HANDOVER_METHOD,
+    CONF_STREAM_QUALITY_PREFERENCE,
     DEFAULT_HANDOVER_METHOD,
+    DEFAULT_STREAM_QUALITY_PREFERENCE,
     DOMAIN,
     EVENT_NEW_CONTENT,
     EVENT_PLAYBACK_STARTED,
@@ -219,7 +222,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
 
     async def handle_get_streams(call: ServiceCall) -> ServiceResponse:  # type: ignore[return-value]
         """Handle get_streams service call."""
-        _, client, _ = _get_entry_data(hass)
+        _, client, entry_id = _get_entry_data(hass)
 
         media_id = call.data[ATTR_MEDIA_ID]
         media_type = call.data[ATTR_MEDIA_TYPE]
@@ -242,12 +245,31 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             episode,
         )
 
+        # Get user preferences from config entry options
+        entry = hass.config_entries.async_get_entry(entry_id)
+        addon_order = None
+        quality_preference = DEFAULT_STREAM_QUALITY_PREFERENCE
+        if entry:
+            addon_order_raw = entry.options.get(CONF_ADDON_STREAM_ORDER)
+            if addon_order_raw:
+                # Parse multiline text to list
+                addon_order = [
+                    line.strip()
+                    for line in addon_order_raw.split("\n")
+                    if line.strip()
+                ]
+            quality_preference = entry.options.get(
+                CONF_STREAM_QUALITY_PREFERENCE, DEFAULT_STREAM_QUALITY_PREFERENCE
+            )
+
         try:
             streams = await client.async_get_streams(
                 media_id=media_id,
                 media_type=media_type,
                 season=season,
                 episode=episode,
+                addon_order=addon_order,
+                quality_preference=quality_preference,
             )
 
             return {

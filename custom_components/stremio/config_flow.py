@@ -15,28 +15,35 @@ from homeassistant.helpers import selector
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .const import (
+    CONF_ADDON_STREAM_ORDER,
     CONF_APPLE_TV_CREDENTIALS,
     CONF_APPLE_TV_DEVICE,
     CONF_APPLE_TV_ENTITY_ID,
     CONF_APPLE_TV_IDENTIFIER,
     CONF_AUTH_KEY,
+    CONF_DEFAULT_CATALOG_SOURCE,
     CONF_ENABLE_APPLE_TV_HANDOVER,
     CONF_HANDOVER_METHOD,
     CONF_LIBRARY_SCAN_INTERVAL,
     CONF_PLAYER_SCAN_INTERVAL,
     CONF_POLLING_GATE_ENTITIES,
     CONF_SHOW_COPY_URL,
+    CONF_STREAM_QUALITY_PREFERENCE,
+    DEFAULT_ADDON_STREAM_ORDER,
     DEFAULT_APPLE_TV_DEVICE,
     DEFAULT_APPLE_TV_ENTITY_ID,
+    DEFAULT_CATALOG_SOURCE,
     DEFAULT_ENABLE_APPLE_TV_HANDOVER,
     DEFAULT_HANDOVER_METHOD,
     DEFAULT_LIBRARY_SCAN_INTERVAL,
     DEFAULT_PLAYER_SCAN_INTERVAL,
     DEFAULT_POLLING_GATE_ENTITIES,
     DEFAULT_SHOW_COPY_URL,
+    DEFAULT_STREAM_QUALITY_PREFERENCE,
     DOMAIN,
     HANDOVER_METHOD_AIRPLAY,
     HANDOVER_METHODS,
+    STREAM_QUALITY_OPTIONS,
 )
 from .stremio_client import StremioAuthError, StremioClient, StremioConnectionError
 
@@ -259,6 +266,28 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                             CONF_SHOW_COPY_URL, DEFAULT_SHOW_COPY_URL
                         ),
                     ): bool,
+                    vol.Optional(
+                        CONF_DEFAULT_CATALOG_SOURCE,
+                        default=self._config_entry.options.get(
+                            CONF_DEFAULT_CATALOG_SOURCE, DEFAULT_CATALOG_SOURCE
+                        ),
+                    ): str,
+                    vol.Optional(
+                        CONF_ADDON_STREAM_ORDER,
+                        default=self._config_entry.options.get(
+                            CONF_ADDON_STREAM_ORDER, DEFAULT_ADDON_STREAM_ORDER
+                        ),
+                    ): selector.TextSelector(
+                        selector.TextSelectorConfig(
+                            multiline=True,
+                        ),
+                    ),
+                    vol.Optional(
+                        CONF_STREAM_QUALITY_PREFERENCE,
+                        default=self._config_entry.options.get(
+                            CONF_STREAM_QUALITY_PREFERENCE, DEFAULT_STREAM_QUALITY_PREFERENCE
+                        ),
+                    ): vol.In(STREAM_QUALITY_OPTIONS),
                 }
             ),
             errors=errors,

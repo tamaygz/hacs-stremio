@@ -23,7 +23,7 @@
     "step": {
       "init": {
         "title": "Stremio Options",
-        "description": "Configure update intervals, polling behavior, and Apple TV handover settings.",
+        "description": "Configure update intervals, polling behavior, streaming preferences, and Apple TV handover settings.",
         "data": {
           "player_scan_interval": "Player state update interval (seconds)",
           "library_scan_interval": "Library sync interval (seconds)",
@@ -32,7 +32,10 @@
           "handover_method": "Handover method",
           "apple_tv_device": "Apple TV device name (for AirPlay)",
           "apple_tv_entity_id": "Apple TV entity ID (for VLC/Direct)",
-          "show_copy_url": "Show 'Copy URL' in media browser"
+          "show_copy_url": "Show 'Copy URL' in media browser",
+          "default_catalog_source": "Default catalog source",
+          "addon_stream_order": "Stream addon order",
+          "stream_quality_preference": "Stream quality preference"
         },
         "data_description": {
           "player_scan_interval": "How often to check for player state changes (10-300 seconds)",
@@ -42,7 +45,10 @@
           "handover_method": "Method to use: 'auto' or 'airplay' (recommended, requires pyatv), 'direct' (may work for HLS). Note: VLC deep links do NOT work on tvOS!",
           "apple_tv_device": "The name of your Apple TV for AirPlay (e.g., 'Living Room Apple TV'). Required for AirPlay method.",
           "apple_tv_entity_id": "The media_player entity ID for Direct handover (e.g., 'media_player.apple_tv_living_room')",
-          "show_copy_url": "Show 'Copy URL' option when browsing streams in the media browser. Disable to reduce clutter."
+          "show_copy_url": "Show 'Copy URL' option when browsing streams in the media browser. Disable to reduce clutter.",
+          "default_catalog_source": "The addon to use for fetching metadata (e.g., 'cinemeta', 'tmdb'). Leave as 'cinemeta' for default.",
+          "addon_stream_order": "Enter addon names (one per line) in your preferred order. Streams from addons listed first will appear at the top. Leave empty to use Stremio's default order.",
+          "stream_quality_preference": "Preferred stream quality. Matching streams will be shown first. Select 'any' to show all streams without filtering."
         }
       }
     }

@@ -420,6 +420,8 @@ class StremioClient:
         media_type: str = "movie",
         season: int | None = None,
         episode: int | None = None,
+        addon_order: list[str] | None = None,
+        quality_preference: str = "any",
     ) -> list[dict[str, Any]]:
         """Get available streams for content from user's installed addons.
 
@@ -434,6 +436,8 @@ class StremioClient:
             media_type: Type of media ("movie" or "series")
             season: Season number for series
             episode: Episode number for series
+            addon_order: Optional list of addon names/IDs in preferred order
+            quality_preference: Preferred quality ("any", "4k", "1080p", "720p", "480p")
 
         Returns:
             List of stream dictionaries with keys like:
@@ -476,6 +480,14 @@ class StremioClient:
                 media_type,
             )
 
+            # Sort addons by user preference if addon_order is provided
+            if addon_order:
+                stream_addons = self._sort_addons_by_preference(stream_addons, addon_order)
+                _LOGGER.debug(
+                    "Sorted addons by user preference: %s",
+                    [a.get("name") for a in stream_addons],
+                )
+
             if not stream_addons:
                 _LOGGER.info("No stream addons found for %s %s", media_type, media_id)
                 return []
@@ -484,6 +496,15 @@ class StremioClient:
             all_streams = await self._fetch_streams_from_addons(
                 stream_addons, media_type, video_id
             )
+
+            # Filter streams by quality preference
+            if quality_preference and quality_preference != "any":
+                all_streams = self._filter_streams_by_quality(all_streams, quality_preference)
+                _LOGGER.debug(
+                    "Filtered to %d streams matching quality preference: %s",
+                    len(all_streams),
+                    quality_preference,
+                )
 
             _LOGGER.info(
                 "Found %d total streams for %s from %d addons",
@@ -570,6 +591,107 @@ class StremioClient:
                 )
 
         return stream_addons
+
+    def _sort_addons_by_preference(
+        self,
+        addons: list[dict[str, Any]],
+        addon_order: list[str],
+    ) -> list[dict[str, Any]]:
+        """Sort addons according to user preference.
+
+        Args:
+            addons: List of addon dictionaries with 'name' and 'id' keys
+            addon_order: User's preferred order (list of addon names/IDs)
+
+        Returns:
+            Sorted list of addons with preferred ones first
+        """
+        if not addon_order:
+            return addons
+
+        # Parse addon_order if it's a string (multiline text from config)
+        if isinstance(addon_order, str):
+            addon_order = [
+                line.strip()
+                for line in addon_order.split("\n")
+                if line.strip()
+            ]
+
+        # Create a mapping of addon name/id to index in preference list
+        # Lower index = higher priority
+        preference_map: dict[str, int] = {}
+        for idx, pref in enumerate(addon_order):
+            pref_lower = pref.lower()
+            preference_map[pref_lower] = idx
+
+        def get_sort_key(addon: dict[str, Any]) -> tuple[int, str]:
+            """Get sort key for addon (priority, name)."""
+            name = addon.get("name", "").lower()
+            addon_id = addon.get("id", "").lower()
+
+            # Check if addon matches any preference (by name or ID)
+            if name in preference_map:
+                return (preference_map[name], name)
+            if addon_id in preference_map:
+                return (preference_map[addon_id], name)
+
+            # Not in preference list - put at the end
+            return (len(addon_order), name)
+
+        return sorted(addons, key=get_sort_key)
+
+    def _filter_streams_by_quality(
+        self,
+        streams: list[dict[str, Any]],
+        quality_preference: str,
+    ) -> list[dict[str, Any]]:
+        """Filter and sort streams by quality preference.
+
+        Args:
+            streams: List of stream dictionaries
+            quality_preference: Desired quality ("4k", "1080p", "720p", "480p")
+
+        Returns:
+            Filtered list with matching quality streams first, then others
+        """
+        if quality_preference == "any":
+            return streams
+
+        # Quality patterns to look for (in stream name/title)
+        quality_patterns: dict[str, list[str]] = {
+            "4k": ["4k", "2160p", "uhd"],
+            "1080p": ["1080p", "1080", "fhd", "full hd"],
+            "720p": ["720p", "720", "hd"],
+            "480p": ["480p", "480", "sd"],
+        }
+
+        patterns = quality_patterns.get(quality_preference.lower(), [])
+        if not patterns:
+            return streams
+
+        def stream_matches_quality(stream: dict[str, Any]) -> bool:
+            """Check if stream matches the quality preference."""
+            # Check in name, title, and quality fields
+            searchable = " ".join([
+                str(stream.get("name", "")),
+                str(stream.get("title", "")),
+                str(stream.get("quality", "")),
+            ]).lower()
+
+            return any(pattern in searchable for pattern in patterns)
+
+        # Sort streams: matching quality first, then others
+        matching = [s for s in streams if stream_matches_quality(s)]
+        non_matching = [s for s in streams if not stream_matches_quality(s)]
+
+        _LOGGER.debug(
+            "Quality filter '%s': %d matching, %d other streams",
+            quality_preference,
+            len(matching),
+            len(non_matching),
+        )
+
+        return matching + non_matching
 
     async def _fetch_streams_from_addons(
         self,

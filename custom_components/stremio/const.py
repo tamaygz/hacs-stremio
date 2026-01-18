@@ -41,6 +41,9 @@ CONF_APPLE_TV_CREDENTIALS: Final = "apple_tv_credentials"
 CONF_APPLE_TV_IDENTIFIER: Final = "apple_tv_identifier"
 CONF_POLLING_GATE_ENTITIES: Final = "polling_gate_entities"
 CONF_SHOW_COPY_URL: Final = "show_copy_url"
+CONF_DEFAULT_CATALOG_SOURCE: Final = "default_catalog_source"
+CONF_ADDON_STREAM_ORDER: Final = "addon_stream_order"
+CONF_STREAM_QUALITY_PREFERENCE: Final = "stream_quality_preference"
 
 # Options defaults
 DEFAULT_PLAYER_SCAN_INTERVAL: Final = 30  # seconds
@@ -52,6 +55,18 @@ DEFAULT_APPLE_TV_DEVICE: Final = ""
 DEFAULT_APPLE_TV_ENTITY_ID: Final = ""
 DEFAULT_POLLING_GATE_ENTITIES: Final[list[str]] = []
 DEFAULT_SHOW_COPY_URL: Final = True  # Show "Copy URL" in media browser streams
+DEFAULT_CATALOG_SOURCE: Final = "cinemeta"  # Default metadata addon
+DEFAULT_ADDON_STREAM_ORDER: Final[list[str]] = []  # Empty = use Stremio's order
+DEFAULT_STREAM_QUALITY_PREFERENCE: Final = "any"  # any, 4k, 1080p, 720p
+
+# Stream quality options
+STREAM_QUALITY_OPTIONS: Final = ["any", "4k", "1080p", "720p", "480p"]
+
+# Catalog source options (addon IDs)
+CATALOG_SOURCE_OPTIONS: Final = {
+    "cinemeta": "Cinemeta (Default)",
+    "tmdb": "TMDB",
+}
 
 # Polling gate intervals (seconds)
 POLLING_GATE_ACTIVE_INTERVAL: Final = None  # Use configured interval
