@@ -83,7 +83,9 @@ HANDOVER_SCHEMA = vol.Schema(
         vol.Required(ATTR_DEVICE_ID): cv.entity_id,
         vol.Optional(ATTR_MEDIA_ID): cv.string,
         vol.Optional(ATTR_STREAM_URL): cv.string,
-        vol.Optional(ATTR_METHOD, default="auto"): vol.In(["auto", "airplay", "vlc"]),
+        vol.Optional(ATTR_METHOD, default="auto"): vol.In(
+            ["auto", "airplay", "vlc", "direct"]
+        ),
     }
 )
 

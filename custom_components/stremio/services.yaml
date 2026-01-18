@@ -146,7 +146,12 @@ handover_to_apple_tv:
         text:
     method:
       name: Handover Method
-      description: Method to use for handover (auto, airplay, or vlc).
+      description: >-
+        Method to use for handover:
+        - auto: Automatically select the best method based on stream format
+        - airplay: Use pyatv to stream via AirPlay (recommended, requires pyatv)
+        - direct: Send stream URL directly to Apple TV's native player
+        - vlc: Attempt VLC deep link (WARNING: does NOT work on tvOS)
       required: false
       default: "auto"
       example: "airplay"
@@ -155,4 +160,5 @@ handover_to_apple_tv:
           options:
             - "auto"
             - "airplay"
+            - "direct"
             - "vlc"

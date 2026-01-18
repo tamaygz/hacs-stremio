@@ -13,7 +13,7 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import StateType
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -169,6 +169,21 @@ class StremioSensor(CoordinatorEntity[StremioDataUpdateCoordinator], SensorEntit
         self._attr_unique_id = f"{entry.entry_id}_{description.key}"
         self._attr_has_entity_name = True
         self._attr_device_info = get_device_info(entry)
+        # Track previous value to avoid unnecessary updates
+        self._previous_value: StateType = None
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Handle updated data from the coordinator.
+
+        Only trigger a state update if the actual value has changed.
+        This prevents unnecessary frontend refreshes.
+        """
+        current_value = self.native_value
+
+        if current_value != self._previous_value:
+            self._previous_value = current_value
+            self.async_write_ha_state()
 
     @property
     def native_value(self) -> StateType:
