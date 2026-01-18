@@ -134,6 +134,8 @@ class StremioLibraryCard extends LitElement {
         cursor: pointer;
         transition: transform 0.2s ease;
         position: relative;
+        min-width: 0; /* Allow grid item to shrink smaller than content */
+        overflow: hidden; /* Contain long titles */
       }
 
       .library-item:hover {
@@ -170,7 +172,6 @@ class StremioLibraryCard extends LitElement {
         position: absolute;
         top: 0;
         left: 0;
-        display: block;
       }
 
       .item-poster-placeholder {
@@ -196,10 +197,6 @@ class StremioLibraryCard extends LitElement {
         text-overflow: ellipsis;
         white-space: nowrap;
         color: var(--primary-text-color);
-        height: var(--item-title-height, 20px);
-        line-height: var(--item-title-height, 20px);
-        flex-shrink: 0;
-        flex-grow: 0;
       }
 
       .item-title.hidden {
@@ -210,10 +207,6 @@ class StremioLibraryCard extends LitElement {
         font-size: 0.7em;
         color: var(--secondary-text-color);
         margin-top: 2px;
-        height: var(--item-year-height, 16px);
-        line-height: var(--item-year-height, 16px);
-        flex-shrink: 0;
-        flex-grow: 0;
       }
 
       .media-type-badge {
@@ -236,8 +229,6 @@ class StremioLibraryCard extends LitElement {
         border-radius: 2px;
         margin-top: 4px;
         overflow: hidden;
-        flex-shrink: 0;
-        flex-grow: 0;
       }
 
       .item-progress-fill {
