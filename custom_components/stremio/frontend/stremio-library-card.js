@@ -1166,6 +1166,7 @@ class StremioLibraryCard extends LitElement {
   _closeSimilarView() {
     this._similarItems = null;
     this._similarSourceItem = null;
+    this.requestUpdate();
   }
 
   /**

@@ -429,6 +429,10 @@ class StremioBrowseCard extends LitElement {
       'Documentary', 'Drama', 'Family', 'Fantasy', 'History', 'Horror',
       'Mystery', 'Romance', 'Sci-Fi', 'Sport', 'Thriller', 'War', 'Western'
     ];
+    
+    // Bind methods that are used as event handlers
+    this._closeSimilarView = this._closeSimilarView.bind(this);
+    this._closeDetail = this._closeDetail.bind(this);
   }
 
   setConfig(config) {

@@ -415,6 +415,9 @@ class StremioRecommendationsCard extends LitElement {
     this._loading = false;
     this._error = null;
     this._lastFetchTime = 0;
+    
+    // Bind methods that are used as event handlers
+    this._closeDetail = this._closeDetail.bind(this);
   }
 
   setConfig(config) {
