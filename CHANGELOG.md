@@ -129,7 +129,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Home Assistant 2025.1+
 - Python 3.11+
 - stremio-api>=0.1.0
-- pyatv>=0.14.0 (optional, for AirPlay)
+- pyatv>=0.16.0 (optional, for AirPlay)
 
 ---
 

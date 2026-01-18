@@ -1433,7 +1433,7 @@ async def play_on_apple_tv(
 - Requires VLC app installed on Apple TV
 - URL scheme support on tvOS is limited (may not work on all tvOS versions)
 - Less native integration than AirPlay
-  pyatv>=0.14.0 # For Apple TV AirPlay streaming
+  pyatv>=0.16.0 # For Apple TV AirPlay streaming
 
 ```
 
@@ -1581,7 +1581,7 @@ dependencies:
 **Python Library Requirements:**
 
 ```txt
-pyatv>=0.14.0  # For AirPlay streaming control
+pyatv>=0.16.0  # For AirPlay streaming control
 ```
 
 **Apple TV Requirements:**
