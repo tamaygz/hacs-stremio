@@ -7,7 +7,7 @@
  * @customElement stremio-browse-card
  * @extends LitElement
  * @version 0.4.0
- * @cacheBust 20260118c
+ * @cacheBust 20260118d
  */
 
 // Safe LitElement access - wait for HA frontend to be ready
@@ -1193,10 +1193,10 @@ class StremioBrowseCard extends LitElement {
           </div>
         ` : html`
           <div 
-            class="catalog-grid" 
+            class="catalog-grid ${this.config.horizontal_scroll ? 'horizontal' : ''}" 
             role="list"
             aria-label="Catalog items"
-            style="${gridStyle} grid-template-columns: repeat(auto-fill, minmax(${100 + (columns - 4) * 20}px, 1fr));"
+            style="${gridStyle}"
           >
             ${this._catalogItems.map(item => this._renderCatalogItem(item))}
           </div>

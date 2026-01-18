@@ -110,7 +110,7 @@ class StremioContinueWatchingCard extends LitElement {
 
       @media (max-width: 768px) {
         .items-grid {
-          grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+          grid-template-columns: repeat(var(--grid-columns, 3), 1fr);
           gap: 8px;
           padding: 12px;
         }
