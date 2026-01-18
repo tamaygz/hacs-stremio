@@ -308,6 +308,13 @@ class StremioContinueWatchingCard extends LitElement {
     const oldHass = this._hass;
     this._hass = hass;
     
+    // Load initial data if this is the first time hass is set
+    if (!oldHass && hass) {
+      this._updateContinueWatchingItems();
+      this.requestUpdate();
+      return;
+    }
+    
     // Only update if relevant entity state changed
     if (this.config?.entity) {
       const oldState = oldHass?.states?.[this.config.entity];
