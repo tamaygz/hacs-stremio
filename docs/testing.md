@@ -334,8 +334,9 @@ xdg-open htmlcov/index.html  # Linux
 - [ ] Last watched updates after stopping
 
 ### Binary Sensors
-- [ ] Is playing toggles correctly
-- [ ] Has new content detects additions
+- [ ] Is watching toggles correctly
+- [ ] Has continue watching toggles when items in progress
+- [ ] Has new episodes detects series with unwatched content
 
 ### Media Player
 - [ ] State reflects playback status
