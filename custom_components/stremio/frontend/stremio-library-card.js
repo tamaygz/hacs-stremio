@@ -584,15 +584,16 @@ class StremioLibraryCard extends LitElement {
   }
 
   _showToast(message, type = 'info') {
-    // Show HA toast notification using persistent notification
-    if (this._hass && this._hass.callService) {
-      const notificationId = `stremio_${Date.now()}`;
-      this._hass.callService('persistent_notification', 'create', {
-        notification_id: notificationId,
-        title: 'Stremio Library',
-        message: message,
-      }).catch(err => console.error('Failed to show toast:', err));
-    }
+    // Show HA toast notification using the fire event method
+    const event = new CustomEvent('hass-notification', {
+      detail: { message: message },
+      bubbles: true,
+      composed: true,
+    });
+    this.dispatchEvent(event);
+    
+    // Also log to console for debugging
+    console.log(`[Library Card] Toast: ${message}`);
   }
 
   render() {
