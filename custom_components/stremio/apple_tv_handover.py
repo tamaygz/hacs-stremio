@@ -395,7 +395,7 @@ class HandoverManager:
         to the target device (typically an Apple TV with VLC installed).
 
         Args:
-            device_entity_id: Entity ID of the target media player
+            device_entity_id: Entity ID of the target media player (e.g., media_player.apple_tv_living_room)
             stream_url: URL of the stream to play
             title: Optional title for display
             subtitle_url: Optional subtitle file URL
@@ -411,6 +411,23 @@ class HandoverManager:
             device_entity_id,
             stream_url[:100],
         )
+
+        # Validate entity_id format
+        if not device_entity_id or not device_entity_id.startswith("media_player."):
+            raise HandoverError(
+                f"Invalid entity_id '{device_entity_id}'. VLC handover requires a valid "
+                "media_player entity_id (e.g., media_player.apple_tv_living_room). "
+                "Use AirPlay method for device name based handover, or provide the "
+                "correct entity_id for VLC."
+            )
+
+        # Check if entity exists
+        state = self.hass.states.get(device_entity_id)
+        if state is None:
+            raise HandoverError(
+                f"Entity '{device_entity_id}' not found. Please check the entity_id "
+                "in Home Assistant's Entities page."
+            )
 
         try:
             vlc_url = self.generate_vlc_deep_link(stream_url, title, subtitle_url)
@@ -445,7 +462,9 @@ class HandoverManager:
         """Perform handover to Apple TV using the specified method.
 
         Args:
-            device_identifier: Device name (for AirPlay) or entity_id (for VLC)
+            device_identifier: Device name (for AirPlay) or entity_id (for VLC).
+                              For VLC, must be a valid media_player entity_id.
+                              For AirPlay, can be the Apple TV device name.
             stream_url: URL of the stream to play
             method: Handover method to use
             title: Optional title for display
@@ -488,11 +507,19 @@ class HandoverManager:
                     return result
 
             if method == HandoverMethod.VLC:
+                # For VLC, we need a valid entity_id
+                # If the device_identifier looks like a device name (not an entity_id),
+                # try to find the corresponding media_player entity
+                entity_id = device_identifier
+                if not device_identifier.startswith("media_player."):
+                    entity_id = await self._find_media_player_entity(device_identifier)
+                
                 await self.handover_via_vlc(
-                    device_identifier, stream_url, title, subtitle_url
+                    entity_id, stream_url, title, subtitle_url
                 )
                 result["success"] = True
                 result["method"] = "vlc"
+                result["entity_id"] = entity_id
                 return result
 
         except Exception as err:
@@ -500,3 +527,58 @@ class HandoverManager:
             raise
 
         return result
+
+    async def _find_media_player_entity(self, device_name: str) -> str:
+        """Find a media_player entity_id for a device name.
+
+        Searches Home Assistant's entity registry for a media_player entity
+        that matches the given device name.
+
+        Args:
+            device_name: The friendly name of the device (e.g., "Living Room Apple TV")
+
+        Returns:
+            The entity_id of the matching media_player
+
+        Raises:
+            HandoverError: If no matching entity is found
+        """
+        # Normalize the device name for comparison
+        normalized_name = device_name.lower().replace(" ", "_").replace("-", "_")
+        
+        # Search through all media_player entities
+        all_states = self.hass.states.async_all("media_player")
+        
+        for state in all_states:
+            # Check if entity_id contains the normalized device name
+            if normalized_name in state.entity_id.lower():
+                _LOGGER.debug(
+                    "Found media_player entity '%s' for device '%s'",
+                    state.entity_id,
+                    device_name,
+                )
+                return state.entity_id
+            
+            # Also check friendly name
+            friendly_name = state.attributes.get("friendly_name", "").lower()
+            if device_name.lower() in friendly_name:
+                _LOGGER.debug(
+                    "Found media_player entity '%s' by friendly name for device '%s'",
+                    state.entity_id,
+                    device_name,
+                )
+                return state.entity_id
+        
+        # If we have discovered devices, provide more helpful error
+        if device_name in self._discovered_devices:
+            raise HandoverError(
+                f"Found Apple TV '{device_name}' but could not find a matching "
+                f"media_player entity. For VLC handover, please provide the "
+                f"entity_id directly (e.g., media_player.apple_tv_living_room). "
+                f"You can find this in Home Assistant's Settings > Devices & Services > Entities."
+            )
+        
+        raise HandoverError(
+            f"Could not find a media_player entity for '{device_name}'. "
+            f"Please provide a valid entity_id (e.g., media_player.apple_tv_living_room)."
+        )
