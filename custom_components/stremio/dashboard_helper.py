@@ -375,37 +375,57 @@ async def async_create_testing_dashboard(
         HomeAssistantError: If dashboard creation fails
     """
     try:
-        from homeassistant.components import lovelace
+        from homeassistant.components.lovelace.const import (
+            LOVELACE_DATA,
+            MODE_STORAGE,
+        )
+        from homeassistant.components.lovelace import dashboard as lovelace_dashboard
+        from homeassistant.components.frontend import async_register_built_in_panel
         from homeassistant.helpers import storage
+
+        # Check if lovelace data exists
+        lovelace_data = hass.data.get(LOVELACE_DATA)
+        if not lovelace_data:
+            raise HomeAssistantError("Lovelace not initialized")
+
+        # Check if dashboard already exists in runtime
+        if DASHBOARD_URL_PATH in lovelace_data.dashboards:
+            _LOGGER.info("Dashboard already registered, updating content only")
+            dashboard_config = lovelace_data.dashboards[DASHBOARD_URL_PATH]
+            config = get_testing_dashboard_config(entity_id)
+            await dashboard_config.async_save(config)
+            _LOGGER.info("Updated existing Stremio testing dashboard")
+            return
 
         # Access the lovelace storage directly
         dashboards_store = storage.Store(
             hass, 
-            lovelace.dashboard.DASHBOARDS_STORAGE_VERSION, 
-            lovelace.dashboard.DASHBOARDS_STORAGE_KEY
+            lovelace_dashboard.DASHBOARDS_STORAGE_VERSION, 
+            lovelace_dashboard.DASHBOARDS_STORAGE_KEY
         )
         
         # Load existing dashboards
         dashboards_data = await dashboards_store.async_load() or {"items": []}
         
-        # Check if dashboard already exists
+        # Check if dashboard already exists in storage
         existing_dashboard = None
         for dashboard in dashboards_data.get("items", []):
             if dashboard.get("url_path") == DASHBOARD_URL_PATH:
                 existing_dashboard = dashboard
                 break
         
-        # Create or update dashboard metadata
+        # Create or get dashboard metadata
         if existing_dashboard:
-            _LOGGER.info("Stremio testing dashboard already exists, will update content")
+            _LOGGER.info("Found existing dashboard in storage, will register it")
             dashboard_id = existing_dashboard["id"]
+            dashboard_item = existing_dashboard
         else:
             # Generate a unique ID for the dashboard
             import uuid
             dashboard_id = str(uuid.uuid4())
             
-            # Add new dashboard to storage
-            new_dashboard = {
+            # Create dashboard item
+            dashboard_item = {
                 "id": dashboard_id,
                 "url_path": DASHBOARD_URL_PATH,
                 "title": DASHBOARD_TITLE,
@@ -413,22 +433,31 @@ async def async_create_testing_dashboard(
                 "show_in_sidebar": True,
                 "require_admin": False,
             }
-            dashboards_data.setdefault("items", []).append(new_dashboard)
+            dashboards_data.setdefault("items", []).append(dashboard_item)
             await dashboards_store.async_save(dashboards_data)
             _LOGGER.info("Created Stremio testing dashboard metadata with ID: %s", dashboard_id)
 
-        # Now create/update the dashboard content
-        config_store = storage.Store(
+        # Create the LovelaceStorage instance for this dashboard
+        storage_dashboard = lovelace_dashboard.LovelaceStorage(hass, dashboard_item)
+        
+        # Register in lovelace data
+        lovelace_data.dashboards[DASHBOARD_URL_PATH] = storage_dashboard
+
+        # Register the panel with the frontend using the proper method
+        async_register_built_in_panel(
             hass,
-            lovelace.dashboard.CONFIG_STORAGE_VERSION,
-            lovelace.dashboard.CONFIG_STORAGE_KEY.format(dashboard_id)
+            component_name="lovelace",
+            sidebar_title=DASHBOARD_TITLE,
+            sidebar_icon=DASHBOARD_ICON,
+            frontend_url_path=DASHBOARD_URL_PATH,
+            config={"mode": MODE_STORAGE},
+            require_admin=False,
         )
-        
-        # Generate the dashboard configuration
+        _LOGGER.info("Registered dashboard panel at /%s", DASHBOARD_URL_PATH)
+
+        # Now create/update the dashboard content
         config = get_testing_dashboard_config(entity_id)
-        
-        # Save the dashboard content
-        await config_store.async_save({"config": config})
+        await storage_dashboard.async_save(config)
         _LOGGER.info("Updated Stremio testing dashboard configuration")
         
         # Fire lovelace updated event to refresh the UI
