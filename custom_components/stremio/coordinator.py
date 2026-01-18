@@ -492,17 +492,24 @@ class StremioDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             user = await self._async_fetch_with_retry(
                 self.client.async_get_user, "user profile"
             )
+            _LOGGER.info("Coordinator: Fetched user profile: %s", user.get("email") if user else "None")
 
             # Fetch library items with retry
             library = await self._async_fetch_with_retry(
                 self.client.async_get_library, "library"
             )
+            _LOGGER.info("Coordinator: Fetched library items count: %d", len(library))
+            if library:
+                _LOGGER.debug("Coordinator: First library item: %s", library[0])
 
             # Fetch continue watching with retry
             continue_watching = await self._async_fetch_with_retry(
                 lambda: self.client.async_get_continue_watching(limit=10),
                 "continue watching",
             )
+            _LOGGER.info("Coordinator: Fetched continue watching count: %d", len(continue_watching))
+            if continue_watching:
+                _LOGGER.debug("Coordinator: First continue watching item: %s", continue_watching[0])
 
             # Prepare data structure
             data = {

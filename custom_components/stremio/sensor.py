@@ -275,6 +275,26 @@ class StremioSensor(CoordinatorEntity[StremioDataUpdateCoordinator], SensorEntit
         This prevents unnecessary frontend refreshes.
         """
         current_value = self.native_value
+        
+        # Log sensor data for debugging
+        if self.entity_description.key in ["library_count", "continue_watching_count"]:
+            _LOGGER.info(
+                "Sensor %s: value=%s, previous=%s, coordinator_data_keys=%s",
+                self.entity_description.key,
+                current_value,
+                self._previous_value,
+                list(self.coordinator.data.keys()) if self.coordinator.data else "None"
+            )
+            if self.entity_description.key == "library_count" and self.coordinator.data:
+                _LOGGER.info(
+                    "Sensor library_count: library items in coordinator data: %d",
+                    len(self.coordinator.data.get("library", []))
+                )
+            if self.entity_description.key == "continue_watching_count" and self.coordinator.data:
+                _LOGGER.info(
+                    "Sensor continue_watching_count: items in coordinator data: %d",
+                    len(self.coordinator.data.get("continue_watching", []))
+                )
 
         if current_value != self._previous_value:
             self._previous_value = current_value
@@ -291,5 +311,13 @@ class StremioSensor(CoordinatorEntity[StremioDataUpdateCoordinator], SensorEntit
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return the state attributes."""
         if self.coordinator.data and self.entity_description.attributes_fn:
-            return self.entity_description.attributes_fn(self.coordinator.data)
+            attrs = self.entity_description.attributes_fn(self.coordinator.data)
+            # Log attributes for debugging
+            if self.entity_description.key in ["library_count", "continue_watching_count"]:
+                _LOGGER.info(
+                    "Sensor %s: attributes items count: %d",
+                    self.entity_description.key,
+                    len(attrs.get("items", [])) if isinstance(attrs, dict) else 0
+                )
+            return attrs
         return {}
