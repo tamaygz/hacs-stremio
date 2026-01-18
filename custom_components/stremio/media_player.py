@@ -267,24 +267,31 @@ class StremioMediaPlayer(
             )
             return
 
-        # Parse the media_id to extract stream information
+        # Parse the media_id to extract stream information and media metadata
         stream_url = None
         title = None
+        media_info: dict[str, Any] = {}
 
         # Case 1: Direct HTTP(S) URL
         if media_id.startswith(("http://", "https://")):
             stream_url = media_id
             _LOGGER.debug("Direct stream URL provided: %s", stream_url[:100])
+            # For direct URLs, we have minimal info
+            media_info = {"stream_url": stream_url}
 
         # Case 2: media-source:// URI format from media browser
         elif media_id.startswith("media-source://stremio/"):
             # Format: media-source://stremio/{type}/{imdb_id}[/{season}/{episode}][#{stream_index}]
             identifier = media_id.replace("media-source://stremio/", "")
-            stream_url, title = await self._resolve_media_source_identifier(identifier)
+            stream_url, title, media_info = await self._resolve_and_build_media_info(
+                identifier
+            )
 
         # Case 3: Direct identifier format (type/imdb_id or type/imdb_id/s/e)
         elif "/" in media_id:
-            stream_url, title = await self._resolve_media_source_identifier(media_id)
+            stream_url, title, media_info = await self._resolve_and_build_media_info(
+                media_id
+            )
 
         else:
             _LOGGER.warning(
@@ -313,11 +320,15 @@ class StremioMediaPlayer(
         credentials = options.get(CONF_APPLE_TV_CREDENTIALS)
         device_identifier = options.get(CONF_APPLE_TV_IDENTIFIER)
 
+        # Use title from media_info if not set from stream resolution
+        display_title = title or media_info.get("title")
+
         _LOGGER.info(
-            "Starting Apple TV handover: device=%s, method=%s, title=%s",
+            "Starting Apple TV handover: device=%s, method=%s, title=%s, media_id=%s",
             apple_tv_entity_id,
             handover_method,
-            title,
+            display_title,
+            media_info.get("imdb_id"),
         )
 
         # Create handover manager and perform handover
@@ -332,18 +343,13 @@ class StremioMediaPlayer(
                 device_identifier=apple_tv_entity_id,
                 stream_url=stream_url,
                 method=handover_method,
-                title=title,
+                title=display_title,
             )
 
             _LOGGER.info(
                 "Apple TV handover completed: method=%s, success=%s",
                 result.get("method"),
                 result.get("success"),
-            )
-
-            # Build media info for updating coordinator
-            media_info = await self._build_media_info_from_identifier(
-                media_id, title, stream_url
             )
 
             # Update the current media on the Stremio device coordinator
