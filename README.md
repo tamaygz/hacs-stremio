@@ -74,6 +74,12 @@ A comprehensive Home Assistant Custom Component (HACS) integration that connects
 | ---------------------- | -------------------------------- |
 | `media_player.stremio` | Playback state, metadata, poster |
 
+### Media Source
+
+Browse your entire Stremio library through Home Assistant's media browser:
+
+<img src="docs/screenshots/media_browser_support.png" alt="Media Browser Support" width="100%">
+
 ---
 
 ## 🛠️ Services
@@ -106,19 +112,46 @@ data:
 
 Cards are **auto-registered** - no manual setup needed!
 
-```yaml
-# Player Card
-type: custom:stremio-player-card
-entity: media_player.stremio
+### My Library Card
 
-# Library Card
+Browse and manage your Stremio library directly in Home Assistant.
+
+```yaml
 type: custom:stremio-library-card
 title: My Library
-
-# Media Details Card
-type: custom:stremio-media-details-card
-entity: media_player.stremio
 ```
+
+<img src="docs/screenshots/card_my_library.png" alt="My Library Card" width="100%">
+
+### Continue Watching Card
+
+Keep track of shows and movies you're currently watching.
+
+```yaml
+type: custom:stremio-continue-watching-card
+```
+
+<img src="docs/screenshots/card_continue_watching.png" alt="Continue Watching Card" width="100%">
+
+### Browse Catalog Card
+
+Explore popular and recommended content from various catalogs.
+
+```yaml
+type: custom:stremio-browse-catalog-card
+```
+
+<img src="docs/screenshots/card_browse_catalog.png" alt="Browse Catalog Card" width="100%">
+
+### Recommended Media Card
+
+Get personalized media recommendations.
+
+```yaml
+type: custom:stremio-recommended-media-card
+```
+
+<img src="docs/screenshots/card_recommended_media.png" alt="Recommended Media Card" width="100%">
 
 📖 [UI Cards Guide](docs/ui.md)
 
