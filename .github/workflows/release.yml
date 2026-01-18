@@ -26,6 +26,7 @@ jobs:
 
       - name: Determine version
         id: version
+        shell: bash
         run: |
           if [ -n "${{ inputs.version }}" ]; then
             # Use the provided version
@@ -72,6 +73,12 @@ jobs:
           )
           fi
           
+          # Validate VERSION was successfully set
+          if [ -z "$VERSION" ]; then
+            echo "Error: VERSION is empty. Failing workflow." >&2
+            exit 1
+          fi
+          
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Final version to release: $VERSION"
 
@@ -82,6 +89,15 @@ jobs:
           sed -i "s|\"version\": \".*\"|\"version\": \"$VERSION\"|" custom_components/stremio/manifest.json
           cat custom_components/stremio/manifest.json
 
+      - name: Check if release already exists
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          if git ls-remote --tags origin | grep -q "refs/tags/v${VERSION}$"; then
+            echo "Error: Release tag v${VERSION} already exists. Please use a different version or delete the existing tag."
+            exit 1
+          fi
+          echo "Release tag v${VERSION} does not exist. Proceeding..."
+
       - name: Commit version update
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
@@ -91,6 +107,12 @@ jobs:
             echo "No changes to commit"
           else
             git commit -m "chore: bump version to ${{ steps.version.outputs.version }}"
+            # Pull with rebase to avoid non-fast-forward push failures
+            git pull --rebase origin "${{ github.ref_name }}" || { 
+              echo "Error: Rebase failed. This may indicate a concurrent workflow run or manual changes."
+              echo "Please resolve conflicts manually or try running the workflow again."
+              exit 1
+            }
             git push
           fi
 
@@ -100,6 +122,7 @@ jobs:
           zip -r ../stremio.zip stremio
 
       - name: Create GitHub Release
+        id: create_release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: v${{ steps.version.outputs.version }}
@@ -108,6 +131,16 @@ jobs:
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Handle release failure
+        if: failure() && steps.create_release.outcome == 'failure'
+        run: |
+          echo "⚠️ Release creation failed!"
+          echo "The version in manifest.json has been updated to ${{ steps.version.outputs.version }}"
+          echo "Please investigate the release creation failure and either:"
+          echo "  1. Manually create the release for v${{ steps.version.outputs.version }}"
+          echo "  2. Manually revert the version in manifest.json and re-run the workflow"
+          exit 1
 
       - name: Summary
         run: |
