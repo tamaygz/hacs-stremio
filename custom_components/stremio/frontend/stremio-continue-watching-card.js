@@ -772,7 +772,8 @@ class StremioContinueWatchingCard extends LitElement {
           poster: item.poster,
           imdb_id: item.imdb_id || item.id,
         },
-        streams
+        streams,
+        this.config.apple_tv_entity
       );
     } else {
       // Fallback: Create dialog directly
@@ -788,6 +789,7 @@ class StremioContinueWatchingCard extends LitElement {
         poster: item.poster,
       };
       dialog.streams = streams;
+      dialog.appleTvEntity = this.config.apple_tv_entity;
       dialog.open = true;
     }
   }

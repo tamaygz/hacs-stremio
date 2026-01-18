@@ -836,7 +836,8 @@ class StremioBrowseCard extends LitElement {
           poster: item.thumbnail,
           imdb_id: this._extractMediaId(item),
         },
-        streams
+        streams,
+        this._config.apple_tv_entity
       );
     } else {
       // Fallback: Create dialog directly
@@ -852,6 +853,7 @@ class StremioBrowseCard extends LitElement {
         poster: item.thumbnail,
       };
       dialog.streams = streams;
+      dialog.appleTvEntity = this._config.apple_tv_entity;
       dialog.open = true;
     }
   }
