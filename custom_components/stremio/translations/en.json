@@ -20,6 +20,41 @@
     }
   },
   "entity": {
+    "binary_sensor": {
+      "is_watching": {
+        "name": "Is Watching",
+        "state_attributes": {
+          "title": {
+            "name": "Title"
+          },
+          "type": {
+            "name": "Content type"
+          },
+          "progress_percent": {
+            "name": "Progress"
+          }
+        }
+      },
+      "has_continue_watching": {
+        "name": "Has Continue Watching",
+        "state_attributes": {
+          "count": {
+            "name": "Count"
+          }
+        }
+      },
+      "has_new_episodes": {
+        "name": "Has New Episodes",
+        "state_attributes": {
+          "count": {
+            "name": "Count"
+          },
+          "series": {
+            "name": "Series"
+          }
+        }
+      }
+    },
     "media_player": {
       "stremio": {
         "name": "Stremio",

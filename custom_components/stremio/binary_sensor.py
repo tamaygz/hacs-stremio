@@ -32,6 +32,38 @@ class StremioBinarySensorEntityDescription(BinarySensorEntityDescription):
     attributes_fn: Callable[[dict[str, Any]], dict[str, Any]] | None = None
 
 
+def _get_series_with_new_episodes(data: dict[str, Any]) -> list[dict[str, str]]:
+    """Get list of series that have unwatched episodes.
+
+    A series is considered to have new episodes if:
+    1. It's in the continue watching list (meaning it has been partially watched)
+    2. It's of type "series"
+
+    Args:
+        data: Coordinator data
+
+    Returns:
+        List of series with unwatched episodes (title and imdb_id)
+    """
+    continue_watching = data.get("continue_watching", [])
+    series_list = []
+    seen_ids = set()
+
+    for item in continue_watching:
+        if item.get("type") == "series":
+            imdb_id = item.get("imdb_id", "")
+            if imdb_id and imdb_id not in seen_ids:
+                seen_ids.add(imdb_id)
+                series_list.append({
+                    "title": item.get("title", "Unknown"),
+                    "imdb_id": imdb_id,
+                    "season": item.get("season"),
+                    "episode": item.get("episode"),
+                })
+
+    return series_list
+
+
 BINARY_SENSOR_TYPES: tuple[StremioBinarySensorEntityDescription, ...] = (
     StremioBinarySensorEntityDescription(
         key="is_watching",
@@ -58,6 +90,16 @@ BINARY_SENSOR_TYPES: tuple[StremioBinarySensorEntityDescription, ...] = (
         value_fn=lambda data: len(data.get("continue_watching", [])) > 0,
         attributes_fn=lambda data: {
             "count": len(data.get("continue_watching", [])),
+        },
+    ),
+    StremioBinarySensorEntityDescription(
+        key="has_new_episodes",
+        name="Has New Episodes",
+        icon="mdi:television-play",
+        value_fn=lambda data: len(_get_series_with_new_episodes(data)) > 0,
+        attributes_fn=lambda data: {
+            "count": len(_get_series_with_new_episodes(data)),
+            "series": _get_series_with_new_episodes(data),
         },
     ),
 )
