@@ -517,14 +517,14 @@ class StremioMediaSource(MediaSource):
             )
 
         # Find the season data by number
-        season_data = next(
+        current_season: dict[str, Any] = next(
             (s for s in seasons if s.get("number") == season),
             {},
         )
 
         # If episode specified, show episode detail with streams
         if episode is not None:
-            episode_list: list[dict[str, Any]] = season_data.get("episodes", [])
+            episode_list: list[dict[str, Any]] = current_season.get("episodes", [])
             ep_data: dict[str, Any] = next(
                 (e for e in episode_list if e.get("number") == episode),
                 {},
@@ -563,7 +563,7 @@ class StremioMediaSource(MediaSource):
 
         # Show episodes for specific season
         episodes = []
-        ep_list: list[dict[str, Any]] = season_data.get("episodes", [])
+        ep_list: list[dict[str, Any]] = current_season.get("episodes", [])
 
         for ep_data in ep_list:
             ep_num = ep_data.get("number", 0)
