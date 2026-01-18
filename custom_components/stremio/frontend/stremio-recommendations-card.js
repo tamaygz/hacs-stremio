@@ -179,7 +179,6 @@ class StremioRecommendationsCard extends LitElement {
         overflow: hidden;
         border-radius: 6px;
         background: var(--secondary-background-color);
-        flex-shrink: 0;
         height: 0; /* Required for padding-bottom technique to work */
       }
 
