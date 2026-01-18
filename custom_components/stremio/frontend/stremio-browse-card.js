@@ -7,7 +7,7 @@
  * @customElement stremio-browse-card
  * @extends LitElement
  * @version 0.4.0
- * @cacheBust 20260118b
+ * @cacheBust 20260118c
  */
 
 // Safe LitElement access - wait for HA frontend to be ready
@@ -114,6 +114,8 @@ class StremioBrowseCard extends LitElement {
         overflow: hidden;
         transition: transform 0.2s;
         position: relative;
+        display: flex;
+        flex-direction: column;
       }
 
       .catalog-item:hover {
@@ -126,11 +128,40 @@ class StremioBrowseCard extends LitElement {
         transform: scale(1.05);
       }
 
+      .catalog-poster-container {
+        width: 100%;
+        aspect-ratio: var(--poster-aspect-ratio, 2/3);
+        position: relative;
+        overflow: hidden;
+        border-radius: 8px 8px 0 0;
+        background: var(--secondary-background-color);
+        flex-shrink: 0;
+      }
+
       .catalog-poster {
         width: 100%;
-        aspect-ratio: 2/3;
+        height: 100%;
         object-fit: cover;
+        position: absolute;
+        top: 0;
+        left: 0;
+      }
+
+      .catalog-poster-placeholder {
+        width: 100%;
+        height: 100%;
+        position: absolute;
+        top: 0;
+        left: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
         background: var(--secondary-background-color);
+      }
+
+      .catalog-poster-placeholder ha-icon {
+        --mdc-icon-size: 32px;
+        color: var(--secondary-text-color);
       }
 
       .catalog-title {
@@ -936,6 +967,7 @@ class StremioBrowseCard extends LitElement {
         role="listitem"
         tabindex="0"
         aria-label="${item.title}"
+        style="--poster-aspect-ratio: ${this.config.poster_aspect_ratio || '2/3'}"
         @click=${() => this._handleItemClick(item)}
         @keydown=${(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
@@ -944,16 +976,20 @@ class StremioBrowseCard extends LitElement {
           }
         }}
       >
-        ${item.thumbnail ? html`
-          <img 
-            class="catalog-poster" 
-            src="${item.thumbnail}" 
-            alt="${item.title}"
-            loading="lazy"
-          />
-        ` : html`
-          <div class="catalog-poster"></div>
-        `}
+        <div class="catalog-poster-container">
+          ${item.thumbnail ? html`
+            <img 
+              class="catalog-poster" 
+              src="${item.thumbnail}" 
+              alt=""
+              loading="lazy"
+            />
+          ` : html`
+            <div class="catalog-poster-placeholder">
+              <ha-icon icon="mdi:movie-outline"></ha-icon>
+            </div>
+          `}
+        </div>
         ${this.config.show_media_type_badge ? html`
           <span class="media-type-badge ${mediaType}">${mediaType === 'series' ? 'TV' : 'Movie'}</span>
         ` : ''}
