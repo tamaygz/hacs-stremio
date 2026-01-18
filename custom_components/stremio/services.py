@@ -28,6 +28,7 @@ from .const import (
     EVENT_PLAYBACK_STARTED,
     SERVICE_ADD_TO_LIBRARY,
     SERVICE_BROWSE_CATALOG,
+    SERVICE_GET_ADDONS,
     SERVICE_GET_RECOMMENDATIONS,
     SERVICE_GET_SERIES_METADATA,
     SERVICE_GET_SIMILAR_CONTENT,
@@ -150,6 +151,9 @@ GET_SIMILAR_CONTENT_SCHEMA = vol.Schema(
         ),
     }
 )
+
+# Get addons has no required parameters
+GET_ADDONS_SCHEMA = vol.Schema({})
 
 
 def _get_entry_data(
@@ -683,6 +687,74 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         except StremioConnectionError as err:
             raise HomeAssistantError(f"Failed to get similar content: {err}") from err
 
+    async def handle_get_addons(call: ServiceCall) -> ServiceResponse:
+        """Handle get_addons service call.
+
+        Retrieves the user's configured Stremio addons with their details
+        including manifest information, transport URLs, and capabilities.
+        """
+        _, client, _ = _get_entry_data(hass)
+
+        _LOGGER.debug("Getting configured addons")
+
+        try:
+            addons = await client.async_get_addon_collection()
+
+            # Process addons to extract useful information
+            processed_addons = []
+            for addon in addons:
+                manifest = addon.get("manifest", {})
+                transport_url = addon.get("transportUrl", "")
+
+                # Extract resources (capabilities)
+                resources = manifest.get("resources", [])
+                capabilities = []
+                for resource in resources:
+                    if isinstance(resource, str):
+                        capabilities.append(resource)
+                    elif isinstance(resource, dict):
+                        capabilities.append(resource.get("name", ""))
+
+                # Extract types supported
+                types = manifest.get("types", [])
+
+                # Extract catalogs
+                catalogs = manifest.get("catalogs", [])
+                catalog_info = []
+                for catalog in catalogs:
+                    if isinstance(catalog, dict):
+                        catalog_info.append({
+                            "type": catalog.get("type"),
+                            "id": catalog.get("id"),
+                            "name": catalog.get("name"),
+                        })
+
+                processed_addon = {
+                    "id": manifest.get("id", ""),
+                    "name": manifest.get("name", "Unknown"),
+                    "version": manifest.get("version", ""),
+                    "description": manifest.get("description", ""),
+                    "logo": manifest.get("logo", ""),
+                    "background": manifest.get("background", ""),
+                    "transport_url": transport_url,
+                    "types": types,
+                    "resources": capabilities,
+                    "catalogs": catalog_info,
+                    "id_prefixes": manifest.get("idPrefixes", []),
+                    "behavior_hints": manifest.get("behaviorHints", {}),
+                }
+                processed_addons.append(processed_addon)
+
+            _LOGGER.info("Retrieved %d configured addons", len(processed_addons))
+
+            return {
+                "addons": processed_addons,
+                "count": len(processed_addons),
+            }
+
+        except StremioConnectionError as err:
+            raise HomeAssistantError(f"Failed to get addons: {err}") from err
+
     # Register services
     hass.services.async_register(
         DOMAIN,
@@ -767,6 +839,14 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         supports_response=SupportsResponse.OPTIONAL,
     )
 
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_GET_ADDONS,
+        handle_get_addons,
+        schema=GET_ADDONS_SCHEMA,
+        supports_response=SupportsResponse.OPTIONAL,
+    )
+
 
 async def async_unload_services(hass: HomeAssistant) -> None:
     """Unload Stremio services.
@@ -785,3 +865,4 @@ async def async_unload_services(hass: HomeAssistant) -> None:
     hass.services.async_remove(DOMAIN, SERVICE_GET_UPCOMING_EPISODES)
     hass.services.async_remove(DOMAIN, SERVICE_GET_RECOMMENDATIONS)
     hass.services.async_remove(DOMAIN, SERVICE_GET_SIMILAR_CONTENT)
+    hass.services.async_remove(DOMAIN, SERVICE_GET_ADDONS)

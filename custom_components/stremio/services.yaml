@@ -316,3 +316,8 @@ get_similar_content:
           min: 1
           max: 30
           mode: slider
+
+get_addons:
+  name: Get Addons
+  description: Retrieve the list of configured Stremio addons with their details including capabilities, supported types, and catalogs.
+  fields: {}

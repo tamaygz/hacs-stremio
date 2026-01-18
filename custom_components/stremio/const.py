@@ -173,6 +173,7 @@ SERVICE_BROWSE_CATALOG: Final = "browse_catalog"
 SERVICE_GET_UPCOMING_EPISODES: Final = "get_upcoming_episodes"
 SERVICE_GET_RECOMMENDATIONS: Final = "get_recommendations"
 SERVICE_GET_SIMILAR_CONTENT: Final = "get_similar_content"
+SERVICE_GET_ADDONS: Final = "get_addons"
 
 # API Constants
 API_BASE_URL: Final = "https://api.strem.io"
