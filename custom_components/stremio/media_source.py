@@ -150,8 +150,14 @@ class StremioMediaSource(MediaSource):
             return await self._build_movies_browse()
         if identifier == SERIES_IDENTIFIER:
             return await self._build_series_browse()
+
+        # Handle individual series items (series/imdb_id or series/imdb_id/season)
         if identifier.startswith(f"{SERIES_IDENTIFIER}/"):
             return await self._build_series_detail_browse(identifier)
+
+        # Handle individual movie items (movie/imdb_id)
+        if identifier.startswith("movie/"):
+            return await self._build_movie_detail_browse(identifier)
 
         raise BrowseError(f"Unknown media identifier: {identifier}")
 
@@ -312,6 +318,69 @@ class StremioMediaSource(MediaSource):
             can_play=False,
             can_expand=True,
             children=children,
+        )
+
+    async def _build_movie_detail_browse(self, identifier: str) -> BrowseMediaSource:
+        """Build movie detail view showing the movie as playable.
+
+        Args:
+            identifier: Format is movie/imdb_id
+
+        Returns:
+            BrowseMediaSource for the movie
+        """
+        parts = identifier.split("/")
+        media_id = parts[1] if len(parts) > 1 else None
+
+        if not media_id:
+            raise BrowseError("Invalid movie identifier")
+
+        coordinator = self._get_coordinator()
+        if not coordinator:
+            raise BrowseError("Stremio coordinator not available")
+
+        # Find movie in library
+        library_items = coordinator.data.get("library", [])
+        movie_item = next(
+            (
+                item
+                for item in library_items
+                if (item.get("imdb_id") == media_id or item.get("id") == media_id)
+                and item.get("type") == "movie"
+            ),
+            None,
+        )
+
+        if not movie_item:
+            # Return a placeholder for movies not in library (e.g., from search)
+            return BrowseMediaSource(
+                domain=DOMAIN,
+                identifier=identifier,
+                media_class=MediaClass.MOVIE,
+                media_content_type=MediaType.MOVIE,
+                title=f"Movie ({media_id})",
+                can_play=True,
+                can_expand=False,
+                thumbnail=None,
+            )
+
+        title = movie_item.get("title") or movie_item.get("name") or "Unknown Movie"
+        poster = movie_item.get("poster") or movie_item.get("thumbnail")
+        year = movie_item.get("year")
+        description = movie_item.get("description") or movie_item.get("overview")
+
+        if year:
+            title = f"{title} ({year})"
+
+        return BrowseMediaSource(
+            domain=DOMAIN,
+            identifier=identifier,
+            media_class=MediaClass.MOVIE,
+            media_content_type=MediaType.MOVIE,
+            title=title,
+            can_play=True,
+            can_expand=False,
+            thumbnail=poster,
         )
 
     async def _build_series_detail_browse(self, identifier: str) -> BrowseMediaSource:
