@@ -78,7 +78,9 @@ A comprehensive Home Assistant Custom Component (HACS) integration that connects
 
 Browse your entire Stremio library through Home Assistant's media browser:
 
-<img src="docs/screenshots/media_browser_support.png" alt="Media Browser Support" width="100%">
+<a href="docs/screenshots/media_browser_support.png">
+  <img src="docs/screenshots/media_browser_support.png" alt="Media Browser Support" width="600" />
+</a>
 
 ---
 
@@ -121,7 +123,9 @@ type: custom:stremio-library-card
 title: My Library
 ```
 
-<img src="docs/screenshots/card_my_library.png" alt="My Library Card" width="100%">
+<a href="docs/screenshots/card_my_library.png">
+  <img src="docs/screenshots/card_my_library.png" alt="My Library Card" width="600" />
+</a>
 
 ### Continue Watching Card
 
@@ -131,7 +135,9 @@ Keep track of shows and movies you're currently watching.
 type: custom:stremio-continue-watching-card
 ```
 
-<img src="docs/screenshots/card_continue_watching.png" alt="Continue Watching Card" width="100%">
+<a href="docs/screenshots/card_continue_watching.png">
+  <img src="docs/screenshots/card_continue_watching.png" alt="Continue Watching Card" width="600" />
+</a>
 
 ### Browse Catalog Card
 
@@ -141,7 +147,9 @@ Explore popular and recommended content from various catalogs.
 type: custom:stremio-browse-catalog-card
 ```
 
-<img src="docs/screenshots/card_browse_catalog.png" alt="Browse Catalog Card" width="100%">
+<a href="docs/screenshots/card_browse_catalog.png">
+  <img src="docs/screenshots/card_browse_catalog.png" alt="Browse Catalog Card" width="600" />
+</a>
 
 ### Recommended Media Card
 
@@ -151,7 +159,9 @@ Get personalized media recommendations.
 type: custom:stremio-recommended-media-card
 ```
 
-<img src="docs/screenshots/card_recommended_media.png" alt="Recommended Media Card" width="100%">
+<a href="docs/screenshots/card_recommended_media.png">
+  <img src="docs/screenshots/card_recommended_media.png" alt="Recommended Media Card" width="600" />
+</a>
 
 📖 [UI Cards Guide](docs/ui.md)
 
