@@ -6,44 +6,40 @@ homeassistant>=2026.1.0
 # Runtime Dependencies (from manifest.json)
 # Note: Stremio API integration is implemented natively using aiohttp
 # to avoid pydantic v2 dependency conflict with Home Assistant's pydantic v1.
-pyatv>=0.14.0
+pyatv>=0.16.0
 
 # Testing
 # Let pytest-homeassistant-custom-component control pytest and related plugin versions
 pytest-homeassistant-custom-component>=0.13.0
-pytest-cov>=4.1.0
+pytest-cov>=7.0.0
 # pytest-asyncio, pytest-aiohttp, pytest-timeout are included by pytest-homeassistant-custom-component
 
 # Async Support
-aiohttp>=3.9.0
-aioresponses>=0.7.6
-
-# Compatibility fix for acme/josepy issue
-# josepy 2.x removed ComparableX509 which acme 2.8.0 depends on
-josepy<2.0.0
+aiohttp>=3.13.0
+aioresponses>=0.7.8
 
 # Code Quality
-black>=24.0.0
-flake8>=7.0.0
-pylint>=3.0.0
-mypy>=1.8.0
-isort>=5.13.0
-ruff>=0.2.0
+black>=26.0.0
+flake8>=7.3.0
+pylint>=4.0.0
+mypy>=1.19.0
+isort>=7.0.0
+ruff>=0.14.0
 
 # Type Stubs
-types-requests>=2.31.0
+types-requests>=2.32.0
 
 # Pre-commit
-pre-commit>=3.6.0
+pre-commit>=4.5.0
 
 # Build & Package
-build>=1.0.0
-twine>=5.0.0
+build>=1.4.0
+twine>=6.0.0
 
 # Documentation
-mkdocs>=1.5.0
-mkdocs-material>=9.5.0
+mkdocs>=1.6.0
+mkdocs-material>=9.7.0
 
 # Debugging
-ipython>=8.0.0
-ipdb>=0.13.0
+ipython>=9.0.0
+ipdb>=0.13.13
