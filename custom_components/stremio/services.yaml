@@ -78,6 +78,18 @@ get_streams:
           max: 100
           mode: box
 
+get_series_metadata:
+  name: Get Series Metadata
+  description: Fetch series metadata including all seasons and episodes from Cinemeta.
+  fields:
+    media_id:
+      name: Media ID
+      description: The IMDB ID of the TV series.
+      required: true
+      example: "tt0944947"
+      selector:
+        text:
+
 add_to_library:
   name: Add to Library
   description: Add a media item to your Stremio library.
