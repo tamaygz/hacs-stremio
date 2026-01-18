@@ -1,0 +1,241 @@
+# Auto-Resume on Apple TV - Stremio Automation Example
+#
+# This set of automations offers to resume your last watched content when
+# your Apple TV turns on. It uses actionable mobile notifications to let
+# you confirm before playback starts.
+#
+# Prerequisites:
+# - Stremio integration configured with Apple TV handover enabled
+# - Apple TV integration configured in Home Assistant
+# - Mobile app with actionable notifications support (iOS/Android Companion App)
+#
+# How it works:
+# 1. When Apple TV state changes to "idle", the first automation sends a notification
+# 2. If you tap "Resume", the second automation handles the action and starts playback
+# 3. Optional: Auto-resume without notification (third automation)
+
+# Part 1: Send notification when Apple TV turns on
+alias: "Stremio: Offer Resume on Apple TV"
+description: "Send notification when Apple TV turns on and there's content to resume"
+mode: single
+
+trigger:
+  # Trigger when Apple TV goes from off/standby to idle
+  - platform: state
+    entity_id: media_player.apple_tv_living_room # Change to your Apple TV entity
+    from:
+      - "off"
+      - "standby"
+      - "unavailable"
+    to: "idle"
+
+condition:
+  # Only offer if there's something to resume
+  - condition: state
+    entity_id: binary_sensor.stremio_has_continue_watching
+    state: "on"
+  # Optional: Only during evening hours
+  - condition: time
+    after: "17:00:00"
+    before: "23:59:00"
+
+action:
+  # Get the most recent item from continue watching
+  - variables:
+      resume_item: "{{ state_attr('sensor.stremio_continue_watching', 'items')[0] }}"
+      progress: "{{ resume_item.progress_percent | round(0) }}"
+      title: "{{ resume_item.title }}"
+      media_type: "{{ resume_item.type }}"
+      season: "{{ resume_item.season | default('') }}"
+      episode: "{{ resume_item.episode | default('') }}"
+
+  # Build the message
+  - variables:
+      episode_info: >
+        {% if media_type == 'series' and season and episode %}
+        (S{{ '%02d' % season }}E{{ '%02d' % episode }})
+        {% endif %}
+
+  - service: notify.mobile_app_your_phone # Change to your notification service
+    data:
+      title: "📺 Continue Watching?"
+      message: "Resume {{ title }} {{ episode_info }}? {{ progress }}% complete"
+      data:
+        # Show poster if available
+        image: "{{ resume_item.poster }}"
+        # Notification priority
+        priority: high
+        ttl: 0
+        # Auto-dismiss after 60 seconds
+        timeout: 60
+        # Android settings
+        channel: stremio_resume
+        # iOS settings
+        push:
+          sound: default
+        # Actionable buttons
+        actions:
+          - action: STREMIO_RESUME_PLAYBACK
+            title: "▶️ Resume"
+          - action: STREMIO_DISMISS_RESUME
+            title: "Not Now"
+
+---
+# Part 2: Handle the resume action from notification
+alias: "Stremio: Handle Resume Action"
+description: "Start playback when user taps Resume in notification"
+mode: single
+
+trigger:
+  - platform: event
+    event_type: mobile_app_notification_action
+    event_data:
+      action: STREMIO_RESUME_PLAYBACK
+
+action:
+  # Get the item to resume
+  - variables:
+      resume_item: "{{ state_attr('sensor.stremio_continue_watching', 'items')[0] }}"
+
+  # Log what we're resuming
+  - service: logbook.log
+    data:
+      name: "Stremio"
+      message: "Resuming {{ resume_item.title }} on Apple TV"
+
+  # Use the Stremio handover service to start playback
+  - service: stremio.handover_to_apple_tv
+    data:
+      device_name: "Apple TV Living Room" # Or use entity_id for your Apple TV
+      media_id: "{{ resume_item.imdb_id }}"
+      # For series, include season and episode
+      season: "{{ resume_item.season | default(omit) }}"
+      episode: "{{ resume_item.episode | default(omit) }}"
+      # Resume from last position
+      resume: true
+
+---
+# Part 3: Alternative - Auto-resume without notification (use with caution!)
+alias: "Stremio: Auto Resume Playback"
+description: "Automatically resume playback when Apple TV turns on - no confirmation"
+mode: single
+
+trigger:
+  - platform: state
+    entity_id: media_player.apple_tv_living_room
+    from:
+      - "off"
+      - "standby"
+    to: "idle"
+
+condition:
+  - condition: state
+    entity_id: binary_sensor.stremio_has_continue_watching
+    state: "on"
+  # Only auto-resume in the evening
+  - condition: time
+    after: "19:00:00"
+    before: "23:00:00"
+  # Only if no one else is using the TV (optional)
+  - condition: state
+    entity_id: binary_sensor.stremio_is_watching
+    state: "off"
+
+action:
+  - variables:
+      resume_item: "{{ state_attr('sensor.stremio_continue_watching', 'items')[0] }}"
+
+  # Small delay to let the Apple TV fully initialize
+  - delay:
+      seconds: 5
+
+  - service: stremio.handover_to_apple_tv
+    data:
+      device_name: "Apple TV Living Room"
+      media_id: "{{ resume_item.imdb_id }}"
+      season: "{{ resume_item.season | default(omit) }}"
+      episode: "{{ resume_item.episode | default(omit) }}"
+      resume: true
+
+---
+# Part 4: Resume with device selection (multiple Apple TVs)
+alias: "Stremio: Resume with Room Selection"
+description: "Ask which Apple TV to resume on"
+mode: single
+
+trigger:
+  - platform: event
+    event_type: mobile_app_notification_action
+    event_data:
+      action: STREMIO_CHOOSE_ROOM
+
+action:
+  - service: notify.mobile_app_your_phone
+    data:
+      title: "🏠 Choose Room"
+      message: "Where do you want to watch?"
+      data:
+        actions:
+          - action: STREMIO_RESUME_LIVING_ROOM
+            title: "Living Room"
+          - action: STREMIO_RESUME_BEDROOM
+            title: "Bedroom"
+          - action: STREMIO_RESUME_OFFICE
+            title: "Office"
+
+---
+# Part 5: Handle room-specific resume actions
+alias: "Stremio: Resume in Living Room"
+mode: single
+trigger:
+  - platform: event
+    event_type: mobile_app_notification_action
+    event_data:
+      action: STREMIO_RESUME_LIVING_ROOM
+action:
+  - variables:
+      resume_item: "{{ state_attr('sensor.stremio_continue_watching', 'items')[0] }}"
+  - service: stremio.handover_to_apple_tv
+    data:
+      device_name: "Apple TV Living Room"
+      media_id: "{{ resume_item.imdb_id }}"
+      season: "{{ resume_item.season | default(omit) }}"
+      episode: "{{ resume_item.episode | default(omit) }}"
+      resume: true
+
+---
+alias: "Stremio: Resume in Bedroom"
+mode: single
+trigger:
+  - platform: event
+    event_type: mobile_app_notification_action
+    event_data:
+      action: STREMIO_RESUME_BEDROOM
+action:
+  - variables:
+      resume_item: "{{ state_attr('sensor.stremio_continue_watching', 'items')[0] }}"
+  - service: stremio.handover_to_apple_tv
+    data:
+      device_name: "Bedroom Apple TV"
+      media_id: "{{ resume_item.imdb_id }}"
+      season: "{{ resume_item.season | default(omit) }}"
+      episode: "{{ resume_item.episode | default(omit) }}"
+      resume: true
+
+---
+# Bonus: Dismiss tracking (optional, for analytics)
+alias: "Stremio: Track Resume Dismissals"
+description: "Track when users dismiss the resume offer"
+mode: single
+
+trigger:
+  - platform: event
+    event_type: mobile_app_notification_action
+    event_data:
+      action: STREMIO_DISMISS_RESUME
+
+action:
+  - service: logbook.log
+    data:
+      name: "Stremio"
+      message: "User dismissed resume offer for {{ state_attr('sensor.stremio_continue_watching', 'items')[0].title }}"

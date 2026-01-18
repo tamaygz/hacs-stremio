@@ -26,8 +26,10 @@ from .const import (
     DEFAULT_POLLING_GATE_ENTITIES,
     DOMAIN,
     EVENT_NEW_CONTENT,
+    EVENT_NEW_EPISODES,
     EVENT_PLAYBACK_STARTED,
     EVENT_PLAYBACK_STOPPED,
+    EVENT_RESUME_AVAILABLE,
     POLLING_GATE_IDLE_INTERVAL,
 )
 from .stremio_client import StremioAuthError, StremioClient, StremioConnectionError
@@ -64,6 +66,7 @@ class StremioDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.entry = entry
         self._previous_watching: dict[str, Any] | None = None
         self._previous_library_count: int = 0
+        self._previous_series_episodes: dict[str, tuple[int, int]] = {}  # imdb_id -> (season, episode)
         self._consecutive_failures: int = 0
         self._state_change_unsub: list[Any] = []
         self._is_polling_gated: bool = False
@@ -628,6 +631,7 @@ class StremioDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """
         current_watching = data.get("current_watching")
         library_count = data.get("library_count", 0)
+        continue_watching = data.get("continue_watching", [])
 
         # Check for playback started
         if current_watching and not self._previous_watching:
@@ -698,6 +702,138 @@ class StremioDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 },
             )
 
+        # Check for new episodes in series the user is watching
+        self._check_for_new_episodes(continue_watching)
+
+        # Fire resume_available event if there's resumable content
+        # This event is fired on every update when there's resumable content
+        # Automations can filter based on their own conditions (e.g., Apple TV turning on)
+        self._fire_resume_available_event(data)
+
         # Update previous state
         self._previous_watching = current_watching
         self._previous_library_count = library_count
+
+    def _check_for_new_episodes(self, continue_watching: list[dict[str, Any]]) -> None:
+        """Check for new episodes in series and fire event if detected.
+
+        This detects when a series the user has been watching has new episodes
+        available that they haven't seen yet.
+
+        Args:
+            continue_watching: List of continue watching items
+        """
+        new_episodes_detected: list[dict[str, Any]] = []
+        current_series_episodes: dict[str, tuple[int, int]] = {}
+
+        for item in continue_watching:
+            if item.get("type") != "series":
+                continue
+
+            imdb_id = item.get("imdb_id")
+            season = item.get("season")
+            episode = item.get("episode")
+
+            if not imdb_id or season is None or episode is None:
+                continue
+
+            current_series_episodes[imdb_id] = (season, episode)
+
+            # Check if we've seen this series before
+            if imdb_id in self._previous_series_episodes:
+                prev_season, prev_episode = self._previous_series_episodes[imdb_id]
+
+                # New episode detected if season or episode increased
+                if season > prev_season or (season == prev_season and episode > prev_episode):
+                    new_episodes_detected.append({
+                        "imdb_id": imdb_id,
+                        "title": item.get("title", "Unknown"),
+                        "previous_season": prev_season,
+                        "previous_episode": prev_episode,
+                        "new_season": season,
+                        "new_episode": episode,
+                        "episode_title": item.get("episode_title"),
+                        "poster": item.get("poster"),
+                    })
+                    _LOGGER.debug(
+                        "New episode detected for %s: S%02dE%02d -> S%02dE%02d",
+                        item.get("title"),
+                        prev_season,
+                        prev_episode,
+                        season,
+                        episode,
+                    )
+
+        # Update tracking
+        self._previous_series_episodes = current_series_episodes
+
+        # Fire event if new episodes were detected
+        if new_episodes_detected:
+            _LOGGER.info(
+                "Firing new episodes detected event for %d series",
+                len(new_episodes_detected),
+            )
+            self.hass.bus.async_fire(
+                EVENT_NEW_EPISODES,
+                {
+                    "series_count": len(new_episodes_detected),
+                    "series": new_episodes_detected,
+                },
+            )
+
+    def _fire_resume_available_event(self, data: dict[str, Any]) -> None:
+        """Fire event when resumable content is available.
+
+        This event provides information needed for "resume on device power-on"
+        automations. It fires whenever there's content that can be resumed,
+        allowing automations to react when combined with device state triggers.
+
+        Args:
+            data: Current coordinator data
+        """
+        last_watched = data.get("last_watched")
+        current_watching = data.get("current_watching")
+
+        # Use current_watching if available (most recent), otherwise last_watched
+        resume_item = current_watching or last_watched
+
+        if not resume_item:
+            return
+
+        # Only fire if there's actual progress to resume (between 1% and 95%)
+        progress_percent = resume_item.get("progress_percent", 0)
+        if not (1 < progress_percent < 95):
+            return
+
+        # Build event data
+        event_data = {
+            "media_id": resume_item.get("imdb_id"),
+            "title": resume_item.get("title"),
+            "type": resume_item.get("type", "movie"),
+            "progress_percent": progress_percent,
+            "time_offset": resume_item.get("time_offset", 0),
+            "duration": resume_item.get("duration", 0),
+            "poster": resume_item.get("poster"),
+        }
+
+        # Add series-specific info if applicable
+        if resume_item.get("type") == "series":
+            event_data.update({
+                "season": resume_item.get("season"),
+                "episode": resume_item.get("episode"),
+                "episode_title": resume_item.get("episode_title"),
+            })
+
+        # Include remaining time for display purposes
+        duration = resume_item.get("duration", 0)
+        progress = resume_item.get("progress", 0)
+        if duration > 0:
+            remaining_seconds = duration - progress
+            event_data["remaining_minutes"] = round(remaining_seconds / 60)
+
+        _LOGGER.debug(
+            "Firing resume available event: %s (%.1f%% complete)",
+            event_data.get("title"),
+            progress_percent,
+        )
+        self.hass.bus.async_fire(EVENT_RESUME_AVAILABLE, event_data)

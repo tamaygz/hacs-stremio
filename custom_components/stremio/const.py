@@ -158,6 +158,8 @@ EVENT_PLAYBACK_STARTED: Final = "stremio_playback_started"
 EVENT_PLAYBACK_STOPPED: Final = "stremio_playback_stopped"
 EVENT_NEW_CONTENT: Final = "stremio_new_content"
 EVENT_STREAM_URL: Final = "stremio_stream_url"
+EVENT_NEW_EPISODES: Final = "stremio_new_episodes_detected"
+EVENT_RESUME_AVAILABLE: Final = "stremio_resume_available"
 
 # Service Names
 SERVICE_GET_STREAMS: Final = "get_streams"
