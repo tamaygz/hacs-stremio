@@ -191,11 +191,11 @@ def mock_config_entry():
 
 
 @pytest.fixture
-def hass(event_loop):
+def hass(event_loop, tmp_path):
     """Create a Home Assistant instance for testing."""
     from homeassistant.core import HomeAssistant
 
-    hass = HomeAssistant()
+    hass = HomeAssistant(config_dir=str(tmp_path))
     hass.config.components.add("stremio")
 
     yield hass
@@ -242,9 +242,12 @@ def mock_pyatv():
 # ============================================================================
 
 
-def create_mock_entity(entity_id: str, state: str, attributes: dict = None):
+def create_mock_entity(entity_id: str, state: str, attributes: dict | None = None):
     """Create a mock entity state."""
     from homeassistant.core import State
+
+    if attributes is None:
+        attributes = {}
 
     return State(
         entity_id=entity_id,

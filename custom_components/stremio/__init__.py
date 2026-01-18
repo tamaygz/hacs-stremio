@@ -23,7 +23,9 @@ from homeassistant.helpers.typing import ConfigType
 
 # Try to import StaticPathConfig for modern HA versions (2024.6+)
 try:
-    from homeassistant.components.http import StaticPathConfig
+    from homeassistant.components.http import (  # type: ignore[import, attr-defined]
+        StaticPathConfig,
+    )
 
     HAS_STATIC_PATH_CONFIG = True
 except ImportError:
@@ -96,9 +98,9 @@ async def _async_register_frontend(hass: HomeAssistant) -> None:
             )
             # For modern HA versions, use async_register_static_paths
             if hasattr(hass.http, "async_register_static_paths"):
-                await hass.http.async_register_static_paths(
+                await hass.http.async_register_static_paths(  # type: ignore[attr-defined]
                     [
-                        StaticPathConfig(
+                        StaticPathConfig(  # type: ignore[name-defined]
                             url_path="/stremio_cards",
                             path=str(www_path),
                             cache_headers=True,

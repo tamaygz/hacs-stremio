@@ -2,15 +2,15 @@
 
 from __future__ import annotations
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 from homeassistant import config_entries
 from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
-from homeassistant.data_entry_flow import FlowResultType, AbortFlow
+from homeassistant.data_entry_flow import AbortFlow, FlowResultType
 
-from custom_components.stremio.const import DOMAIN, CONF_AUTH_KEY
 from custom_components.stremio.config_flow import ConfigFlow, OptionsFlowHandler
+from custom_components.stremio.const import CONF_AUTH_KEY, DOMAIN
 
 from .conftest import MOCK_CONFIG_ENTRY, MOCK_USER_DATA
 
@@ -23,9 +23,9 @@ async def test_form_user_step(mock_hass):
 
     result = await flow.async_step_user()
 
-    assert result["type"] == FlowResultType.FORM
-    assert result["step_id"] == "user"
-    assert result["errors"] == {}
+    assert result["type"] == FlowResultType.FORM  # type: ignore[index]
+    assert result["step_id"] == "user"  # type: ignore[index]
+    assert result["errors"] == {}  # type: ignore[index]
 
 
 @pytest.mark.asyncio
@@ -54,10 +54,10 @@ async def test_form_user_step_success(mock_hass):
     ):
         result = await flow.async_step_user(MOCK_CONFIG_ENTRY)
 
-    assert result["type"] == FlowResultType.CREATE_ENTRY
-    assert result["title"] == MOCK_CONFIG_ENTRY[CONF_EMAIL]
-    assert CONF_AUTH_KEY in result["data"]
-    assert result["data"][CONF_EMAIL] == MOCK_CONFIG_ENTRY[CONF_EMAIL]
+    assert result["type"] == FlowResultType.CREATE_ENTRY  # type: ignore[index]
+    assert result["title"] == MOCK_CONFIG_ENTRY[CONF_EMAIL]  # type: ignore[index]
+    assert CONF_AUTH_KEY in result["data"]  # type: ignore[index]
+    assert result["data"][CONF_EMAIL] == MOCK_CONFIG_ENTRY[CONF_EMAIL]  # type: ignore[index]
 
 
 @pytest.mark.asyncio
@@ -78,8 +78,8 @@ async def test_form_user_step_invalid_auth(mock_hass):
     ):
         result = await flow.async_step_user(MOCK_CONFIG_ENTRY)
 
-    assert result["type"] == FlowResultType.FORM
-    assert result["errors"]["base"] == "invalid_auth"
+    assert result["type"] == FlowResultType.FORM  # type: ignore[index]
+    assert result["errors"]["base"] == "invalid_auth"  # type: ignore[index]
 
 
 @pytest.mark.asyncio
@@ -100,8 +100,8 @@ async def test_form_user_step_connection_error(mock_hass):
     ):
         result = await flow.async_step_user(MOCK_CONFIG_ENTRY)
 
-    assert result["type"] == FlowResultType.FORM
-    assert result["errors"]["base"] == "cannot_connect"
+    assert result["type"] == FlowResultType.FORM  # type: ignore[index]
+    assert result["errors"]["base"] == "cannot_connect"  # type: ignore[index]
 
 
 @pytest.mark.asyncio
@@ -122,9 +122,9 @@ async def test_form_user_step_no_auth_key(mock_hass):
     ):
         result = await flow.async_step_user(MOCK_CONFIG_ENTRY)
 
-    assert result["type"] == FlowResultType.FORM
+    assert result["type"] == FlowResultType.FORM  # type: ignore[index]
     # Should get invalid_auth error since no auth key means authentication failed
-    assert result["errors"]["base"] in ["invalid_auth", "cannot_connect"]
+    assert result["errors"]["base"] in ["invalid_auth", "cannot_connect"]  # type: ignore[index]
 
 
 @pytest.mark.asyncio
@@ -135,8 +135,8 @@ async def test_options_flow_init(mock_hass, mock_config_entry):
 
     result = await options_flow.async_step_init()
 
-    assert result["type"] == FlowResultType.FORM
-    assert result["step_id"] == "init"
+    assert result["type"] == FlowResultType.FORM  # type: ignore[index]
+    assert result["step_id"] == "init"  # type: ignore[index]
 
 
 @pytest.mark.asyncio
@@ -154,8 +154,8 @@ async def test_options_flow_update(mock_hass, mock_config_entry):
 
     result = await options_flow.async_step_init(new_options)
 
-    assert result["type"] == FlowResultType.CREATE_ENTRY
-    assert result["data"] == new_options
+    assert result["type"] == FlowResultType.CREATE_ENTRY  # type: ignore[index]
+    assert result["data"] == new_options  # type: ignore[index]
 
 
 @pytest.mark.asyncio
