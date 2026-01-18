@@ -563,9 +563,9 @@ class StremioMediaSource(MediaSource):
 
         # Show episodes for specific season
         episodes = []
-        episode_list: list[dict[str, Any]] = season_data.get("episodes", [])
+        ep_list: list[dict[str, Any]] = season_data.get("episodes", [])
 
-        for ep_data in episode_list:
+        for ep_data in ep_list:
             ep_num = ep_data.get("number", 0)
             ep_title = ep_data.get("title") or f"Episode {ep_num}"
             ep_identifier = f"{SERIES_IDENTIFIER}/{media_id}/{season}/{ep_num}"
