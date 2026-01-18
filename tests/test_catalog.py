@@ -173,3 +173,34 @@ async def test_async_get_catalog_with_pagination(mock_catalog_response):
         
         # Verify pagination was applied
         assert len(result) <= 10
+
+
+@pytest.mark.asyncio
+async def test_browse_catalog_service():
+    """Test browse_catalog service integration."""
+    # This test would require more setup with Home Assistant service infrastructure
+    # For now, we'll test the client methods that the service uses
+    client = StremioClient("test@example.com", "fake_auth_key")
+    
+    mock_response = {
+        "metas": [
+            {
+                "id": "tt0111161",
+                "type": "movie",
+                "name": "The Shawshank Redemption",
+                "poster": "https://example.com/poster1.jpg",
+            }
+        ]
+    }
+    
+    with patch.object(client, '_get_session') as mock_session:
+        mock_resp = AsyncMock()
+        mock_resp.status = 200
+        mock_resp.json = AsyncMock(return_value=mock_response)
+        
+        mock_session.return_value.__aenter__.return_value.get.return_value.__aenter__.return_value = mock_resp
+        
+        # Test browsing movies
+        movies = await client.async_get_popular_movies(genre="Drama", limit=20)
+        assert len(movies) == 1
+        assert movies[0]["title"] == "The Shawshank Redemption"
