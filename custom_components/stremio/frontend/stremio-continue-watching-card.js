@@ -596,23 +596,31 @@ class StremioContinueWatchingCard extends LitElement {
       .then((response) => {
         console.log('[Continue Watching Card] Streams response:', response);
         
-        if (response && response.response && response.response.streams) {
-          const streams = response.response.streams;
+        // Handle different response formats:
+        // HA 2024+: { context: {...}, response: { streams: [...] } }
+        // Some versions: { context: {...}, streams: [...] }
+        // Direct return: { streams: [...] }
+        let streams = null;
+        
+        if (response?.response?.streams) {
+          // Format: { response: { streams: [...] } }
+          streams = response.response.streams;
+        } else if (response?.streams) {
+          // Format: { streams: [...] } (direct)
+          streams = response.streams;
+        }
+        
+        if (streams && streams.length > 0) {
           console.log('[Continue Watching Card] Found', streams.length, 'streams');
-          
-          if (streams.length > 0) {
-            // Show the stream dialog
-            const displayItem = { ...item };
-            if (season && episode) {
-              displayItem.title = `${item.title || item.name} - S${season}E${episode}`;
-            }
-            this._showStreamDialog(displayItem, streams);
-          } else {
-            this._showToast('No streams found for this title');
+          // Show the stream dialog
+          const displayItem = { ...item };
+          if (season && episode) {
+            displayItem.title = `${item.title || item.name} - S${season}E${episode}`;
           }
+          this._showStreamDialog(displayItem, streams);
         } else {
-          console.log('[Continue Watching Card] Unexpected response format:', response);
-          this._showToast('No streams found');
+          console.log('[Continue Watching Card] No streams in response:', response);
+          this._showToast('No streams found for this title');
         }
       })
       .catch((error) => {
