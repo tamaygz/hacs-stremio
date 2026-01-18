@@ -113,7 +113,10 @@ class HandoverManager:
             return False, "Stream URL is empty"
 
         if not url.startswith(("http://", "https://")):
-            return False, f"Invalid URL scheme. Expected http:// or https://, got: {url[:50]}"
+            return (
+                False,
+                f"Invalid URL scheme. Expected http:// or https://, got: {url[:50]}",
+            )
 
         # Check for common problematic patterns
         if "localhost" in url or "127.0.0.1" in url:
@@ -714,9 +717,20 @@ class HandoverManager:
                     _LOGGER.warning("AirPlay unavailable, falling back to direct")
                     method = HandoverMethod.DIRECT
                 else:
-                    await self.handover_via_airplay(
-                        device_identifier, stream_url, title
-                    )
+                    # AirPlay needs device name, not entity_id
+                    # Convert entity_id to device name if needed
+                    device_name = device_identifier
+                    if device_identifier.startswith("media_player."):
+                        device_name = await self._entity_id_to_device_name(
+                            device_identifier
+                        )
+                        _LOGGER.debug(
+                            "Converted entity_id '%s' to device name '%s' for AirPlay",
+                            device_identifier,
+                            device_name,
+                        )
+
+                    await self.handover_via_airplay(device_name, stream_url, title)
                     result["success"] = True
                     result["method"] = "airplay"
                     return result
@@ -758,7 +772,9 @@ class HandoverManager:
                                         "friendly_name", device_identifier
                                     )
 
-                            await self.handover_via_airplay(device_name, stream_url, title)
+                            await self.handover_via_airplay(
+                                device_name, stream_url, title
+                            )
                             result["success"] = True
                             result["method"] = "airplay"
                             result["fallback"] = True
@@ -839,4 +855,135 @@ class HandoverManager:
         raise HandoverError(
             f"Could not find a media_player entity for '{device_name}'. "
             f"Please provide a valid entity_id (e.g., media_player.apple_tv_living_room)."
+        )
+
+    async def _entity_id_to_device_name(self, entity_id: str) -> str:
+        """Convert a media_player entity_id to an Apple TV device name.
+
+        For AirPlay handover, we need the actual device name (e.g., "Kartoffel TV (2)")
+        rather than the Home Assistant entity_id (e.g., "media_player.kartoffel_tv").
+
+        This method:
+        1. Gets the friendly_name from the entity state
+        2. Discovers Apple TV devices on the network
+        3. Finds a matching device by comparing names (fuzzy match)
+
+        Args:
+            entity_id: The Home Assistant entity_id (e.g., "media_player.kartoffel_tv")
+
+        Returns:
+            The Apple TV device name for pyatv
+
+        Raises:
+            HandoverError: If no matching device is found
+        """
+        # Get the entity's friendly name
+        state = self.hass.states.get(entity_id)
+        friendly_name = ""
+        if state:
+            friendly_name = state.attributes.get("friendly_name", "")
+            _LOGGER.debug(
+                "Entity '%s' has friendly_name: '%s'", entity_id, friendly_name
+            )
+
+        # Discover devices if not already done
+        if not self._discovered_devices:
+            await self.discover_apple_tv_devices()
+
+        if not self._discovered_devices:
+            raise HandoverError(
+                f"No Apple TV devices discovered on the network. "
+                f"Cannot convert entity_id '{entity_id}' to device name."
+            )
+
+        # Try to find a matching device
+        # 1. First try exact match with friendly_name
+        if friendly_name and friendly_name in self._discovered_devices:
+            _LOGGER.debug("Exact match found for friendly_name '%s'", friendly_name)
+            return friendly_name
+
+        # 2. Try fuzzy matching - normalize both names and compare
+        def normalize(name: str) -> str:
+            """Normalize a name for comparison."""
+            return (
+                name.lower()
+                .replace(" ", "")
+                .replace("-", "")
+                .replace("_", "")
+                .replace("(", "")
+                .replace(")", "")
+                .replace("'", "")
+            )
+
+        # Extract base name from entity_id (e.g., "kartoffel_tv" from "media_player.kartoffel_tv")
+        entity_base = entity_id.replace("media_player.", "")
+        normalized_entity = normalize(entity_base)
+        normalized_friendly = normalize(friendly_name) if friendly_name else ""
+
+        best_match = None
+        best_score = 0
+
+        for device_name in self._discovered_devices:
+            normalized_device = normalize(device_name)
+
+            # Check various match conditions
+            score = 0
+
+            # Exact normalized match with friendly name
+            if normalized_friendly and normalized_device == normalized_friendly:
+                score = 100
+
+            # Exact normalized match with entity base name
+            elif normalized_device == normalized_entity:
+                score = 90
+
+            # Friendly name contains device name or vice versa
+            elif normalized_friendly and (
+                normalized_friendly in normalized_device
+                or normalized_device in normalized_friendly
+            ):
+                score = 80
+
+            # Entity base name in device name or vice versa
+            elif (
+                normalized_entity in normalized_device
+                or normalized_device in normalized_entity
+            ):
+                score = 70
+
+            # Partial word match
+            else:
+                entity_words = set(entity_base.lower().replace("_", " ").split())
+                device_words = set(device_name.lower().split())
+                common_words = entity_words & device_words
+                if common_words:
+                    score = len(common_words) * 20
+
+            if score > best_score:
+                best_score = score
+                best_match = device_name
+                _LOGGER.debug(
+                    "New best match: '%s' with score %d (entity: '%s', friendly: '%s')",
+                    device_name,
+                    score,
+                    entity_base,
+                    friendly_name,
+                )
+
+        if best_match and best_score >= 40:
+            _LOGGER.info(
+                "Mapped entity_id '%s' to device name '%s' (score: %d)",
+                entity_id,
+                best_match,
+                best_score,
+            )
+            return best_match
+
+        # No match found - provide helpful error
+        available_devices = ", ".join(f"'{name}'" for name in self._discovered_devices)
+        raise HandoverError(
+            f"Could not find Apple TV device matching entity '{entity_id}' "
+            f"(friendly_name: '{friendly_name}'). "
+            f"Available devices: {available_devices}. "
+            f"Try configuring the Apple TV device name in the integration options."
         )

@@ -128,7 +128,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
 
     async def handle_search_library(call: ServiceCall) -> ServiceResponse:  # type: ignore[return-value]
         """Handle search_library service call."""
-        coordinator, client = _get_entry_data(hass)
+        coordinator, _, _ = _get_entry_data(hass)
 
         query = call.data[ATTR_QUERY]
         search_type = call.data.get(ATTR_SEARCH_TYPE, "all")
@@ -192,7 +192,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
 
     async def handle_get_streams(call: ServiceCall) -> ServiceResponse:  # type: ignore[return-value]
         """Handle get_streams service call."""
-        _, client = _get_entry_data(hass)
+        _, client, _ = _get_entry_data(hass)
 
         media_id = call.data[ATTR_MEDIA_ID]
         media_type = call.data[ATTR_MEDIA_TYPE]
