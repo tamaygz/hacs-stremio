@@ -208,12 +208,35 @@ class StremioPlayerCard extends LitElement {
   }
 
   set hass(hass) {
+    const oldHass = this._hass;
     this._hass = hass;
-    this._updateMediaInfo();
+    
+    // Only update if entity state actually changed
+    if (this.config?.entity) {
+      const oldState = oldHass?.states?.[this.config.entity];
+      const newState = hass?.states?.[this.config.entity];
+      
+      if (oldState !== newState) {
+        this._updateMediaInfo();
+        this.requestUpdate();
+      }
+    }
   }
 
   get hass() {
     return this._hass;
+  }
+
+  // Optimize re-renders - only update when relevant properties change
+  shouldUpdate(changedProps) {
+    if (changedProps.has('config')) {
+      return true;
+    }
+    if (changedProps.has('_mediaInfo')) {
+      return true;
+    }
+    // hass changes are handled in the setter
+    return false;
   }
 
   _updateMediaInfo() {
@@ -288,26 +311,38 @@ class StremioPlayerCard extends LitElement {
   }
 
   render() {
-    if (!this._hass) {
-      return html`<ha-card><div class="card-content">Loading...</div></ha-card>`;
+    try {
+      if (!this._hass) {
+        return html`<ha-card><div class="card-content">Loading...</div></ha-card>`;
+      }
+
+      const isPlaying = this._mediaInfo?.state === 'playing';
+      const hasMedia = this._mediaInfo && this._mediaInfo.state !== 'idle' && this._mediaInfo.state !== 'unavailable';
+
+      return html`
+        <ha-card>
+          ${hasMedia ? html`
+            <span class="status-badge" role="status" aria-live="polite">${isPlaying ? 'Playing' : 'Paused'}</span>
+          ` : html`
+            <span class="status-badge idle" role="status">Idle</span>
+          `}
+          
+          <div class="card-content">
+            ${hasMedia ? this._renderPlaying() : this._renderIdle()}
+          </div>
+        </ha-card>
+      `;
+    } catch (error) {
+      console.error('Stremio Player Card render error:', error);
+      return html`
+        <ha-card>
+          <div class="card-content" style="color: var(--error-color);">
+            <ha-icon icon="mdi:alert"></ha-icon>
+            Error rendering card: ${error.message}
+          </div>
+        </ha-card>
+      `;
     }
-
-    const isPlaying = this._mediaInfo?.state === 'playing';
-    const hasMedia = this._mediaInfo && this._mediaInfo.state !== 'idle' && this._mediaInfo.state !== 'unavailable';
-
-    return html`
-      <ha-card>
-        ${hasMedia ? html`
-          <span class="status-badge">${isPlaying ? 'Playing' : 'Paused'}</span>
-        ` : html`
-          <span class="status-badge idle">Idle</span>
-        `}
-        
-        <div class="card-content">
-          ${hasMedia ? this._renderPlaying() : this._renderIdle()}
-        </div>
-      </ha-card>
-    `;
   }
 
   _renderIdle() {
@@ -353,8 +388,12 @@ class StremioPlayerCard extends LitElement {
           ` : ''}
 
           ${this.config.show_actions ? html`
-            <div class="actions">
-              <button class="action-button" @click="${this._openInStremio}">
+            <div class="actions" role="group" aria-label="Media actions">
+              <button 
+                class="action-button" 
+                @click="${this._openInStremio}"
+                aria-label="Open ${m.title} in Stremio app"
+              >
                 <ha-icon icon="mdi:open-in-new"></ha-icon>
                 Open in Stremio
               </button>
@@ -367,6 +406,16 @@ class StremioPlayerCard extends LitElement {
 
   getCardSize() {
     return 3;
+  }
+
+  // Grid sizing for sections view (HA 2024.8+)
+  getGridOptions() {
+    return {
+      rows: 3,
+      columns: 6,
+      min_rows: 2,
+      min_columns: 3,
+    };
   }
 
   static getConfigElement() {
@@ -383,7 +432,10 @@ class StremioPlayerCard extends LitElement {
   }
 }
 
-customElements.define('stremio-player-card', StremioPlayerCard);
+// Guard against duplicate registration
+if (!customElements.get('stremio-player-card')) {
+  customElements.define('stremio-player-card', StremioPlayerCard);
+}
 
 // Editor for visual configuration
 class StremioPlayerCardEditor extends LitElement {
@@ -471,8 +523,11 @@ class StremioPlayerCardEditor extends LitElement {
         ...this._config,
         [configValue]: value,
       };
+      // Dispatch config-changed with bubbles and composed for HA compatibility
       this.dispatchEvent(
         new CustomEvent('config-changed', {
+          bubbles: true,
+          composed: true,
           detail: { config: this._config },
         })
       );
@@ -496,4 +551,7 @@ class StremioPlayerCardEditor extends LitElement {
   }
 }
 
-customElements.define('stremio-player-card-editor', StremioPlayerCardEditor);
+// Guard against duplicate registration
+if (!customElements.get('stremio-player-card-editor')) {
+  customElements.define('stremio-player-card-editor', StremioPlayerCardEditor);
+}

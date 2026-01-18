@@ -290,12 +290,34 @@ class StremioLibraryCard extends LitElement {
   }
 
   set hass(hass) {
+    const oldHass = this._hass;
     this._hass = hass;
-    this._updateLibraryItems();
+    
+    // Only update if relevant entity state changed
+    if (this.config?.entity) {
+      const oldState = oldHass?.states?.[this.config.entity];
+      const newState = hass?.states?.[this.config.entity];
+      
+      if (oldState !== newState) {
+        this._updateLibraryItems();
+        this.requestUpdate();
+      }
+    }
   }
 
   get hass() {
     return this._hass;
+  }
+
+  // Optimize re-renders
+  shouldUpdate(changedProps) {
+    if (changedProps.has('config')) return true;
+    if (changedProps.has('_searchQuery')) return true;
+    if (changedProps.has('_filterType')) return true;
+    if (changedProps.has('_sortBy')) return true;
+    if (changedProps.has('_libraryItems')) return true;
+    if (changedProps.has('_selectedItem')) return true;
+    return false;
   }
 
   _updateLibraryItems() {
@@ -577,6 +599,16 @@ class StremioLibraryCard extends LitElement {
     return 4;
   }
 
+  // Grid sizing for sections view (HA 2024.8+)
+  getGridOptions() {
+    return {
+      rows: 6,
+      columns: 6,
+      min_rows: 4,
+      min_columns: 3,
+    };
+  }
+
   static getConfigElement() {
     return document.createElement('stremio-library-card-editor');
   }
@@ -591,7 +623,10 @@ class StremioLibraryCard extends LitElement {
   }
 }
 
-customElements.define('stremio-library-card', StremioLibraryCard);
+// Guard against duplicate registration
+if (!customElements.get('stremio-library-card')) {
+  customElements.define('stremio-library-card', StremioLibraryCard);
+}
 
 // Editor
 class StremioLibraryCardEditor extends LitElement {
@@ -642,8 +677,13 @@ class StremioLibraryCardEditor extends LitElement {
 
     if (configValue) {
       this._config = { ...this._config, [configValue]: value };
+      // Dispatch config-changed with bubbles and composed for HA compatibility
       this.dispatchEvent(
-        new CustomEvent('config-changed', { detail: { config: this._config } })
+        new CustomEvent('config-changed', {
+          bubbles: true,
+          composed: true,
+          detail: { config: this._config },
+        })
       );
     }
   }
@@ -660,4 +700,7 @@ class StremioLibraryCardEditor extends LitElement {
   }
 }
 
-customElements.define('stremio-library-card-editor', StremioLibraryCardEditor);
+// Guard against duplicate registration
+if (!customElements.get('stremio-library-card-editor')) {
+  customElements.define('stremio-library-card-editor', StremioLibraryCardEditor);
+}

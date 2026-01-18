@@ -406,6 +406,16 @@ class StremioMediaDetailsCard extends LitElement {
     return 6;
   }
 
+  // Grid sizing for sections view (HA 2024.8+)
+  getGridOptions() {
+    return {
+      rows: 6,
+      columns: 6,
+      min_rows: 4,
+      min_columns: 3,
+    };
+  }
+
   static getConfigElement() {
     return document.createElement('stremio-media-details-card-editor');
   }
@@ -419,9 +429,28 @@ class StremioMediaDetailsCard extends LitElement {
     };
   }
 
+  // Optimize re-renders
+  shouldUpdate(changedProps) {
+    if (changedProps.has('config')) return true;
+    if (changedProps.has('_media')) return true;
+    if (changedProps.has('_loading')) return true;
+    if (changedProps.has('_showStreamDialog')) return true;
+    if (changedProps.has('_expanded')) return true;
+    
+    // For hass, only update if relevant entity changed
+    if (changedProps.has('hass') && this.config?.entity) {
+      const oldHass = changedProps.get('hass');
+      const oldState = oldHass?.states?.[this.config.entity];
+      const newState = this.hass?.states?.[this.config.entity];
+      return oldState !== newState;
+    }
+    
+    return false;
+  }
+
   updated(changedProps) {
     super.updated(changedProps);
-    if (changedProps.has('hass')) {
+    if (changedProps.has('hass') || changedProps.has('config')) {
       this._updateMedia();
     }
   }
@@ -854,28 +883,21 @@ class StremioMediaDetailsCardEditor extends LitElement {
       [configValue]: value,
     };
     
+    // Dispatch config-changed with bubbles and composed for HA compatibility
     this.dispatchEvent(new CustomEvent('config-changed', {
-      detail: { config: newConfig }
+      bubbles: true,
+      composed: true,
+      detail: { config: newConfig },
     }));
   }
 }
 
-// Register elements
-customElements.define('stremio-media-details-card', StremioMediaDetailsCard);
-customElements.define('stremio-media-details-card-editor', StremioMediaDetailsCardEditor);
+// Register elements (guard against duplicate registration)
+if (!customElements.get('stremio-media-details-card')) {
+  customElements.define('stremio-media-details-card', StremioMediaDetailsCard);
+}
+if (!customElements.get('stremio-media-details-card-editor')) {
+  customElements.define('stremio-media-details-card-editor', StremioMediaDetailsCardEditor);
+}
 
-// Register card info
-window.customCards = window.customCards || [];
-window.customCards.push({
-  type: 'stremio-media-details-card',
-  name: 'Stremio Media Details',
-  description: 'Display full media metadata with actions',
-  preview: true,
-  documentationURL: 'https://github.com/yourusername/hacs-stremio/blob/main/docs/ui.md',
-});
-
-console.info(
-  '%c STREMIO-MEDIA-DETAILS-CARD %c v1.0.0 ',
-  'color: white; background: #8458b3; font-weight: bold;',
-  'color: #8458b3; background: white; font-weight: bold;'
-);
+// Note: Card info is registered in stremio-card-bundle.js to avoid duplicates

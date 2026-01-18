@@ -294,9 +294,18 @@ class StremioStreamDialog extends LitElement {
 
   _showCopied(index) {
     this._copiedIndex = index;
-    setTimeout(() => {
+    // Store timeout ID for cleanup
+    this._copiedTimeout = setTimeout(() => {
       this._copiedIndex = -1;
     }, 2000);
+  }
+
+  // Lifecycle: cleanup timers when element is removed
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    if (this._copiedTimeout) {
+      clearTimeout(this._copiedTimeout);
+    }
   }
 
   _fireUrlEvent(url) {
@@ -453,7 +462,10 @@ class StremioStreamDialog extends LitElement {
   }
 }
 
-customElements.define('stremio-stream-dialog', StremioStreamDialog);
+// Guard against duplicate registration
+if (!customElements.get('stremio-stream-dialog')) {
+  customElements.define('stremio-stream-dialog', StremioStreamDialog);
+}
 
 // Global helper to open the dialog
 window.StremioStreamDialog = {
