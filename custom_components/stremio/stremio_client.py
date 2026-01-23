@@ -383,12 +383,12 @@ class StremioClient:
                 if not isinstance(library_items, list):
                     library_items = []
 
-                # Filter items with watch progress (timeWatched > 0)
+                # Filter items with timeOffset > 0 (indicating in-progress watching)
                 watching = [
                     item
                     for item in library_items
                     if isinstance(item, dict)
-                    and item.get("state", {}).get("timeWatched", 0) > 0
+                    and item.get("state", {}).get("timeOffset", 0) > 0
                 ]
 
                 # Sort by most recently watched and limit
@@ -1138,13 +1138,21 @@ class StremioClient:
                         season = int(parts[1]) if parts[1].isdigit() else None
                         episode = int(parts[2]) if parts[2].isdigit() else None
 
+                # Calculate progress percentage if timeOffset and duration are available
+                timeOffset = state.get("timeOffset", 0)
+                duration = state.get("duration", 0)
+                if timeOffset > 0 and duration > 0:
+                    progress = (timeOffset / duration) * 100.0
+                else:
+                    progress = 0.0
+
                 processed_item = {
                     "id": _id,
                     "imdb_id": imdb_id,
                     "title": name,
                     "type": item_type,
                     "poster": item.get("poster"),
-                    "progress": state.get("timeWatched", 0),
+                    "progress": progress,
                     "duration": state.get("duration", 0),
                     "season": season,
                     "episode": episode,
@@ -1739,9 +1747,9 @@ class StremioClient:
                                 and item_id not in library_ids
                                 and item_id not in seen_ids
                             ):
-                                movie["recommendation_reason"] = (
-                                    f"Based on your interest in {genre}"
-                                )
+                                movie[
+                                    "recommendation_reason"
+                                ] = f"Based on your interest in {genre}"
                                 recommendations.append(movie)
                                 seen_ids.add(item_id)
 
@@ -1759,9 +1767,9 @@ class StremioClient:
                                 and item_id not in library_ids
                                 and item_id not in seen_ids
                             ):
-                                show["recommendation_reason"] = (
-                                    f"Based on your interest in {genre}"
-                                )
+                                show[
+                                    "recommendation_reason"
+                                ] = f"Based on your interest in {genre}"
                                 recommendations.append(show)
                                 seen_ids.add(item_id)
 
@@ -1894,9 +1902,9 @@ class StremioClient:
                             item_genres = item.get("genres", [])
                             shared_genres = set(source_genres) & set(item_genres)
                             item["similarity_score"] = len(shared_genres)
-                            item["similarity_reason"] = (
-                                f"Similar {primary_genre} content"
-                            )
+                            item[
+                                "similarity_reason"
+                            ] = f"Similar {primary_genre} content"
                             similar.append(item)
                             seen_ids.add(item_id)
 
@@ -1920,9 +1928,9 @@ class StremioClient:
                             item_genres = item.get("genres", [])
                             shared_genres = set(source_genres) & set(item_genres)
                             item["similarity_score"] = len(shared_genres)
-                            item["similarity_reason"] = (
-                                f"You might also like this {secondary_genre}"
-                            )
+                            item[
+                                "similarity_reason"
+                            ] = f"You might also like this {secondary_genre}"
                             similar.append(item)
                             seen_ids.add(item_id)
                             if len(similar) >= limit * 2:
