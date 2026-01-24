@@ -16,7 +16,8 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Any
+from datetime import datetime, timezone
+from typing import Any, Optional
 
 import aiohttp
 from aiohttp import ClientError, ClientTimeout
@@ -36,6 +37,14 @@ STREMIO_ADDON_COLLECTION_URL = f"{STREMIO_API_BASE}/api/addonCollectionGet"
 # Datastore collection types
 COLLECTION_LIBRARY_ITEM = "libraryItem"
 COLLECTION_USER = "user"
+
+
+def _utc_iso_ms_z() -> str:
+    return (
+        datetime.now(timezone.utc)
+        .isoformat(timespec="milliseconds")
+        .replace("+00:00", "Z")
+    )
 
 
 class StremioClient:
@@ -871,37 +880,36 @@ class StremioClient:
         try:
             session = await self._get_session()
 
-            # Build library item ID (format: type:imdb_id)
-            item_id = f"{media_type}:{media_id}"
-            current_time = int(time.time() * 1000)  # milliseconds
+            now = (
+                _utc_iso_ms_z()
+            )  # convert to iso format (e.g., "2023-10-05T12:34:56.789Z")
 
-            # Create library item structure based on Stremio's format
-            library_item = {
-                "_id": item_id,
-                "type": media_type,
-                "name": "",  # Name will be populated by Stremio
-                "poster": "",
-                "removed": False,
-                "temp": False,
-                "state": {
-                    "lastWatched": None,
-                    "timeWatched": 0,
-                    "timeOffset": 0,
-                    "duration": 0,
-                    "video_id": None,
-                    "watched": False,
-                    "noNotif": False,
-                },
-                "mtime": current_time,
-            }
+            # Find existing library item to preserve state (if any)
+            library_item = await self.async_find_item(media_id, media_type)
+            # If not found, skip adding
+            if library_item is None or not isinstance(library_item, dict):
+                _LOGGER.warning(
+                    "Cannot add to library: item %s of type %s not found",
+                    media_id,
+                    media_type,
+                )
+                return False
+
+            # Update mtime to current time
+            library_item["_mtime"] = now
+            library_item["removed"] = False  # ensure not marked as removed
+            library_item["state"]["lastWatched"] = now  # update lastWatched time
+
+            # Prepare payload for datastorePut
 
             payload = {
                 "authKey": self._auth_key,
                 "collection": COLLECTION_LIBRARY_ITEM,
                 "changes": [library_item],
             }
-
-            _LOGGER.debug("Sending datastorePut request to add library item")
+            _LOGGER.debug(
+                f"Sending datastorePut request to add library item: {library_item}"
+            )
 
             async with session.post(
                 STREMIO_DATASTORE_PUT_URL, json=payload
@@ -964,24 +972,19 @@ class StremioClient:
 
         try:
             session = await self._get_session()
-            current_time = int(time.time() * 1000)  # milliseconds
+            current_time = _utc_iso_ms_z()  # convert to iso
+            # Find if the item exists in library, otherwise cannot remove
+            library_item = await self.async_find_existing_item(media_id)
+            if library_item is None or not isinstance(library_item, dict):
+                _LOGGER.warning(
+                    "Cannot remove from library: item %s not found", media_id
+                )
+                return False
+            # Update item object to mark as removed, keep other fields intact
+            library_item["removed"] = True
+            library_item["_mtime"] = current_time
 
-            # Try both movie and series formats since we may not know the type
-            # In practice, the ID should include the type prefix
-            if ":" in media_id:
-                item_id = media_id
-            else:
-                # Default to movie format, but this may need adjustment
-                item_id = f"movie:{media_id}"
-                _LOGGER.debug("No type prefix in media_id, assuming movie: %s", item_id)
-
-            # Mark item as removed
-            library_item = {
-                "_id": item_id,
-                "removed": True,
-                "mtime": current_time,
-            }
-
+            # Prepare payload for datastorePut
             payload = {
                 "authKey": self._auth_key,
                 "collection": COLLECTION_LIBRARY_ITEM,
@@ -989,6 +992,7 @@ class StremioClient:
             }
 
             _LOGGER.debug("Sending datastorePut request to remove library item")
+            _LOGGER.debug(f"Changes: {library_item}")
 
             async with session.post(
                 STREMIO_DATASTORE_PUT_URL, json=payload
@@ -1942,6 +1946,170 @@ class StremioClient:
             _LOGGER.exception("Failed to get similar content for %s: %s", media_id, err)
             raise StremioConnectionError(
                 f"Failed to get similar content: {err}"
+            ) from err
+
+    async def async_find_item(
+        self, media_id: str, media_type: str = "movie"
+    ) -> Optional[dict[str, Any]]:
+        """Helper to find a specific item in the user's library by media ID.
+
+        Uses the datastoreGet endpoint with ids:[media_id] to search for the item.
+        If not found, fetches metadata from Cinemeta as a fallback and constructs
+        a basic item structure with removed=True.
+        Args:
+            media_id: IMDb ID of the media item (e.g., "tt1234567")
+            media_type: Type of media ("movie" or "series")
+        Returns:
+            Dictionary of the found item, or None if not found
+        """
+        if not self._auth_key:
+            _LOGGER.error("Cannot find item: client not authenticated")
+            raise StremioConnectionError("Client not authenticated")
+
+        try:
+            session = await self._get_session()
+
+            payload = {
+                "authKey": self._auth_key,
+                "collection": COLLECTION_LIBRARY_ITEM,
+                "ids": [media_id],
+                "all": False,
+            }
+
+            _LOGGER.debug("Sending datastoreGet request for item %s", media_id)
+
+            async with session.post(
+                STREMIO_DATASTORE_GET_URL, json=payload
+            ) as response:
+                if response.status == 401:
+                    _LOGGER.warning("Authentication expired while finding item")
+                    raise StremioAuthError("Authentication expired or invalid")
+                if response.status != 200:
+                    text = await response.text()
+                    _LOGGER.error(
+                        "Failed to find item (status %d): %s",
+                        response.status,
+                        text[:200],
+                    )
+                    raise StremioConnectionError(
+                        f"Failed to find item with status {response.status}: {text}"
+                    )
+                data = await response.json()
+                result = data.get("result", [])
+                if result:
+                    _LOGGER.info("Found item %s in user's library", media_id)
+                    return result[0]
+            # If not found in library, fetch metadata from Cinemeta as fallback and construct item
+            _LOGGER.debug("Item %s not found in library, fetching metadata", media_id)
+            from .const import CINEMETA_BASE_URL
+
+            meta_url = f"{CINEMETA_BASE_URL}/meta/{media_type}/{media_id}.json"
+
+            async with session.get(
+                meta_url,
+                timeout=aiohttp.ClientTimeout(total=10),
+            ) as response:
+                if response.status != 200:
+                    _LOGGER.debug(
+                        "Cinemeta returned status %d for item %s",
+                        response.status,
+                        media_id,
+                    )
+                    return None
+
+                data = await response.json()
+                meta = data.get("meta", {})
+                default_video_id = meta.get("behaviorHints", {}).get(
+                    "defaultVideoId", ""
+                )
+                # If no default video ID, return None as we can't construct full item
+                if not default_video_id or not meta:
+                    _LOGGER.debug("No metadata found for item %s", media_id)
+                    return None
+
+                item = {
+                    "_id": meta.get("imdb_id") or media_id,
+                    "type": meta.get("type"),
+                    "name": meta.get("name"),
+                    "poster": meta.get("poster"),
+                    "posterShape": "poster",
+                    "removed": True,
+                    "temp": False,
+                    "state": {
+                        "lastWatched": "",
+                        "timeWatched": 0,
+                        "timeOffset": 0,
+                        "overallTimeWatched": 0,
+                        "timesWatched": 0,
+                        "flaggedWatched": 0,
+                        "duration": 0,
+                        "video_id": "",
+                        "watched": "",
+                        "noNotif": False,
+                    },
+                }
+                _LOGGER.info("Fetched metadata for item %s from Cinemeta", media_id)
+                _LOGGER.debug("Item data: %s", item)
+                return item
+        except (StremioAuthError, StremioConnectionError):
+            raise
+        except ClientError as err:
+            _LOGGER.error("Connection error finding item: %s", err)
+            raise StremioConnectionError(f"Connection failed: {err}") from err
+        except Exception as err:
+            _LOGGER.exception("Failed to find item %s", media_id)
+            raise StremioConnectionError(f"Failed to find item: {err}") from err
+
+    async def async_find_existing_item(self, media_id: str) -> dict[str, Any] | None:
+        """Find an existing item in the user's library by media ID.
+        Args:
+            media_id: IMDb ID of the media item (e.g., "tt1234567")
+        Returns:
+            Dictionary of the found item, or None if not found
+        """
+        try:
+            session = await self._get_session()
+            payload = {
+                "authKey": self._auth_key,
+                "collection": COLLECTION_LIBRARY_ITEM,
+                "ids": [media_id],
+                "all": False,
+            }
+            _LOGGER.debug("Sending datastoreGet request for existing item %s", media_id)
+            async with session.post(
+                STREMIO_DATASTORE_GET_URL, json=payload
+            ) as response:
+                if response.status == 401:
+                    _LOGGER.warning(
+                        "Authentication expired while finding existing item"
+                    )
+                    raise StremioAuthError("Authentication expired or invalid")
+                if response.status != 200:
+                    text = await response.text()
+                    _LOGGER.error(
+                        "Failed to find existing item (status %d): %s",
+                        response.status,
+                        text[:200],
+                    )
+                    raise StremioConnectionError(
+                        f"Failed to find existing item with status {response.status}: {text}"
+                    )
+                data = await response.json()
+                result = data.get("result", [])
+                if result:
+                    _LOGGER.info("Found existing item %s in user's library", media_id)
+                    return result[0]
+                _LOGGER.debug("Existing item %s not found in library", media_id)
+                return None
+        except (StremioAuthError, StremioConnectionError):
+            raise
+        except ClientError as err:
+            _LOGGER.error("Connection error finding existing item: %s", err)
+            raise StremioConnectionError(f"Connection failed: {err}") from err
+        except Exception as err:
+            _LOGGER.exception("Failed to find existing item %s", media_id)
+            raise StremioConnectionError(
+                f"Failed to find existing item: {err}"
             ) from err
 
 
