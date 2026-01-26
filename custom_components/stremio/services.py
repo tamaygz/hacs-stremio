@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 
 import voluptuous as vol
@@ -563,6 +564,24 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                 "method": method,
             },
         )
+
+        # Schedule a refresh after a short delay to allow Stremio's backend to sync
+        # The Stremio API is event-driven but not real-time, so we poll after playback starts
+        async def _delayed_refresh():
+            """Refresh coordinator data after playback has started."""
+            try:
+                await asyncio.sleep(10)  # Wait 10 seconds for Stremio backend to sync
+                _LOGGER.debug(
+                    "Triggering refresh after handover to update continue watching list"
+                )
+                await coordinator.async_request_refresh()
+            except asyncio.CancelledError:
+                # Task was cancelled during shutdown, this is expected
+                _LOGGER.debug("Delayed refresh cancelled during shutdown")
+            except Exception as err:
+                _LOGGER.warning("Error during delayed refresh after handover: %s", err)
+
+        hass.async_create_task(_delayed_refresh(), eager_start=True)
 
     async def handle_browse_catalog(call: ServiceCall) -> ServiceResponse:
         """Handle browse_catalog service call.
