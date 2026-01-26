@@ -73,6 +73,7 @@ class StremioDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._state_change_unsub: list[Any] = []
         self._is_polling_gated: bool = False
         self._current_stream_url: str | None = None  # Track current stream URL
+        self._delayed_refresh_task: asyncio.Task | None = None  # Track pending refresh task
 
         # Get scan interval from options or use default
         self._configured_scan_interval = entry.options.get(
@@ -306,10 +307,15 @@ class StremioDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         This allows Stremio's backend time to sync watch progress before
         we poll for updates. The Stremio API is event-driven but not real-time.
 
+        If a refresh is already scheduled, it will be cancelled and replaced.
+
         Args:
             delay_seconds: Seconds to wait before refreshing (default: 10)
         """
-        import asyncio
+        # Cancel any existing delayed refresh task
+        if self._delayed_refresh_task and not self._delayed_refresh_task.done():
+            self._delayed_refresh_task.cancel()
+            _LOGGER.debug("Cancelled previous scheduled refresh")
 
         async def _delayed_refresh():
             """Refresh coordinator data after playback has started."""
@@ -320,12 +326,18 @@ class StremioDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 )
                 await self.async_request_refresh()
             except asyncio.CancelledError:
-                # Task was cancelled during shutdown, this is expected
-                _LOGGER.debug("Scheduled refresh cancelled during shutdown")
+                # Task was cancelled during shutdown or replaced, this is expected
+                _LOGGER.debug("Scheduled refresh cancelled")
             except Exception as err:
                 _LOGGER.warning("Error during scheduled refresh after playback: %s", err)
+            finally:
+                # Clear the task reference when done
+                if self._delayed_refresh_task and not self._delayed_refresh_task.cancelled():
+                    self._delayed_refresh_task = None
 
-        self.hass.async_create_task(_delayed_refresh(), eager_start=True)
+        self._delayed_refresh_task = self.hass.async_create_task(
+            _delayed_refresh(), eager_start=True
+        )
 
     def set_current_media(
         self,
@@ -390,6 +402,14 @@ class StremioDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     async def async_shutdown(self) -> None:
         """Clean up resources on shutdown."""
+        # Cancel any pending delayed refresh task
+        if self._delayed_refresh_task and not self._delayed_refresh_task.done():
+            self._delayed_refresh_task.cancel()
+            try:
+                await self._delayed_refresh_task
+            except asyncio.CancelledError:
+                pass  # Expected when cancelling
+
         # Unsubscribe from state change events
         for unsub in self._state_change_unsub:
             unsub()
