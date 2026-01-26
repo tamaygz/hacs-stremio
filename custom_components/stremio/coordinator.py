@@ -319,6 +319,8 @@ class StremioDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         async def _delayed_refresh():
             """Refresh coordinator data after playback has started."""
+            # Store reference to this task to avoid race condition in cleanup
+            current_task = self._delayed_refresh_task
             try:
                 await asyncio.sleep(delay_seconds)
                 _LOGGER.debug(
@@ -331,8 +333,10 @@ class StremioDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             except Exception as err:
                 _LOGGER.warning("Error during scheduled refresh after playback: %s", err)
             finally:
-                # Always clear the task reference when done, regardless of how it completed
-                self._delayed_refresh_task = None
+                # Only clear the reference if this task is still the current one
+                # This prevents race condition where a new task was created while this one was finishing
+                if self._delayed_refresh_task is current_task:
+                    self._delayed_refresh_task = None
 
         self._delayed_refresh_task = self.hass.async_create_task(
             _delayed_refresh(), eager_start=True
