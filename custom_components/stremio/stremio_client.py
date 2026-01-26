@@ -779,11 +779,17 @@ class StremioClient:
 
     @staticmethod
     def parse_stream_metadata(stream: dict[str, Any]) -> dict[str, str | None]:
-        """Parse metadata from stream name/title for enhanced display.
+        """Parse metadata from stream fields for enhanced display.
 
         This is a shared utility used by both the frontend and media_source.
-        It extracts structured metadata from stream names which often contain
+        It extracts structured metadata from stream data which often contains
         quality info, file size, seeders, codec, HDR type, and audio format.
+
+        Parses multiple fields as addons use different conventions:
+        - name: Usually the main display name
+        - title: Additional info line
+        - description: Detailed file info (many addons put size/codec here)
+        - behaviorHints.filename: Actual filename with full metadata
 
         Args:
             stream: Stream dictionary from addon
@@ -811,8 +817,21 @@ class StremioClient:
         # Get addon name
         metadata["addon"] = stream.get("addon") or stream.get("source")
 
-        # Combine name and title for parsing
-        text = f"{stream.get('name', '')} {stream.get('title', '')}"
+        # Combine ALL relevant fields for parsing - addons use different conventions
+        # name: "[RD ⚡] Comet 2160p"
+        # title: "Comet | ElfHosted | RD" (addon info)
+        # description: "📂 23.99 GB ⚙️ HEVC 👤 2025" (detailed metadata)
+        # behaviorHints.filename: "Movie.2024.2160p.HEVC.DV.Atmos.mkv"
+        behavior_hints = stream.get("behaviorHints", {}) or {}
+        filename = behavior_hints.get("filename", "") or ""
+        
+        text_parts = [
+            stream.get("name", ""),
+            stream.get("title", ""),
+            stream.get("description", ""),
+            filename,
+        ]
+        text = " ".join(str(p) for p in text_parts if p)
 
         # Extract file size (e.g., "1.5 GB", "15.2GB", "800 MB")
         size_match = re.search(r"(\d+(?:\.\d+)?)\s*(GB|MB|TB)", text, re.IGNORECASE)

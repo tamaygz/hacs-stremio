@@ -478,8 +478,21 @@ class StremioStreamDialog extends LitElement {
     // Get addon name
     metadata.addon = stream.addon || stream.source || null;
     
-    // Combine name and title for parsing
-    const text = `${stream.name || ''} ${stream.title || ''}`;
+    // Combine ALL relevant fields for parsing - addons use different conventions
+    // name: "[RD ⚡] Comet 2160p"
+    // title: "Comet | ElfHosted | RD" (addon info)
+    // description: "📂 23.99 GB ⚙️ HEVC 👤 2025" (detailed metadata)
+    // behaviorHints.filename: "Movie.2024.2160p.HEVC.DV.Atmos.mkv"
+    const behaviorHints = stream.behaviorHints || {};
+    const filename = behaviorHints.filename || '';
+    
+    const textParts = [
+      stream.name || '',
+      stream.title || '',
+      stream.description || '',
+      filename,
+    ];
+    const text = textParts.filter(p => p).join(' ');
     
     // Extract file size (e.g., "1.5 GB", "15.2GB", "800 MB")
     const sizeMatch = text.match(/(\d+(?:\.\d+)?)\s*(GB|MB|TB)/i);
