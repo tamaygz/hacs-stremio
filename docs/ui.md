@@ -87,6 +87,7 @@ columns: 4
 | `default_view` | string | "library" | Default view ("library" or "catalog") |
 | `max_items` | number | 50 | Maximum items to display |
 | `columns` | number | 4 | Grid columns (desktop) |
+| `apple_tv_entity` | string | undefined | Apple TV entity ID for handover (e.g., `media_player.apple_tv_living_room`) |
 
 #### Features
 
@@ -136,6 +137,7 @@ max_cast: 8
 | `show_cast` | boolean | true | Show cast members |
 | `show_genres` | boolean | true | Show genre tags |
 | `max_cast` | number | 8 | Maximum cast to show |
+| `apple_tv_entity` | string | undefined | Apple TV entity ID for handover (e.g., `media_player.apple_tv_living_room`) |
 
 ---
 
@@ -197,6 +199,7 @@ poster_aspect_ratio: '2/3'
 | `max_items` | number | 50 | Maximum items to display |
 | `card_height` | number | 500 | Max height in px (0 for auto) |
 | `poster_aspect_ratio` | string | "2/3" | Poster ratio ("2/3", "16/9", "1/1", "4/3") |
+| `apple_tv_entity` | string | undefined | Apple TV entity ID for handover (e.g., `media_player.apple_tv_living_room`) |
 
 #### Features
 
@@ -264,6 +267,7 @@ default_sort: recent
 | `horizontal_scroll` | boolean | false | Enable horizontal carousel mode |
 | `tap_action` | string | "details" | Action on tap ("details", "play", "streams") |
 | `default_sort` | string | "recent" | Default sort ("recent", "progress", "title") |
+| `apple_tv_entity` | string | undefined | Apple TV entity ID for handover (e.g., `media_player.apple_tv_living_room`) |
 
 #### Features
 
@@ -327,6 +331,7 @@ refresh_interval: 3600
 | `tap_action` | string | "details" | Action on tap ("details", "open_stremio", "streams") |
 | `default_filter` | string | "all" | Default filter ("all", "movie", "series") |
 | `refresh_interval` | number | 3600 | Seconds between auto-refreshes |
+| `apple_tv_entity` | string | undefined | Apple TV entity ID for handover (e.g., `media_player.apple_tv_living_room`) |
 
 #### Features
 
@@ -431,6 +436,28 @@ views:
         columns: 2
         max_items: 20
 ```
+
+---
+
+## Apple TV Handover
+
+Several cards support direct Apple TV handover when getting streams. Configure the `apple_tv_entity` option to enable this feature:
+
+```yaml
+type: custom:stremio-browse-card
+apple_tv_entity: media_player.apple_tv_living_room
+```
+
+**Supported Cards:**
+- Stremio Library Card
+- Stremio Media Details Card
+- Stremio Browse Card
+- Stremio Continue Watching Card
+- Stremio Recommendations Card
+
+When configured, the stream dialog will include an option to play streams directly on your Apple TV. The entity ID should match your Apple TV media player entity (e.g., `media_player.apple_tv_living_room`).
+
+**Note:** You can configure the Apple TV entity in each card's configuration UI under the "Device Integration" section.
 
 ---
 
