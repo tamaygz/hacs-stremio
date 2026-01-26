@@ -300,6 +300,33 @@ class StremioDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.data["current_watching"]["stream_url"] = stream_url
             self.async_set_updated_data(self.data)
 
+    def schedule_refresh_after_playback(self, delay_seconds: int = 10) -> None:
+        """Schedule a delayed refresh after playback starts.
+
+        This allows Stremio's backend time to sync watch progress before
+        we poll for updates. The Stremio API is event-driven but not real-time.
+
+        Args:
+            delay_seconds: Seconds to wait before refreshing (default: 10)
+        """
+        import asyncio
+
+        async def _delayed_refresh():
+            """Refresh coordinator data after playback has started."""
+            try:
+                await asyncio.sleep(delay_seconds)
+                _LOGGER.debug(
+                    "Triggering scheduled refresh to update continue watching list"
+                )
+                await self.async_request_refresh()
+            except asyncio.CancelledError:
+                # Task was cancelled during shutdown, this is expected
+                _LOGGER.debug("Scheduled refresh cancelled during shutdown")
+            except Exception as err:
+                _LOGGER.warning("Error during scheduled refresh after playback: %s", err)
+
+        self.hass.async_create_task(_delayed_refresh(), eager_start=True)
+
     def set_current_media(
         self,
         media_info: dict[str, Any] | None,
