@@ -148,11 +148,11 @@
       },
       "pairing_disabled": {
         "title": "Pairing Disabled",
-        "description": "Pairing is currently disabled on '{device}'. Please enable AirPlay in your Apple TV settings:\n\n1. Go to Settings > AirPlay and HomeKit\n2. Ensure AirPlay is turned On\n3. Set 'Allow Access' to 'Anyone on the Same Network' or add a password\n\nClick Submit to continue without pairing (handover may not work)."
+        "description": "Pairing is currently disabled on {device}. Please enable AirPlay in your Apple TV settings:\n\n1. Go to Settings > AirPlay and HomeKit\n2. Ensure AirPlay is turned On\n3. Set \"Allow Access\" to \"Anyone on the Same Network\" or add a password\n\nClick Submit to continue without pairing (handover may not work)."
       },
       "apple_tv_pair_pin": {
         "title": "Enter PIN",
-        "description": "A PIN code should now be displayed on your Apple TV '{device}'. Enter it below to complete pairing.",
+        "description": "A PIN code should now be displayed on your Apple TV {device}. Enter it below to complete pairing.",
         "data": {
           "pin": "PIN code"
         },
@@ -162,7 +162,7 @@
       },
       "apple_tv_pair_pin_device": {
         "title": "Enter PIN on Apple TV",
-        "description": "Please enter this PIN on your Apple TV '{device}':\n\n**{pin}**\n\nOnce entered, click Submit to complete pairing."
+        "description": "Please enter this PIN on your Apple TV {device}:\n\n**{pin}**\n\nOnce entered, click Submit to complete pairing."
       }
     },
     "error": {

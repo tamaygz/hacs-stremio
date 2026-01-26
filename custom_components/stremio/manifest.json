@@ -8,6 +8,7 @@
   "dependencies": [
     "frontend",
     "http",
+    "lovelace",
     "media_source"
   ],
   "documentation": "https://github.com/tamaygz/hacs-stremio",
