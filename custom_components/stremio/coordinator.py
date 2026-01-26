@@ -317,7 +317,7 @@ class StremioDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self._delayed_refresh_task.cancel()
             _LOGGER.debug("Cancelled previous scheduled refresh")
 
-        async def _delayed_refresh(task_ref_holder: list) -> None:
+        async def _delayed_refresh(task_ref_holder: list[asyncio.Task]) -> None:
             """Refresh coordinator data after playback has started.
             
             Args:
@@ -341,7 +341,7 @@ class StremioDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     self._delayed_refresh_task = None
 
         # Use a list to pass task reference to the coroutine
-        task_ref_holder: list = []
+        task_ref_holder: list[asyncio.Task] = []
         task = self.hass.async_create_task(
             _delayed_refresh(task_ref_holder), eager_start=True
         )
