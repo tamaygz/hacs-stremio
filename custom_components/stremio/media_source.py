@@ -849,6 +849,114 @@ class StremioMediaSource(MediaSource):
             thumbnail=poster,
         )
 
+    def _parse_stream_metadata(self, stream: dict[str, Any]) -> dict[str, str | None]:
+        """Parse metadata from stream name/title for enhanced display.
+
+        Args:
+            stream: Stream dictionary from addon
+
+        Returns:
+            Dictionary with extracted metadata fields
+        """
+        import re
+
+        metadata: dict[str, str | None] = {
+            "addon": None,
+            "size": None,
+            "seeders": None,
+            "codec": None,
+            "hdr": None,
+            "audio": None,
+        }
+
+        # Get addon name
+        metadata["addon"] = stream.get("addon") or stream.get("source")
+
+        # Combine name and title for parsing
+        text = f"{stream.get('name', '')} {stream.get('title', '')}"
+
+        # Extract file size (e.g., "1.5 GB", "15.2GB", "800 MB")
+        size_match = re.search(r"(\d+(?:\.\d+)?)\s*(GB|MB|TB)", text, re.IGNORECASE)
+        if size_match:
+            metadata["size"] = f"{size_match.group(1)} {size_match.group(2).upper()}"
+
+        # Extract seeders (e.g., "👤 150", "⬆️ 45", "seeders: 100", "S: 50")
+        seeders_match = re.search(
+            r"(?:👤|⬆️|seeders?[:\s]*|S[:\s]*)(\d+)", text, re.IGNORECASE
+        )
+        if seeders_match:
+            metadata["seeders"] = seeders_match.group(1)
+
+        # Extract video codec
+        if re.search(r"\b(HEVC|H\.?265|x265)\b", text, re.IGNORECASE):
+            metadata["codec"] = "HEVC"
+        elif re.search(r"\b(AVC|H\.?264|x264)\b", text, re.IGNORECASE):
+            metadata["codec"] = "x264"
+        elif re.search(r"\bAV1\b", text, re.IGNORECASE):
+            metadata["codec"] = "AV1"
+
+        # Extract HDR type
+        if re.search(r"\b(Dolby.?Vision|DV)\b", text, re.IGNORECASE):
+            metadata["hdr"] = "DV"
+        elif re.search(r"\bHDR10\+", text, re.IGNORECASE):
+            metadata["hdr"] = "HDR10+"
+        elif re.search(r"\bHDR10?\b", text, re.IGNORECASE):
+            metadata["hdr"] = "HDR"
+
+        # Extract audio format
+        if re.search(r"\b(Atmos)\b", text, re.IGNORECASE):
+            metadata["audio"] = "Atmos"
+        elif re.search(r"\b(DTS[-:]?X)\b", text, re.IGNORECASE):
+            metadata["audio"] = "DTS-X"
+        elif re.search(r"\b(TrueHD)\b", text, re.IGNORECASE):
+            metadata["audio"] = "TrueHD"
+        elif re.search(r"\b(DTS[-:]?HD)\b", text, re.IGNORECASE):
+            metadata["audio"] = "DTS-HD"
+
+        return metadata
+
+    def _format_stream_label(
+        self, stream: dict[str, Any], index: int
+    ) -> tuple[str, str]:
+        """Format stream information into a two-line label.
+
+        Args:
+            stream: Stream dictionary from addon
+            index: Stream index for fallback naming
+
+        Returns:
+            Tuple of (main_title, metadata_line)
+        """
+        # Get the stream name/title
+        stream_name = (
+            stream.get("name") or stream.get("title") or f"Stream {index + 1}"
+        )
+
+        # Parse metadata
+        meta = self._parse_stream_metadata(stream)
+
+        # Build metadata chips
+        meta_parts = []
+        if meta["addon"]:
+            meta_parts.append(f"📦 {meta['addon']}")
+        if stream.get("size") or meta["size"]:
+            size = stream.get("size") or meta["size"]
+            meta_parts.append(f"💾 {size}")
+        if meta["seeders"]:
+            meta_parts.append(f"👤 {meta['seeders']}")
+        if stream.get("quality"):
+            meta_parts.append(f"🎬 {stream['quality']}")
+        if meta["codec"]:
+            meta_parts.append(meta["codec"])
+        if meta["hdr"]:
+            meta_parts.append(f"🌈 {meta['hdr']}")
+        if meta["audio"]:
+            meta_parts.append(f"🔊 {meta['audio']}")
+
+        metadata_line = " · ".join(meta_parts) if meta_parts else ""
+
+        return stream_name, metadata_line
+
     async def _build_streams_browse(self, identifier: str) -> BrowseMediaSource:
         """Build streams browse view for a movie or episode.
 
@@ -919,28 +1027,17 @@ class StremioMediaSource(MediaSource):
         # Build stream children
         children = []
         for idx, stream in enumerate(streams):
-            stream_name = (
-                stream.get("name") or stream.get("title") or f"Stream {idx + 1}"
-            )
-            stream_title = stream.get("title") or ""
-            quality = stream.get("quality") or ""
-            size = stream.get("size") or ""
-            addon_name = stream.get("addon") or ""
+            # Get formatted stream label with metadata
+            stream_name, metadata_line = self._format_stream_label(stream, idx)
 
             # Get the stream URL for display
             stream_url = stream.get("url") or stream.get("externalUrl") or ""
 
-            # Build descriptive label
-            label_parts = [stream_name]
-            if stream_title and stream_title != stream_name:
-                label_parts.append(stream_title)
-            if quality:
-                label_parts.append(quality)
-            if size:
-                label_parts.append(size)
-            if addon_name:
-                label_parts.append(f"[{addon_name}]")
-            label = " - ".join(label_parts)
+            # Build two-line label: title on first line, metadata on second
+            if metadata_line:
+                label = f"{stream_name}\n{metadata_line}"
+            else:
+                label = stream_name
 
             # Create stream identifier for playback
             # Format: type/media_id or type/media_id/season/episode with stream index
