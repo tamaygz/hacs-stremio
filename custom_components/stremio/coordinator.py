@@ -321,7 +321,7 @@ class StremioDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             """Refresh coordinator data after playback has started.
             
             Args:
-                task_ref_holder: List containing reference to this task (passed by reference)
+                task_ref_holder: List that will contain reference to this task for race condition prevention
             """
             try:
                 await asyncio.sleep(delay_seconds)
@@ -337,7 +337,11 @@ class StremioDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             finally:
                 # Only clear the reference if this task is still the current one
                 # This prevents race condition where a new task was created while this one was finishing
-                if task_ref_holder and self._delayed_refresh_task is task_ref_holder[0]:
+                if (
+                    task_ref_holder
+                    and len(task_ref_holder) > 0
+                    and self._delayed_refresh_task is task_ref_holder[0]
+                ):
                     self._delayed_refresh_task = None
 
         # Use a list to pass task reference to the coroutine
