@@ -28,22 +28,28 @@ from homeassistant.core import HomeAssistant
 from custom_components.stremio.const import DOMAIN
 
 # Skip all tests on Windows with a helpful message
+# Also prevent loading of pytest-homeassistant-custom-component on Windows
+# as it requires fcntl (Unix-only module)
 if sys.platform == "win32":
 
     def pytest_collection_modifyitems(config, items):
         """Skip all tests on Windows due to pytest-socket incompatibility."""
         skip_windows = pytest.mark.skip(
             reason="Tests cannot run on Windows due to pytest-socket blocking "
-            "socket.socketpair() required by asyncio ProactorEventLoop. "
+            "socket.socketpair() required by asyncio ProactorEventLoop and "
+            "missing fcntl module (Unix-only). "
             "Please run tests on Linux/macOS/WSL2 or in a devcontainer."
         )
         for item in items:
             item.add_marker(skip_windows)
 
-
-# Import fixtures from pytest-homeassistant-custom-component
-# These provide properly mocked HomeAssistant instances that work with pytest-socket
-pytest_plugins = "pytest_homeassistant_custom_component"
+    # Don't load pytest-homeassistant-custom-component on Windows
+    # as it will fail to import due to missing fcntl module
+    pytest_plugins = []
+else:
+    # Import fixtures from pytest-homeassistant-custom-component
+    # These provide properly mocked HomeAssistant instances that work with pytest-socket
+    pytest_plugins = "pytest_homeassistant_custom_component"
 
 # ============================================================================
 # Mock Data
@@ -268,6 +274,9 @@ def mock_coordinator(mock_stremio_client):
 @pytest.fixture
 def mock_config_entry(hass: HomeAssistant):
     """Create a mock config entry."""
+    if sys.platform == "win32":
+        pytest.skip("Skipping on Windows - pytest-homeassistant-custom-component not available")
+    
     from pytest_homeassistant_custom_component.common import MockConfigEntry
 
     entry = MockConfigEntry(
@@ -297,6 +306,9 @@ def mock_hass(hass: HomeAssistant):
     This fixture wraps the 'hass' fixture from pytest-homeassistant-custom-component
     and adds additional mock data structures needed by the Stremio integration tests.
     """
+    if sys.platform == "win32":
+        pytest.skip("Skipping on Windows - pytest-homeassistant-custom-component not available")
+    
     hass.data = hass.data if hass.data else {}
     return hass
 
