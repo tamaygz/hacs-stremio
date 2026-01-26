@@ -18,5 +18,5 @@
   "requirements": [
     "pyatv>=0.16.0"
   ],
-  "version": "0.5.30"
+  "version": "0.5.31"
 }
