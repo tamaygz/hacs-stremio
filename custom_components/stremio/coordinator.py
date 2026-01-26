@@ -317,10 +317,12 @@ class StremioDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self._delayed_refresh_task.cancel()
             _LOGGER.debug("Cancelled previous scheduled refresh")
 
-        async def _delayed_refresh():
-            """Refresh coordinator data after playback has started."""
-            # Store reference to this task to avoid race condition in cleanup
-            current_task = self._delayed_refresh_task
+        async def _delayed_refresh(task_ref_holder: list) -> None:
+            """Refresh coordinator data after playback has started.
+            
+            Args:
+                task_ref_holder: List containing reference to this task (passed by reference)
+            """
             try:
                 await asyncio.sleep(delay_seconds)
                 _LOGGER.debug(
@@ -335,12 +337,16 @@ class StremioDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             finally:
                 # Only clear the reference if this task is still the current one
                 # This prevents race condition where a new task was created while this one was finishing
-                if self._delayed_refresh_task is current_task:
+                if task_ref_holder and self._delayed_refresh_task is task_ref_holder[0]:
                     self._delayed_refresh_task = None
 
-        self._delayed_refresh_task = self.hass.async_create_task(
-            _delayed_refresh(), eager_start=True
+        # Use a list to pass task reference to the coroutine
+        task_ref_holder: list = []
+        task = self.hass.async_create_task(
+            _delayed_refresh(task_ref_holder), eager_start=True
         )
+        task_ref_holder.append(task)
+        self._delayed_refresh_task = task
 
     def set_current_media(
         self,
