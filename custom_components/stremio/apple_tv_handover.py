@@ -26,14 +26,14 @@ from homeassistant.exceptions import HomeAssistantError
 
 _LOGGER = logging.getLogger(__name__)
 
-# Try to import pyatv, but handle if not installed
+# Try to import pyatv, but handle if not installed or incompatible
 try:
     import pyatv
 
     PYATV_AVAILABLE = True
-except ImportError:
+except (ImportError, Exception) as e:
     PYATV_AVAILABLE = False
-    _LOGGER.warning("pyatv not installed, AirPlay handover will not be available")
+    _LOGGER.warning("pyatv not installed or not compatible, AirPlay handover will not be available: %s", e)
 
 
 class HandoverMethod(Enum):

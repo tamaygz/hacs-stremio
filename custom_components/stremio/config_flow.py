@@ -57,9 +57,9 @@ try:
     from pyatv.const import PairingRequirement, Protocol
 
     PYATV_AVAILABLE = True
-except ImportError:
+except (ImportError, Exception) as e:
     PYATV_AVAILABLE = False
-    _LOGGER.debug("pyatv not installed, Apple TV pairing will not be available")
+    _LOGGER.debug("pyatv not installed or not compatible, Apple TV pairing will not be available: %s", e)
 
 STEP_USER_DATA_SCHEMA = vol.Schema(
     {
