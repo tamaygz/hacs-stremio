@@ -447,7 +447,25 @@ class StremioStreamDialog extends LitElement {
     `;
   }
 
-  _parseStreamMetadata(stream) {
+  /**
+   * Get stream metadata, using pre-parsed data from backend if available.
+   * Falls back to client-side parsing for backward compatibility.
+   */
+  _getStreamMetadata(stream) {
+    // Use pre-parsed metadata from stremio_client if available
+    if (stream.parsed_metadata) {
+      return stream.parsed_metadata;
+    }
+    
+    // Fallback: parse client-side for backward compatibility
+    return this._parseStreamMetadataFallback(stream);
+  }
+
+  /**
+   * Fallback client-side parsing for streams without pre-parsed metadata.
+   * This mirrors the logic in stremio_client.py parse_stream_metadata().
+   */
+  _parseStreamMetadataFallback(stream) {
     const metadata = {
       addon: null,
       size: null,
@@ -510,7 +528,7 @@ class StremioStreamDialog extends LitElement {
   _renderStreamItem(stream, index) {
     const isCopied = this._copiedIndex === index;
     const streamName = stream.name || stream.title || `Stream ${index + 1}`;
-    const meta = this._parseStreamMetadata(stream);
+    const meta = this._getStreamMetadata(stream);
 
     return html`
       <div class="stream-item" role="listitem">
