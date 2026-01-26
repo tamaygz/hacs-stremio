@@ -538,9 +538,56 @@ class StremioStreamDialog extends LitElement {
     return metadata;
   }
 
+  /**
+   * Get the best display name for a stream.
+   * Prefers the actual filename (most informative) over generic addon names.
+   * Checks multiple fields as addons use different conventions.
+   */
+  _getStreamDisplayName(stream, index) {
+    // 1. Prefer behaviorHints.filename - this is the actual release name
+    const behaviorHints = stream.behaviorHints || {};
+    if (behaviorHints.filename) {
+      let name = behaviorHints.filename;
+      // Remove common video extensions
+      name = name.replace(/\.(mkv|mp4|avi|webm|m4v)$/i, '');
+      return name;
+    }
+    
+    // 2. Check description - some addons put detailed release info here
+    // Look for patterns like "Fallout.S01E02.2160p.WEB..." in description
+    if (stream.description) {
+      // Match common release name patterns (starts with title, has resolution)
+      const releasePattern = /^[\w\.\-]+\.(S\d{2}E\d{2}\.)?(\d{3,4}p|4K|2160|1080|720)/i;
+      if (releasePattern.test(stream.description)) {
+        return stream.description.split('\n')[0].trim();
+      }
+      // Or if description is long and looks like a filename (has dots as separators)
+      const descFirstLine = stream.description.split('\n')[0].trim();
+      if (descFirstLine.length > 20 && (descFirstLine.match(/\./g) || []).length >= 3) {
+        return descFirstLine;
+      }
+    }
+    
+    // 3. Fall back to name or title
+    return stream.name || stream.title || `Stream ${index + 1}`;
+  }
+
   _renderStreamItem(stream, index) {
+    // Debug: log first stream's structure to see available fields
+    if (index === 0) {
+      console.log('[Stream Dialog] Stream object structure:', {
+        name: stream.name,
+        title: stream.title,
+        description: stream.description,
+        behaviorHints: stream.behaviorHints,
+        parsed_metadata: stream.parsed_metadata,
+        addon: stream.addon,
+        allKeys: Object.keys(stream),
+      });
+    }
+    
     const isCopied = this._copiedIndex === index;
-    const streamName = stream.name || stream.title || `Stream ${index + 1}`;
+    const streamName = this._getStreamDisplayName(stream, index);
     const meta = this._getStreamMetadata(stream);
 
     return html`

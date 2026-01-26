@@ -867,6 +867,49 @@ class StremioMediaSource(MediaSource):
 
         return StremioClient.parse_stream_metadata(stream)
 
+    def _get_stream_display_name(
+        self, stream: dict[str, Any], index: int
+    ) -> str:
+        """Get the best display name for a stream.
+
+        Prefers the actual filename (most informative) over generic addon names.
+        Checks multiple fields as addons use different conventions.
+
+        Args:
+            stream: Stream dictionary from addon
+            index: Stream index for fallback naming
+
+        Returns:
+            Best available display name for the stream
+        """
+        import re
+
+        # 1. Prefer behaviorHints.filename - this is the actual release name
+        behavior_hints = stream.get("behaviorHints") or {}
+        filename = behavior_hints.get("filename")
+        if filename:
+            # Remove common video extensions for cleaner display
+            name = re.sub(r"\.(mkv|mp4|avi|webm|m4v)$", "", filename, flags=re.IGNORECASE)
+            return name
+
+        # 2. Check description - some addons put detailed release info here
+        description = stream.get("description", "")
+        if description:
+            # Match common release name patterns (starts with title, has resolution)
+            release_pattern = re.compile(
+                r"^[\w\.\-]+\.(S\d{2}E\d{2}\.)?(\d{3,4}p|4K|2160|1080|720)",
+                re.IGNORECASE
+            )
+            if release_pattern.match(description):
+                return description.split("\n")[0].strip()
+            # Or if description is long and looks like a filename (has dots as separators)
+            desc_first_line = description.split("\n")[0].strip()
+            if len(desc_first_line) > 20 and desc_first_line.count(".") >= 3:
+                return desc_first_line
+
+        # 3. Fall back to name or title
+        return stream.get("name") or stream.get("title") or f"Stream {index + 1}"
+
     def _format_stream_label(
         self, stream: dict[str, Any], index: int
     ) -> str:
@@ -882,10 +925,8 @@ class StremioMediaSource(MediaSource):
         Returns:
             Formatted single-line label string
         """
-        # Get the stream name/title
-        stream_name = (
-            stream.get("name") or stream.get("title") or f"Stream {index + 1}"
-        )
+        # Get the best display name (prefer filename)
+        stream_name = self._get_stream_display_name(stream, index)
 
         # Get metadata (pre-parsed or parse on-demand)
         meta = self._get_stream_metadata(stream)
