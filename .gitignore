@@ -96,3 +96,5 @@ config/custom_components
 /config/home-assistant*.db*
 /config/blueprints/*
 config/.ha_run.lock
+.tldr/languages.json
+.tldr/

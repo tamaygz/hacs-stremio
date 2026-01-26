@@ -1,0 +1,9 @@
+{
+	"servers": {
+		// "tldr": {
+		// 	"command": "tldr-mcp",
+		// 	"args": ["--project", "."]
+		// }
+	},
+	"inputs": []
+}
