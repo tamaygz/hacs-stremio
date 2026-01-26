@@ -471,6 +471,9 @@ class StremioRecommendationsCard extends LitElement {
       // Filter defaults
       default_filter: 'all', // all, movie, series
       
+      // Device integration
+      apple_tv_entity: undefined, // For Apple TV handover
+      
       ...config,
     };
     
@@ -715,7 +718,8 @@ class StremioRecommendationsCard extends LitElement {
           poster: item.poster,
           imdb_id: item.imdb_id || item.id,
         },
-        streams
+        streams,
+        this.config.apple_tv_entity
       );
     } else {
       let dialog = document.querySelector('stremio-stream-dialog');
@@ -726,6 +730,7 @@ class StremioRecommendationsCard extends LitElement {
       dialog.hass = this._hass;
       dialog.mediaItem = item;
       dialog.streams = streams;
+      dialog.appleTvEntity = this.config.apple_tv_entity;
       dialog.open = true;
     }
   }
@@ -999,6 +1004,7 @@ class StremioRecommendationsCardEditor extends LitElement {
       hass: { type: Object },
       _config: { type: Object },
       _expandedSections: { type: Object },
+      _appleTvEntities: { type: Array },
     };
   }
 
@@ -1008,11 +1014,38 @@ class StremioRecommendationsCardEditor extends LitElement {
       display: true,
       layout: false,
       behavior: false,
+      device: false,
     };
   }
 
   setConfig(config) {
     this._config = config;
+  }
+
+  updated(changedProps) {
+    if (changedProps.has('hass') && this.hass) {
+      this._updateEntities();
+    }
+  }
+
+  _updateEntities() {
+    // Find Apple TV media_player entities
+    this._appleTvEntities = Object.keys(this.hass.states)
+      .filter(entityId => {
+        if (!entityId.startsWith('media_player.')) return false;
+        const state = this.hass.states[entityId];
+        const friendlyName = (state.attributes.friendly_name || '').toLowerCase();
+        const entityLower = entityId.toLowerCase();
+        // Match Apple TV by entity ID or friendly name
+        return entityLower.includes('apple_tv') ||
+               entityLower.includes('appletv') ||
+               friendlyName.includes('apple tv') ||
+               friendlyName.includes('appletv');
+      })
+      .map(entityId => ({
+        entity_id: entityId,
+        friendly_name: this.hass.states[entityId].attributes.friendly_name || entityId,
+      }));
   }
 
   _toggleSection(section) {
@@ -1194,8 +1227,57 @@ class StremioRecommendationsCardEditor extends LitElement {
             </div>
           ` : ''}
         </div>
+
+        <!-- Device Section -->
+        <div class="config-section">
+          <div class="section-header" @click=${() => this._toggleSection('device')}>
+            <ha-icon icon="mdi:devices"></ha-icon>
+            <span>Device Integration</span>
+            <ha-icon class="expand-icon ${this._expandedSections.device ? 'expanded' : ''}" icon="mdi:chevron-down"></ha-icon>
+          </div>
+          ${this._expandedSections.device ? html`
+            <div class="section-content">
+              <p class="helper-text">Select an Apple TV to enable handover functionality.</p>
+              
+              ${this._appleTvEntities?.length > 0 ? html`
+                <div class="entity-buttons">
+                  ${this._appleTvEntities.map(entity => html`
+                    <button 
+                      class="entity-btn ${this._config.apple_tv_entity === entity.entity_id ? 'selected' : ''}"
+                      @click=${() => this._selectAppleTv(entity.entity_id)}
+                    >
+                      <ha-icon icon="mdi:apple"></ha-icon>
+                      <span>${entity.friendly_name}</span>
+                    </button>
+                  `)}
+                  <button 
+                    class="entity-btn ${!this._config.apple_tv_entity ? 'selected' : ''}"
+                    @click=${() => this._selectAppleTv('')}
+                  >
+                    <ha-icon icon="mdi:close"></ha-icon>
+                    <span>None</span>
+                  </button>
+                </div>
+              ` : ''}
+
+              <ha-entity-picker
+                .hass=${this.hass}
+                .value=${this._config.apple_tv_entity || ''}
+                .configValue=${'apple_tv_entity'}
+                .includeDomains=${['media_player']}
+                label="Apple TV Entity"
+                allow-custom-entity
+                @value-changed=${this._valueChanged}
+              ></ha-entity-picker>
+            </div>
+          ` : ''}
+        </div>
       </div>
     `;
+  }
+
+  _selectAppleTv(entityId) {
+    this._updateConfig('apple_tv_entity', entityId || undefined);
   }
 
   _selectChanged(ev) {
