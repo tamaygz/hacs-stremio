@@ -849,6 +849,66 @@ class StremioMediaSource(MediaSource):
             thumbnail=poster,
         )
 
+    def _get_stream_metadata(self, stream: dict[str, Any]) -> dict[str, str | None]:
+        """Get parsed metadata from stream, using pre-parsed data if available.
+
+        Args:
+            stream: Stream dictionary from addon
+
+        Returns:
+            Dictionary with extracted metadata fields
+        """
+        # Use pre-parsed metadata from stremio_client if available
+        if "parsed_metadata" in stream:
+            return stream["parsed_metadata"]
+
+        # Fallback: parse on-demand using the shared utility
+        from .stremio_client import StremioClient
+
+        return StremioClient.parse_stream_metadata(stream)
+
+    def _format_stream_label(
+        self, stream: dict[str, Any], index: int
+    ) -> tuple[str, str]:
+        """Format stream information into a two-line label.
+
+        Args:
+            stream: Stream dictionary from addon
+            index: Stream index for fallback naming
+
+        Returns:
+            Tuple of (main_title, metadata_line)
+        """
+        # Get the stream name/title
+        stream_name = (
+            stream.get("name") or stream.get("title") or f"Stream {index + 1}"
+        )
+
+        # Get metadata (pre-parsed or parse on-demand)
+        meta = self._get_stream_metadata(stream)
+
+        # Build metadata chips
+        meta_parts = []
+        if meta["addon"]:
+            meta_parts.append(f"📦 {meta['addon']}")
+        if stream.get("size") or meta["size"]:
+            size = stream.get("size") or meta["size"]
+            meta_parts.append(f"💾 {size}")
+        if meta["seeders"]:
+            meta_parts.append(f"👤 {meta['seeders']}")
+        if stream.get("quality"):
+            meta_parts.append(f"🎬 {stream['quality']}")
+        if meta["codec"]:
+            meta_parts.append(meta["codec"])
+        if meta["hdr"]:
+            meta_parts.append(f"🌈 {meta['hdr']}")
+        if meta["audio"]:
+            meta_parts.append(f"🔊 {meta['audio']}")
+
+        metadata_line = " · ".join(meta_parts) if meta_parts else ""
+
+        return stream_name, metadata_line
+
     async def _build_streams_browse(self, identifier: str) -> BrowseMediaSource:
         """Build streams browse view for a movie or episode.
 
@@ -919,28 +979,17 @@ class StremioMediaSource(MediaSource):
         # Build stream children
         children = []
         for idx, stream in enumerate(streams):
-            stream_name = (
-                stream.get("name") or stream.get("title") or f"Stream {idx + 1}"
-            )
-            stream_title = stream.get("title") or ""
-            quality = stream.get("quality") or ""
-            size = stream.get("size") or ""
-            addon_name = stream.get("addon") or ""
+            # Get formatted stream label with metadata
+            stream_name, metadata_line = self._format_stream_label(stream, idx)
 
             # Get the stream URL for display
             stream_url = stream.get("url") or stream.get("externalUrl") or ""
 
-            # Build descriptive label
-            label_parts = [stream_name]
-            if stream_title and stream_title != stream_name:
-                label_parts.append(stream_title)
-            if quality:
-                label_parts.append(quality)
-            if size:
-                label_parts.append(size)
-            if addon_name:
-                label_parts.append(f"[{addon_name}]")
-            label = " - ".join(label_parts)
+            # Build two-line label: title on first line, metadata on second
+            if metadata_line:
+                label = f"{stream_name}\n{metadata_line}"
+            else:
+                label = stream_name
 
             # Create stream identifier for playback
             # Format: type/media_id or type/media_id/season/episode with stream index

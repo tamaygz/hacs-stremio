@@ -145,28 +145,37 @@ class StremioStreamDialog extends LitElement {
       .stream-name {
         font-weight: 500;
         color: var(--primary-text-color);
-        margin-bottom: 4px;
+        margin-bottom: 6px;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
         overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
+        word-break: break-word;
+        line-height: 1.3;
       }
 
       .stream-meta {
-        font-size: 0.85em;
+        font-size: 0.8em;
         color: var(--secondary-text-color);
         display: flex;
-        gap: 12px;
+        gap: 6px;
         flex-wrap: wrap;
-      }
-
-      .stream-meta span {
-        display: flex;
         align-items: center;
-        gap: 4px;
       }
 
-      .stream-meta ha-icon {
-        --mdc-icon-size: 14px;
+      .stream-meta-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        background: var(--card-background-color);
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-size: 0.85em;
+        white-space: nowrap;
+      }
+
+      .stream-meta-item ha-icon {
+        --mdc-icon-size: 12px;
       }
 
       .stream-actions {
@@ -438,9 +447,88 @@ class StremioStreamDialog extends LitElement {
     `;
   }
 
+  /**
+   * Get stream metadata, using pre-parsed data from backend if available.
+   * Falls back to client-side parsing for backward compatibility.
+   */
+  _getStreamMetadata(stream) {
+    // Use pre-parsed metadata from stremio_client if available
+    if (stream.parsed_metadata) {
+      return stream.parsed_metadata;
+    }
+    
+    // Fallback: parse client-side for backward compatibility
+    return this._parseStreamMetadataFallback(stream);
+  }
+
+  /**
+   * Fallback client-side parsing for streams without pre-parsed metadata.
+   * This mirrors the logic in stremio_client.py parse_stream_metadata().
+   */
+  _parseStreamMetadataFallback(stream) {
+    const metadata = {
+      addon: null,
+      size: null,
+      seeders: null,
+      codec: null,
+      hdr: null,
+      audio: null,
+    };
+    
+    // Get addon name
+    metadata.addon = stream.addon || stream.source || null;
+    
+    // Combine name and title for parsing
+    const text = `${stream.name || ''} ${stream.title || ''}`;
+    
+    // Extract file size (e.g., "1.5 GB", "15.2GB", "800 MB")
+    const sizeMatch = text.match(/(\d+(?:\.\d+)?)\s*(GB|MB|TB)/i);
+    if (sizeMatch) {
+      metadata.size = `${sizeMatch[1]} ${sizeMatch[2].toUpperCase()}`;
+    }
+    
+    // Extract seeders (e.g., "👤 150", "S: 45", "seeders: 100")
+    const seedersMatch = text.match(/(?:👤|⬆️|seeders?[:\s]*|S[:\s]*)(\d+)/i);
+    if (seedersMatch) {
+      metadata.seeders = seedersMatch[1];
+    }
+    
+    // Extract video codec
+    if (/\b(HEVC|H\.?265|x265)\b/i.test(text)) {
+      metadata.codec = 'HEVC';
+    } else if (/\b(AVC|H\.?264|x264)\b/i.test(text)) {
+      metadata.codec = 'x264';
+    } else if (/\bAV1\b/i.test(text)) {
+      metadata.codec = 'AV1';
+    }
+    
+    // Extract HDR type
+    if (/\b(Dolby.?Vision|DV)\b/i.test(text)) {
+      metadata.hdr = 'DV';
+    } else if (/\bHDR10\+/i.test(text)) {
+      metadata.hdr = 'HDR10+';
+    } else if (/\bHDR10?\b/i.test(text)) {
+      metadata.hdr = 'HDR';
+    }
+    
+    // Extract audio format
+    if (/\b(Atmos)\b/i.test(text)) {
+      metadata.audio = 'Atmos';
+    } else if (/\b(DTS[-:]?X)\b/i.test(text)) {
+      metadata.audio = 'DTS-X';
+    } else if (/\b(TrueHD)\b/i.test(text)) {
+      metadata.audio = 'TrueHD';
+    } else if (/\b(DTS[-:]?HD)\b/i.test(text)) {
+      metadata.audio = 'DTS-HD';
+    }
+    
+    return metadata;
+  }
+
   _renderStreamItem(stream, index) {
     const isCopied = this._copiedIndex === index;
     const streamName = stream.name || stream.title || `Stream ${index + 1}`;
+    const meta = this._getStreamMetadata(stream);
 
     return html`
       <div class="stream-item" role="listitem">
@@ -454,17 +542,32 @@ class StremioStreamDialog extends LitElement {
             ` : ''}
           </div>
           <div class="stream-meta">
-            ${stream.source ? html`
-              <span>
-                <ha-icon icon="mdi:server"></ha-icon>
-                ${stream.source}
+            ${meta.addon ? html`
+              <span class="stream-meta-item">
+                <ha-icon icon="mdi:puzzle"></ha-icon>
+                ${meta.addon}
               </span>
             ` : ''}
-            ${stream.size ? html`
-              <span>
+            ${meta.size ? html`
+              <span class="stream-meta-item">
                 <ha-icon icon="mdi:file"></ha-icon>
-                ${stream.size}
+                ${meta.size}
               </span>
+            ` : ''}
+            ${meta.seeders ? html`
+              <span class="stream-meta-item">
+                <ha-icon icon="mdi:account-group"></ha-icon>
+                ${meta.seeders}
+              </span>
+            ` : ''}
+            ${meta.codec ? html`
+              <span class="stream-meta-item">${meta.codec}</span>
+            ` : ''}
+            ${meta.hdr ? html`
+              <span class="stream-meta-item">${meta.hdr}</span>
+            ` : ''}
+            ${meta.audio ? html`
+              <span class="stream-meta-item">${meta.audio}</span>
             ` : ''}
           </div>
         </div>
