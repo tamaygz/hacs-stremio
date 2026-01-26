@@ -140,23 +140,27 @@ class StremioStreamDialog extends LitElement {
       .stream-info {
         flex: 1;
         min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
       }
 
       .stream-name {
         font-weight: 500;
         color: var(--primary-text-color);
-        margin-bottom: 4px;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+        width: 100%;
       }
 
       .stream-meta {
         font-size: 0.85em;
         color: var(--secondary-text-color);
         display: flex;
-        gap: 12px;
+        gap: 8px;
         flex-wrap: wrap;
+        align-items: center;
       }
 
       .stream-meta span {
@@ -234,10 +238,12 @@ class StremioStreamDialog extends LitElement {
       .quality-badge {
         background: var(--primary-color);
         color: var(--text-primary-color);
-        padding: 2px 6px;
+        padding: 2px 8px;
         border-radius: 4px;
         font-size: 0.75em;
         font-weight: 500;
+        display: inline-flex;
+        align-items: center;
       }
 
       .quality-badge.hd {
@@ -445,15 +451,15 @@ class StremioStreamDialog extends LitElement {
     return html`
       <div class="stream-item" role="listitem">
         <div class="stream-info">
-          <div class="stream-name">
+          <div class="stream-name" title="${streamName}">
             ${streamName}
+          </div>
+          <div class="stream-meta">
             ${stream.quality ? html`
               <span class="quality-badge ${this._getQualityClass(stream.quality)}">
                 ${stream.quality}
               </span>
             ` : ''}
-          </div>
-          <div class="stream-meta">
             ${stream.source ? html`
               <span>
                 <ha-icon icon="mdi:server"></ha-icon>
