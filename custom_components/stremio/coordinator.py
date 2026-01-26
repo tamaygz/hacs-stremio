@@ -331,9 +331,8 @@ class StremioDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             except Exception as err:
                 _LOGGER.warning("Error during scheduled refresh after playback: %s", err)
             finally:
-                # Clear the task reference when done
-                if self._delayed_refresh_task and not self._delayed_refresh_task.cancelled():
-                    self._delayed_refresh_task = None
+                # Always clear the task reference when done, regardless of how it completed
+                self._delayed_refresh_task = None
 
         self._delayed_refresh_task = self.hass.async_create_task(
             _delayed_refresh(), eager_start=True
