@@ -66,7 +66,16 @@ data:
 
 ### stremio.refresh_library
 
-Force an immediate library refresh.
+Force an immediate library refresh to update continue watching, library items, and other data from the Stremio API.
+
+**When to use:**
+- To manually refresh data outside of the normal polling interval
+- To immediately see library changes made in other Stremio clients
+
+**Automatic Refresh Behavior:**
+- The integration automatically refreshes data at the configured polling interval (default: 30 seconds)
+- Automatic refresh is also triggered 10 seconds after handover to Apple TV completes
+- Library add/remove operations trigger automatic refresh
 
 **Example:**
 ```yaml
@@ -75,13 +84,16 @@ service: stremio.refresh_library
 
 ### stremio.handover_to_apple_tv
 
-Stream content to Apple TV.
+Stream content to Apple TV. When successful, the integration automatically triggers a data refresh after 10 seconds to update the continue watching list with any progress updates from Stremio's backend.
 
 **Parameters:**
 - `entity_id` (required): Apple TV media player entity
 - `content_id` (optional): Content ID to play
 - `stream_url` (optional): Direct stream URL
 - `method` (optional): "auto", "airplay", or "vlc"
+
+**Refresh Behavior:**
+After a successful handover, the integration waits 10 seconds (to allow Stremio's backend to sync watch progress) and then automatically refreshes the continue watching list and other data from the API.
 
 **Example:**
 ```yaml

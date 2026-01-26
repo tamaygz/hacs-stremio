@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any
 
@@ -433,6 +434,24 @@ class StremioMediaPlayer(
 
             # Request a state update so the UI reflects the new media
             self.request_state_update()
+
+            # Schedule a refresh after a short delay to allow Stremio's backend to sync
+            # The Stremio API is event-driven but not real-time, so we poll after playback starts
+            async def _delayed_refresh():
+                """Refresh coordinator data after playback has started."""
+                try:
+                    await asyncio.sleep(10)  # Wait 10 seconds for Stremio backend to sync
+                    _LOGGER.debug(
+                        "Triggering refresh after media player handover to update continue watching list"
+                    )
+                    await self.coordinator.async_request_refresh()
+                except asyncio.CancelledError:
+                    # Task was cancelled during shutdown, this is expected
+                    _LOGGER.debug("Delayed refresh cancelled during shutdown")
+                except Exception as err:
+                    _LOGGER.warning("Error during delayed refresh after handover: %s", err)
+
+            self.hass.async_create_task(_delayed_refresh(), eager_start=True)
 
         except HandoverError as err:
             _LOGGER.error("Apple TV handover failed: %s", err)
