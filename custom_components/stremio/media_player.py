@@ -434,6 +434,9 @@ class StremioMediaPlayer(
             # Request a state update so the UI reflects the new media
             self.request_state_update()
 
+            # Schedule a refresh after a short delay to allow Stremio's backend to sync
+            self.coordinator.schedule_refresh_after_playback()
+
         except HandoverError as err:
             _LOGGER.error("Apple TV handover failed: %s", err)
             raise HomeAssistantError(f"Apple TV handover failed: {err}") from err

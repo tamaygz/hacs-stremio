@@ -116,6 +116,46 @@ Fetch latest data from API. Called automatically at configured intervals.
 
 **Returns:** Dictionary with user, library, and continue watching data
 
+##### `async def async_request_refresh() -> None`
+
+Request an immediate data refresh from the API, bypassing the normal polling interval.
+
+**Usage:** Called automatically after certain events (handover, library changes) or manually via the `stremio.refresh_library` service.
+
+## API Update Behavior
+
+### Continue Watching Refresh
+
+The Stremio API uses an event-driven model for watch progress updates:
+
+1. **API Backend Behavior:**
+   - Stremio's backend updates watch progress when a user's viewing session syncs
+   - There is no documented real-time webhook or push notification system
+   - Updates happen when: playback starts, progress is made, or the app syncs with the server
+   - The exact sync timing is not specified in the API documentation
+
+2. **Integration Polling:**
+   - The integration polls the Stremio API at the configured interval (default: 30 seconds)
+   - This means continue watching updates may have a delay of up to the polling interval
+
+3. **Automatic Refresh Triggers:**
+   - **After handover:** When using `stremio.handover_to_apple_tv` or playing media via the media player, the integration automatically triggers a refresh after 10 seconds
+   - **Library changes:** When adding/removing items, refresh is triggered immediately
+   - **Gate entity activation:** When polling gate entities become active, refresh is triggered immediately
+   - **Manual:** Call `stremio.refresh_library` service to force immediate refresh
+
+4. **Why the 10-second delay?**
+   - Gives Stremio's backend time to sync the watch progress
+   - Balances between quick updates and avoiding unnecessary API calls
+   - Based on observation that Stremio's backend typically syncs within a few seconds of playback starting
+
+### Polling Gate Entities
+
+Configure entities (e.g., media players) to control when polling occurs:
+- When any gate entity is active: Poll at configured interval
+- When all gate entities are inactive: Reduce polling to 24-hour idle interval
+- Saves API calls when you're not actively using Stremio
+
 ## Constants
 
 See [const.py](../custom_components/stremio/const.py) for all constant definitions.

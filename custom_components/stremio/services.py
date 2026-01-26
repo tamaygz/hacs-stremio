@@ -564,6 +564,9 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             },
         )
 
+        # Schedule a refresh after a short delay to allow Stremio's backend to sync
+        coordinator.schedule_refresh_after_playback()
+
     async def handle_browse_catalog(call: ServiceCall) -> ServiceResponse:
         """Handle browse_catalog service call.
 

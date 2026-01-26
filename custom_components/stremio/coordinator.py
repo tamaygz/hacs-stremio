@@ -73,6 +73,7 @@ class StremioDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._state_change_unsub: list[Any] = []
         self._is_polling_gated: bool = False
         self._current_stream_url: str | None = None  # Track current stream URL
+        self._delayed_refresh_task: asyncio.Task | None = None  # Track pending refresh task
 
         # Get scan interval from options or use default
         self._configured_scan_interval = entry.options.get(
@@ -300,6 +301,57 @@ class StremioDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.data["current_watching"]["stream_url"] = stream_url
             self.async_set_updated_data(self.data)
 
+    def schedule_refresh_after_playback(self, delay_seconds: int = 10) -> None:
+        """Schedule a delayed refresh after playback starts.
+
+        This allows Stremio's backend time to sync watch progress before
+        we poll for updates. The Stremio API is event-driven but not real-time.
+
+        If a refresh is already scheduled, it will be cancelled and replaced.
+
+        Args:
+            delay_seconds: Seconds to wait before refreshing (default: 10)
+        """
+        # Cancel any existing delayed refresh task
+        if self._delayed_refresh_task and not self._delayed_refresh_task.done():
+            self._delayed_refresh_task.cancel()
+            _LOGGER.debug("Cancelled previous scheduled refresh")
+
+        async def _delayed_refresh(task_ref_holder: list[asyncio.Task]) -> None:
+            """Refresh coordinator data after playback has started.
+            
+            Args:
+                task_ref_holder: List that will contain reference to this task for race condition prevention
+            """
+            try:
+                await asyncio.sleep(delay_seconds)
+                _LOGGER.debug(
+                    "Triggering scheduled refresh to update continue watching list"
+                )
+                await self.async_request_refresh()
+            except asyncio.CancelledError:
+                # Task was cancelled during shutdown or replaced, this is expected
+                _LOGGER.debug("Scheduled refresh cancelled")
+            except Exception as err:
+                _LOGGER.warning("Error during scheduled refresh after playback: %s", err)
+            finally:
+                # Only clear the reference if this task is still the current one
+                # This prevents race condition where a new task was created while this one was finishing
+                if (
+                    task_ref_holder
+                    and len(task_ref_holder) > 0
+                    and self._delayed_refresh_task is task_ref_holder[0]
+                ):
+                    self._delayed_refresh_task = None
+
+        # Use a list to pass task reference to the coroutine
+        task_ref_holder: list[asyncio.Task] = []
+        task = self.hass.async_create_task(
+            _delayed_refresh(task_ref_holder), eager_start=True
+        )
+        task_ref_holder.append(task)
+        self._delayed_refresh_task = task
+
     def set_current_media(
         self,
         media_info: dict[str, Any] | None,
@@ -363,6 +415,14 @@ class StremioDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     async def async_shutdown(self) -> None:
         """Clean up resources on shutdown."""
+        # Cancel any pending delayed refresh task
+        if self._delayed_refresh_task and not self._delayed_refresh_task.done():
+            self._delayed_refresh_task.cancel()
+            try:
+                await self._delayed_refresh_task
+            except asyncio.CancelledError:
+                pass  # Expected when cancelling
+
         # Unsubscribe from state change events
         for unsub in self._state_change_unsub:
             unsub()
