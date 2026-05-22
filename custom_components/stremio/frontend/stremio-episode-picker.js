@@ -381,7 +381,9 @@ class StremioEpisodePicker extends LitElement {
           thumbnail: ep.thumbnail,
           released: ep.released,
           watched: isWatched,
-          progress: 0, // Could be enhanced with actual progress data
+          progress: isLastWatched && !isWatched
+            ? (this.mediaItem?.lastWatchedProgressPercent || 0)
+            : 0,
           isLastWatched: isLastWatched,
         };
       });
@@ -577,7 +579,7 @@ class StremioEpisodePicker extends LitElement {
             ` : ''}
             ${episode.watched ? html`
               <span class="watched-badge">
-                <ha-icon icon="mdi:check-circle"></ha-icon>
+                <ha-icon icon="mdi:eye"></ha-icon>
                 Watched
               </span>
             ` : ''}
