@@ -671,6 +671,39 @@ class TestSetCurrentlyWatchingService:
         )
 
     @pytest.mark.asyncio
+    async def test_set_currently_watching_with_config_entry_id(
+        self, mock_service_hass, mock_coordinator
+    ):
+        """Test set_currently_watching targets the specified config entry."""
+        primary_client = mock_service_hass.data[DOMAIN]["test_entry"]["client"]
+        primary_client.async_set_currently_watching = AsyncMock(return_value=True)
+
+        second_coordinator = MagicMock()
+        second_coordinator.async_request_refresh = AsyncMock()
+        second_client = AsyncMock()
+        second_client.async_set_currently_watching = AsyncMock(return_value=True)
+        mock_service_hass.data[DOMAIN]["second_entry"] = {
+            "coordinator": second_coordinator,
+            "client": second_client,
+        }
+
+        await async_setup_services(mock_service_hass)
+
+        await mock_service_hass.services.async_call(
+            DOMAIN,
+            "set_currently_watching",
+            {
+                "media_id": "tt0111161",
+                "media_type": "movie",
+                "config_entry_id": "second_entry",
+            },
+            blocking=True,
+        )
+
+        second_client.async_set_currently_watching.assert_called_once()
+        primary_client.async_set_currently_watching.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_set_currently_watching_series_missing_season_episode(
         self, mock_service_hass, mock_coordinator
     ):
@@ -803,6 +836,40 @@ class TestUpdateWatchProgressService:
         )
 
     @pytest.mark.asyncio
+    async def test_update_watch_progress_with_config_entry_id(
+        self, mock_service_hass, mock_coordinator
+    ):
+        """Test update_watch_progress targets the specified config entry."""
+        primary_client = mock_service_hass.data[DOMAIN]["test_entry"]["client"]
+        primary_client.async_update_watch_progress = AsyncMock(return_value=True)
+
+        second_coordinator = MagicMock()
+        second_coordinator.async_request_refresh = AsyncMock()
+        second_client = AsyncMock()
+        second_client.async_update_watch_progress = AsyncMock(return_value=True)
+        mock_service_hass.data[DOMAIN]["second_entry"] = {
+            "coordinator": second_coordinator,
+            "client": second_client,
+        }
+
+        await async_setup_services(mock_service_hass)
+
+        await mock_service_hass.services.async_call(
+            DOMAIN,
+            "update_watch_progress",
+            {
+                "media_id": "tt0111161",
+                "media_type": "movie",
+                "progress": 600,
+                "config_entry_id": "second_entry",
+            },
+            blocking=True,
+        )
+
+        second_client.async_update_watch_progress.assert_called_once()
+        primary_client.async_update_watch_progress.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_update_watch_progress_series_missing_season_episode(
         self, mock_service_hass, mock_coordinator
     ):
@@ -906,6 +973,39 @@ class TestMarkWatchedService:
             progress=None,
             duration=None,
         )
+
+    @pytest.mark.asyncio
+    async def test_mark_watched_with_config_entry_id(
+        self, mock_service_hass, mock_coordinator
+    ):
+        """Test mark_watched targets the specified config entry."""
+        primary_client = mock_service_hass.data[DOMAIN]["test_entry"]["client"]
+        primary_client.async_mark_watched = AsyncMock(return_value=True)
+
+        second_coordinator = MagicMock()
+        second_coordinator.async_request_refresh = AsyncMock()
+        second_client = AsyncMock()
+        second_client.async_mark_watched = AsyncMock(return_value=True)
+        mock_service_hass.data[DOMAIN]["second_entry"] = {
+            "coordinator": second_coordinator,
+            "client": second_client,
+        }
+
+        await async_setup_services(mock_service_hass)
+
+        await mock_service_hass.services.async_call(
+            DOMAIN,
+            "mark_watched",
+            {
+                "media_id": "tt0111161",
+                "media_type": "movie",
+                "config_entry_id": "second_entry",
+            },
+            blocking=True,
+        )
+
+        second_client.async_mark_watched.assert_called_once()
+        primary_client.async_mark_watched.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_mark_watched_series_missing_season_episode(

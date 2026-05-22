@@ -67,6 +67,7 @@ ATTR_DAYS_AHEAD = "days_ahead"
 ATTR_PROGRESS = "progress"
 ATTR_DURATION = "duration"
 ATTR_FALLBACK_TO_WATCHED = "fallback_to_watched"
+ATTR_CONFIG_ENTRY_ID = "config_entry_id"
 
 # Service schemas
 SEARCH_LIBRARY_SCHEMA = vol.Schema(
@@ -131,6 +132,7 @@ SET_CURRENTLY_WATCHING_SCHEMA = vol.Schema(
             vol.Coerce(int), vol.Range(min=0)  # type: ignore[arg-type]
         ),
         vol.Optional(ATTR_FALLBACK_TO_WATCHED, default=False): cv.boolean,
+        vol.Optional(ATTR_CONFIG_ENTRY_ID): cv.string,
     }
 )
 
@@ -146,6 +148,7 @@ UPDATE_WATCH_PROGRESS_SCHEMA = vol.Schema(
         vol.Optional(ATTR_DURATION): vol.All(
             vol.Coerce(int), vol.Range(min=0)  # type: ignore[arg-type]
         ),
+        vol.Optional(ATTR_CONFIG_ENTRY_ID): cv.string,
     }
 )
 
@@ -161,6 +164,7 @@ MARK_WATCHED_SCHEMA = vol.Schema(
         vol.Optional(ATTR_DURATION): vol.All(
             vol.Coerce(int), vol.Range(min=0)  # type: ignore[arg-type]
         ),
+        vol.Optional(ATTR_CONFIG_ENTRY_ID): cv.string,
     }
 )
 
@@ -225,8 +229,9 @@ GET_ADDONS_SCHEMA = vol.Schema({})
 
 def _get_entry_data(
     hass: HomeAssistant,
+    config_entry_id: str | None = None,
 ) -> tuple[StremioDataUpdateCoordinator, StremioClient, str]:
-    """Get coordinator, client, and entry_id from first config entry.
+    """Get coordinator, client, and entry_id from config entry.
 
     Args:
         hass: Home Assistant instance
@@ -244,8 +249,10 @@ def _get_entry_data(
             translation_key="no_integration",
         )
 
-    # Get the first entry's data
-    entry_id = next(iter(hass.data[DOMAIN]))
+    entry_id = config_entry_id or next(iter(hass.data[DOMAIN]))
+    if entry_id not in hass.data[DOMAIN]:
+        raise ServiceValidationError(f"No Stremio config entry found: {entry_id}")
+
     entry_data = hass.data[DOMAIN][entry_id]
     return entry_data["coordinator"], entry_data["client"], entry_id
 
@@ -651,7 +658,9 @@ async def async_setup_services(hass: HomeAssistant) -> None:
 
     async def handle_set_currently_watching(call: ServiceCall) -> None:
         """Handle set_currently_watching service call."""
-        coordinator, client, _ = _get_entry_data(hass)
+        coordinator, client, _ = _get_entry_data(
+            hass, call.data.get(ATTR_CONFIG_ENTRY_ID)
+        )
 
         media_id = call.data[ATTR_MEDIA_ID]
         media_type = call.data[ATTR_MEDIA_TYPE]
@@ -706,7 +715,9 @@ async def async_setup_services(hass: HomeAssistant) -> None:
 
     async def handle_update_watch_progress(call: ServiceCall) -> None:
         """Handle update_watch_progress service call."""
-        coordinator, client, _ = _get_entry_data(hass)
+        coordinator, client, _ = _get_entry_data(
+            hass, call.data.get(ATTR_CONFIG_ENTRY_ID)
+        )
 
         media_id = call.data[ATTR_MEDIA_ID]
         media_type = call.data[ATTR_MEDIA_TYPE]
@@ -746,7 +757,9 @@ async def async_setup_services(hass: HomeAssistant) -> None:
 
     async def handle_mark_watched(call: ServiceCall) -> None:
         """Handle mark_watched service call."""
-        coordinator, client, _ = _get_entry_data(hass)
+        coordinator, client, _ = _get_entry_data(
+            hass, call.data.get(ATTR_CONFIG_ENTRY_ID)
+        )
 
         media_id = call.data[ATTR_MEDIA_ID]
         media_type = call.data[ATTR_MEDIA_TYPE]

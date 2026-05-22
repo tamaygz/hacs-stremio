@@ -243,6 +243,13 @@ set_currently_watching:
       default: false
       selector:
         boolean:
+    config_entry_id:
+      name: Config Entry ID
+      description: Optional Stremio config entry ID to target in multi-entry setups.
+      required: false
+      example: "test_entry"
+      selector:
+        text:
 
 update_watch_progress:
   name: Update Watch Progress
@@ -305,6 +312,13 @@ update_watch_progress:
           min: 0
           max: 100000
           mode: box
+    config_entry_id:
+      name: Config Entry ID
+      description: Optional Stremio config entry ID to target in multi-entry setups.
+      required: false
+      example: "test_entry"
+      selector:
+        text:
 
 mark_watched:
   name: Mark Watched
@@ -367,6 +381,13 @@ mark_watched:
           min: 0
           max: 100000
           mode: box
+    config_entry_id:
+      name: Config Entry ID
+      description: Optional Stremio config entry ID to target in multi-entry setups.
+      required: false
+      example: "test_entry"
+      selector:
+        text:
 
 browse_catalog:
   name: Browse Catalog

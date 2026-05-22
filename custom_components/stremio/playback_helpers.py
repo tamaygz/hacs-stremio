@@ -17,6 +17,7 @@ async def async_update_playback_state_after_handover(
     episode: int | None,
     progress: int | None,
     duration: int | None,
+    fallback_to_watched: bool = False,
 ) -> None:
     """Update playback state after a handover operation."""
     if not media_id:
@@ -33,7 +34,7 @@ async def async_update_playback_state_after_handover(
             progress=progress,
             duration=duration,
         )
-        if not success:
+        if not success and fallback_to_watched:
             _LOGGER.warning(
                 "Set currently watching failed after handover; falling back to mark watched"
             )
