@@ -997,6 +997,17 @@ class StremioBrowseCard extends LitElement {
       return this._hass.states[this._librarySensorEntityId];
     }
 
+    if (this.config?.entity?.startsWith('media_player.')) {
+      const baseSensorEntityId = this.config.entity
+        .replace('media_player.', 'sensor.')
+        .replace('_stremio', '');
+      const derivedLibrarySensorEntityId = `${baseSensorEntityId}_library_count`;
+      if (this._hass.states[derivedLibrarySensorEntityId]) {
+        this._librarySensorEntityId = derivedLibrarySensorEntityId;
+        return this._hass.states[derivedLibrarySensorEntityId];
+      }
+    }
+
     for (const entityId in this._hass.states) {
       if (entityId.startsWith('sensor.stremio') && entityId.endsWith('_library_count')) {
         this._librarySensorEntityId = entityId;
