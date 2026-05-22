@@ -39,6 +39,9 @@ STREMIO_ADDON_COLLECTION_URL = f"{STREMIO_API_BASE}/api/addonCollectionGet"
 COLLECTION_LIBRARY_ITEM = "libraryItem"
 COLLECTION_USER = "user"
 
+# Playback state defaults
+MIN_WATCHING_PROGRESS = 1  # Ensure items appear in Stremio's continue watching list
+
 
 def _utc_iso_ms_z() -> str:
     return (
@@ -1284,7 +1287,7 @@ class StremioClient:
 
             if mode in ("watching", "progress"):
                 if mode == "watching" and progress_value <= 0:
-                    progress_value = 1
+                    progress_value = MIN_WATCHING_PROGRESS
 
                 state["timeOffset"] = progress_value
                 if progress_value > 0:
@@ -1311,10 +1314,13 @@ class StremioClient:
 
                 state["lastWatched"] = now
                 state["watched"] = now
+                current_times_watched = int(state.get("timesWatched", 0))
+                was_flagged = int(state.get("flaggedWatched", 0)) == 1
                 state["flaggedWatched"] = 1
-                state["timesWatched"] = max(
-                    1, int(state.get("timesWatched", 0)) + 1
-                )
+                if not was_flagged:
+                    state["timesWatched"] = max(1, current_times_watched + 1)
+                else:
+                    state["timesWatched"] = max(1, current_times_watched)
             else:
                 _LOGGER.error("Unknown playback update mode: %s", mode)
                 raise StremioConnectionError(f"Unknown playback update mode: {mode}")
