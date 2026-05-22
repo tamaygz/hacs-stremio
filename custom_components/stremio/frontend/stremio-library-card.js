@@ -1081,12 +1081,20 @@ class StremioLibraryCard extends LitElement {
   _renderDetailView() {
     const item = this._selectedItem;
     const title = item.title || item.name || 'Unknown';
-    const progress = item.progress_percent || 0;
-    const isWatched = progress >= 98;
     const hasSelectedEpisode = item.type === 'series' && item.selectedSeason && item.selectedEpisode;
     const episodeLabel = hasSelectedEpisode 
       ? `S${String(item.selectedSeason).padStart(2, '0')}E${String(item.selectedEpisode).padStart(2, '0')}`
-      : null;
+      : (item.type === 'series' && item.season && item.episode)
+        ? `S${String(item.season).padStart(2, '0')}E${String(item.episode).padStart(2, '0')}`
+        : null;
+
+    // Only show progress if displaying the episode that the progress data belongs to
+    const isShowingTrackedEpisode = !hasSelectedEpisode || (
+      item.selectedSeason === (item.last_season || item.season) &&
+      item.selectedEpisode === (item.last_episode || item.episode)
+    );
+    const progress = isShowingTrackedEpisode ? (item.progress_percent || 0) : 0;
+    const isWatched = progress >= 98 || (item.flagged_watched === 1 && item.type !== 'series');
 
     return html`
       <div class="item-detail-view">

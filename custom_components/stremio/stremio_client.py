@@ -1427,6 +1427,21 @@ class StremioClient:
                 # Parse ID (format: type:id, e.g., "movie:tt1234567")
                 imdb_id = _id.split(":", 1)[1] if ":" in _id else _id
 
+                # Extract watch state data
+                state = item.get("state", {})
+                progress = state.get("timeWatched", 0)
+                duration = state.get("duration", 0)
+
+                # Parse season/episode from video_id (format: imdb:season:episode)
+                video_id = state.get("video_id", "")
+                season = None
+                episode = None
+                if ":" in video_id:
+                    parts = video_id.split(":")
+                    if len(parts) >= 3:
+                        season = int(parts[1]) if parts[1].isdigit() else None
+                        episode = int(parts[2]) if parts[2].isdigit() else None
+
                 processed_item = {
                     "id": _id,
                     "imdb_id": imdb_id,
@@ -1437,6 +1452,12 @@ class StremioClient:
                     "genres": item.get("genres", []),
                     "cast": item.get("cast", []),
                     "added_at": item.get("mtime"),
+                    "progress": progress,
+                    "duration": duration,
+                    "season": season,
+                    "episode": episode,
+                    "flagged_watched": state.get("flaggedWatched", 0),
+                    "watched_at": state.get("lastWatched"),
                 }
                 items.append(processed_item)
             except (AttributeError, TypeError, KeyError) as err:

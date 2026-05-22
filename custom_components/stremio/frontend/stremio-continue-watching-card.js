@@ -1046,8 +1046,6 @@ class StremioContinueWatchingCard extends LitElement {
   _renderDetailView() {
     const item = this._selectedItem;
     const title = item.title || 'Unknown';
-    const progress = typeof item.progress_percent === 'number' ? item.progress_percent : 0;
-    const isWatched = progress >= 98;
     // For continue watching, use selectedSeason/Episode if changed, otherwise use original season/episode
     const displaySeason = item.selectedSeason || item.season;
     const displayEpisode = item.selectedEpisode || item.episode;
@@ -1055,6 +1053,16 @@ class StremioContinueWatchingCard extends LitElement {
     const episodeLabel = hasEpisodeInfo 
       ? `S${String(displaySeason).padStart(2, '0')}E${String(displayEpisode).padStart(2, '0')}`
       : null;
+
+    // Only show progress if displaying the episode that the progress data belongs to
+    const isShowingTrackedEpisode = !item.selectedSeason || (
+      item.selectedSeason === item.season &&
+      item.selectedEpisode === item.episode
+    );
+    const progress = isShowingTrackedEpisode
+      ? (typeof item.progress_percent === 'number' ? item.progress_percent : 0)
+      : 0;
+    const isWatched = progress >= 98;
 
     return html`
       <div class="item-detail-view">

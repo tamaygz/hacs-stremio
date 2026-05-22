@@ -235,6 +235,38 @@ class StremioBrowseCard extends LitElement {
         color: var(--secondary-text-color);
       }
 
+      .watched-overlay {
+        position: absolute;
+        top: 6px;
+        right: 6px;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        background: rgba(0, 0, 0, 0.7);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 2;
+      }
+
+      .watched-overlay ha-icon {
+        --mdc-icon-size: 16px;
+        color: white;
+      }
+
+      .item-progress {
+        width: 100%;
+        height: 4px;
+        background: var(--divider-color, rgba(255,255,255,0.1));
+        overflow: hidden;
+      }
+
+      .item-progress-fill {
+        height: 100%;
+        background: var(--primary-color);
+        transition: width 0.3s ease;
+      }
+
       .catalog-title {
         padding: 8px;
         font-size: 0.85em;
@@ -453,6 +485,40 @@ class StremioBrowseCard extends LitElement {
         font-weight: 500;
         font-size: 0.85em;
         margin: 2px 0;
+      }
+
+      .watched-label {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        color: var(--success-color, #4caf50);
+        font-size: 0.85em;
+        font-weight: 500;
+        margin: 4px 0;
+      }
+
+      .watched-label ha-icon {
+        --mdc-icon-size: 16px;
+      }
+
+      .detail-progress-container {
+        margin: 4px 0;
+      }
+
+      .detail-progress-bar {
+        width: 100%;
+        height: 4px;
+        background: var(--divider-color, rgba(255,255,255,0.1));
+        border-radius: 2px;
+        overflow: hidden;
+        margin-top: 2px;
+      }
+
+      .detail-progress-fill {
+        height: 100%;
+        background: var(--primary-color);
+        border-radius: 2px;
+        transition: width 0.3s ease;
       }
 
       .detail-actions {
@@ -858,7 +924,9 @@ class StremioBrowseCard extends LitElement {
   }
 
   _showDetailView(item) {
-    this._selectedItem = item;
+    // Enrich catalog item with library progress data if available
+    const enrichedItem = this._enrichWithLibraryData(item);
+    this._selectedItem = enrichedItem;
     
     // Fire event for external listeners
     this.dispatchEvent(
@@ -888,6 +956,54 @@ class StremioBrowseCard extends LitElement {
     );
   }
 
+  _enrichWithLibraryData(item) {
+    // Cross-reference catalog item with library data to add progress/watched info
+    if (!this._hass) return item;
+
+    const mediaId = this._extractMediaId(item);
+    if (!mediaId) return item;
+
+    // Find the library sensor to get library items
+    const librarySensor = this._findLibrarySensor();
+    if (!librarySensor) return item;
+
+    const libraryItems = librarySensor.attributes?.items || [];
+    const libraryItem = libraryItems.find(
+      li => li.imdb_id === mediaId || li.id === mediaId
+    );
+
+    if (!libraryItem) return item;
+
+    // Merge library progress data into the catalog item
+    return {
+      ...item,
+      progress_percent: libraryItem.progress_percent || 0,
+      progress: libraryItem.progress || 0,
+      duration: libraryItem.duration || 0,
+      season: libraryItem.season || libraryItem.last_season,
+      episode: libraryItem.episode || libraryItem.last_episode,
+      last_season: libraryItem.last_season || libraryItem.season,
+      last_episode: libraryItem.last_episode || libraryItem.episode,
+      flagged_watched: libraryItem.flagged_watched || 0,
+      in_library: true,
+    };
+  }
+
+  _findLibrarySensor() {
+    if (!this._hass?.states) return null;
+    for (const entityId in this._hass.states) {
+      if (entityId.startsWith('sensor.stremio') && entityId.endsWith('_library_count')) {
+        return this._hass.states[entityId];
+      }
+    }
+    for (const entityId in this._hass.states) {
+      if (entityId.includes('stremio') && entityId.includes('library_count')) {
+        return this._hass.states[entityId];
+      }
+    }
+    return null;
+  }
+
   _showEpisodePicker(item, mode = 'streams') {
     const onEpisodeSelected = (season, episode) => {
       console.log('[Browse Card] Episode selected:', { season, episode, mode });
@@ -907,6 +1023,9 @@ class StremioBrowseCard extends LitElement {
     
     // Extract media ID from item
     const mediaId = this._extractMediaId(item);
+
+    // Enrich with library data for progress display in the episode picker
+    const enrichedItem = this._enrichWithLibraryData(item);
     
     // Use the global helper if available
     if (window.StremioEpisodePicker) {
@@ -917,6 +1036,10 @@ class StremioBrowseCard extends LitElement {
           type: 'series',
           poster: item.thumbnail,
           imdb_id: mediaId,
+          lastWatchedSeason: enrichedItem.last_season || enrichedItem.season,
+          lastWatchedEpisode: enrichedItem.last_episode || enrichedItem.episode,
+          lastWatchedProgressPercent: enrichedItem.progress_percent || 0,
+          watched_episodes: enrichedItem.watched_episodes || [],
         },
         (selection) => {
           onEpisodeSelected(selection.season, selection.episode);
@@ -934,6 +1057,10 @@ class StremioBrowseCard extends LitElement {
         title: item.title,
         type: 'series',
         imdb_id: mediaId,
+        lastWatchedSeason: enrichedItem.last_season || enrichedItem.season,
+        lastWatchedEpisode: enrichedItem.last_episode || enrichedItem.episode,
+        lastWatchedProgressPercent: enrichedItem.progress_percent || 0,
+        watched_episodes: enrichedItem.watched_episodes || [],
       };
       picker.open = true;
       
@@ -1420,6 +1547,9 @@ class StremioBrowseCard extends LitElement {
 
   _renderCatalogItem(item) {
     const mediaType = this._getItemMediaType(item);
+    const enriched = this._enrichWithLibraryData(item);
+    const progress = enriched.progress_percent || 0;
+    const isWatched = progress >= 98 || enriched.flagged_watched === 1;
     
     return html`
       <div 
@@ -1448,12 +1578,22 @@ class StremioBrowseCard extends LitElement {
               <ha-icon icon="mdi:movie-outline"></ha-icon>
             </div>
           `}
+          ${isWatched ? html`
+            <div class="watched-overlay" title="Watched">
+              <ha-icon icon="mdi:eye"></ha-icon>
+            </div>
+          ` : ''}
         </div>
         ${this.config.show_media_type_badge ? html`
           <span class="media-type-badge ${mediaType}">${mediaType === 'series' ? 'TV' : 'Movie'}</span>
         ` : ''}
         ${this.config.show_title !== false ? html`
           <div class="catalog-title">${item.title}</div>
+        ` : ''}
+        ${enriched.in_library && progress > 0 ? html`
+          <div class="item-progress" role="progressbar" aria-valuenow="${isWatched ? 100 : progress}" aria-valuemin="0" aria-valuemax="100">
+            <div class="item-progress-fill" style="width: ${isWatched ? 100 : progress}%"></div>
+          </div>
         ` : ''}
       </div>
     `;
@@ -1467,6 +1607,8 @@ class StremioBrowseCard extends LitElement {
     const episodeLabel = hasSelectedEpisode 
       ? `S${String(item.selectedSeason).padStart(2, '0')}E${String(item.selectedEpisode).padStart(2, '0')}`
       : null;
+    const progress = item.progress_percent || 0;
+    const isWatched = progress >= 98 || item.flagged_watched === 1;
 
     return html`
       <div class="item-detail-view">
@@ -1483,6 +1625,19 @@ class StremioBrowseCard extends LitElement {
             <p class="detail-type">${mediaType === 'series' ? 'TV Series' : 'Movie'}</p>
             ${episodeLabel ? html`<p class="detail-episode">Episode: ${episodeLabel}</p>` : ''}
             ${item.year ? html`<p class="detail-meta">Year: ${item.year}</p>` : ''}
+            ${isWatched ? html`
+              <div class="watched-label">
+                <ha-icon icon="mdi:eye"></ha-icon>
+                Watched
+              </div>
+            ` : progress > 0 ? html`
+              <div class="detail-progress-container">
+                <p class="detail-meta">Progress: ${progress.toFixed(0)}%</p>
+                <div class="detail-progress-bar">
+                  <div class="detail-progress-fill" style="width: ${progress}%"></div>
+                </div>
+              </div>
+            ` : ''}
           </div>
         </div>
 
@@ -1501,7 +1656,7 @@ class StremioBrowseCard extends LitElement {
           ` : ''}
           <button class="detail-button tertiary" @click=${() => this._addToLibrary(item)}>
             <ha-icon icon="mdi:plus"></ha-icon>
-            Add to Library
+            ${item.in_library ? 'In Library' : 'Add to Library'}
           </button>
         </div>
 

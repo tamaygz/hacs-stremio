@@ -108,6 +108,8 @@ SENSOR_TYPES: tuple[StremioSensorEntityDescription, ...] = (
                     "imdb_id": item.get("imdb_id"),
                     "id": item.get("id"),
                     "year": item.get("year"),
+                    "progress": item.get("progress", 0),
+                    "duration": item.get("duration", 0),
                     "progress_percent": (
                         round(
                             (item.get("progress", 0) / item.get("duration", 1)) * 100, 1
@@ -115,6 +117,11 @@ SENSOR_TYPES: tuple[StremioSensorEntityDescription, ...] = (
                         if item.get("duration", 0) > 0
                         else 0
                     ),
+                    "season": item.get("season"),
+                    "episode": item.get("episode"),
+                    "last_season": item.get("season"),
+                    "last_episode": item.get("episode"),
+                    "flagged_watched": item.get("flagged_watched", 0),
                 }
                 for item in data.get("library", [])
             ]
@@ -202,6 +209,8 @@ SENSOR_TYPES: tuple[StremioSensorEntityDescription, ...] = (
                     "imdb_id": item.get("imdb_id"),
                     "id": item.get("id"),
                     "year": item.get("year"),
+                    "progress": item.get("progress", 0),
+                    "duration": item.get("duration", 0),
                     "progress_percent": (
                         round(
                             (item.get("progress", 0) / item.get("duration", 1)) * 100, 1
@@ -209,6 +218,10 @@ SENSOR_TYPES: tuple[StremioSensorEntityDescription, ...] = (
                         if item.get("duration", 0) > 0
                         else 0
                     ),
+                    "season": item.get("season"),
+                    "episode": item.get("episode"),
+                    "total_seasons": item.get("total_seasons"),
+                    "episode_title": item.get("episode_title"),
                 }
                 for item in data.get("continue_watching", [])
             ]
