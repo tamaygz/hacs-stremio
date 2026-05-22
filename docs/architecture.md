@@ -273,9 +273,12 @@ Stremio API reports playback change
 - Custom service definitions
 - **Services**:
   - `stremio.search_library`: Search user's library
-  - `stremio.get_stream_url`: Get streaming URLs
+  - `stremio.get_streams`: Get streaming URLs
   - `stremio.add_to_library`: Add item to library
   - `stremio.handover_to_apple_tv`: Send to Apple TV
+  - `stremio.set_currently_watching`: Set an item as currently watching
+  - `stremio.update_watch_progress`: Update watch progress
+  - `stremio.mark_watched`: Mark an item as watched
 
 ---
 

@@ -133,9 +133,9 @@ With these additions, users could create automations like:
 ## 🏆 Priority Recommendations
 
 **Phase 1 (Quick Wins):**
-1. Add `mark_as_watched` / `mark_as_unwatched` services
-2. Add `has_new_episodes` binary sensor  
-3. Add stream quality preference to config
+1. ✅ Add playback state services (`set_currently_watching`, `update_watch_progress`, `mark_watched`)
+2. ✅ Add `has_new_episodes` binary sensor  
+3. ✅ Add stream quality preference to config
 
 **Phase 2 (Medium Effort):**
 1. Watch statistics sensors (`watch_time_today`, `watch_time_week`)

@@ -1288,8 +1288,9 @@ class StremioClient:
 
                 state["timeOffset"] = progress_value
                 if progress_value > 0:
+                    current_time_watched = int(state.get("timeWatched", 0))
                     state["timeWatched"] = max(
-                        int(state.get("timeWatched", 0)), progress_value
+                        current_time_watched, progress_value
                     )
                 state["lastWatched"] = now
 
@@ -1312,7 +1313,7 @@ class StremioClient:
                 state["watched"] = now
                 state["flaggedWatched"] = 1
                 state["timesWatched"] = max(
-                    1, int(state.get("timesWatched") or 0) + 1
+                    1, int(state.get("timesWatched", 0)) + 1
                 )
             else:
                 _LOGGER.error("Unknown playback update mode: %s", mode)
