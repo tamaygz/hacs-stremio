@@ -1293,6 +1293,13 @@ class StremioLibraryCard extends LitElement {
     const showProgress = this.config.show_progress !== false;
 
     // Always render all slots to maintain alignment across items in the same row
+    const progressBarWidth = (() => {
+      if (!showProgress) return 0;
+      if (isWatched) return 100;
+      return progress;
+    })();
+    const ariaLabel = `${title}${isWatched ? ', watched' : progress > 0 ? `, ${progress.toFixed(0)}% watched` : ''}`;
+
     return html`
       <div 
         class="library-item" 
@@ -1300,7 +1307,7 @@ class StremioLibraryCard extends LitElement {
         tabindex="0"
         @click=${() => this._handleItemClick(item)}
         @keydown=${(e) => e.key === 'Enter' && this._handleItemClick(item)}
-        aria-label="${title}${isWatched ? ', watched' : progress > 0 ? `, ${progress.toFixed(0)}% watched` : ''}"
+        aria-label="${ariaLabel}"
       >
         <div class="item-poster-container">
           ${item.poster ? html`
@@ -1321,7 +1328,7 @@ class StremioLibraryCard extends LitElement {
         </div>
         <div class="item-title${showTitle ? '' : ' hidden'}" title="${title}">${showTitle ? title : ''}</div>
         <div class="item-progress" role="progressbar" aria-valuenow="${progress}" aria-valuemin="0" aria-valuemax="100">
-          <div class="item-progress-fill" style="width: ${showProgress && !isWatched ? progress : (isWatched && showProgress ? 100 : 0)}%"></div>
+          <div class="item-progress-fill" style="width: ${progressBarWidth}%"></div>
         </div>
       </div>
     `;

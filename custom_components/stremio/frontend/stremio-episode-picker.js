@@ -381,6 +381,8 @@ class StremioEpisodePicker extends LitElement {
           thumbnail: ep.thumbnail,
           released: ep.released,
           watched: isWatched,
+          // Show partial progress only for the last-watched episode when not yet fully watched.
+          // Fully watched episodes use the eye icon instead of a progress bar.
           progress: isLastWatched && !isWatched
             ? (this.mediaItem?.lastWatchedProgressPercent || 0)
             : 0,
