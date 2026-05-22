@@ -1303,14 +1303,15 @@ class StremioClient:
                         int(state.get("overallTimeWatched", 0)), duration_value
                     )
             elif mode == "watched":
-                watched_progress = progress_value
-                if duration_value > 0 and watched_progress < duration_value:
-                    watched_progress = duration_value
-                if watched_progress > 0:
-                    state["timeWatched"] = watched_progress
-                    state["timeOffset"] = duration_value or watched_progress
+                effective_watched_time = progress_value
+                if duration_value > 0 and effective_watched_time < duration_value:
+                    effective_watched_time = duration_value
+                if effective_watched_time > 0:
+                    state["timeWatched"] = effective_watched_time
+                    state["timeOffset"] = duration_value or effective_watched_time
                     state["overallTimeWatched"] = max(
-                        int(state.get("overallTimeWatched", 0)), watched_progress
+                        int(state.get("overallTimeWatched", 0)),
+                        effective_watched_time,
                     )
 
                 state["lastWatched"] = now

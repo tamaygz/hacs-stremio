@@ -44,6 +44,7 @@ from .const import (
     SERVICE_UPDATE_WATCH_PROGRESS,
 )
 from .coordinator import StremioDataUpdateCoordinator
+from .playback_helpers import async_update_playback_state_after_handover
 from .stremio_client import StremioClient, StremioConnectionError
 
 _LOGGER = logging.getLogger(__name__)
@@ -621,35 +622,15 @@ async def async_setup_services(hass: HomeAssistant) -> None:
 
             # Update the current media on the Stremio device coordinator
             coordinator.set_current_media(media_info, stream_url)
-
-            # Update playback state in Stremio via service action
-            playback_payload = {
-                ATTR_MEDIA_ID: media_id,
-                ATTR_MEDIA_TYPE: media_info.get("type", "movie"),
-                ATTR_SEASON: media_info.get("season"),
-                ATTR_EPISODE: media_info.get("episode"),
-                ATTR_PROGRESS: media_info.get("progress"),
-                ATTR_DURATION: media_info.get("duration"),
-                ATTR_FALLBACK_TO_WATCHED: True,
-            }
-            filtered_payload = {
-                key: value
-                for key, value in playback_payload.items()
-                if value is not None
-            }
-
-            if filtered_payload.get(ATTR_MEDIA_ID):
-                try:
-                    await hass.services.async_call(
-                        DOMAIN,
-                        SERVICE_SET_CURRENTLY_WATCHING,
-                        filtered_payload,
-                        blocking=True,
-                    )
-                except HomeAssistantError as err:
-                    _LOGGER.warning(
-                        "Failed to update playback state after handover: %s", err
-                    )
+            await async_update_playback_state_after_handover(
+                hass=hass,
+                media_id=media_id,
+                media_type=media_info.get("type"),
+                season=media_info.get("season"),
+                episode=media_info.get("episode"),
+                progress=media_info.get("progress"),
+                duration=media_info.get("duration"),
+            )
 
         except HandoverError as err:
             raise HomeAssistantError(f"Handover failed: {err}") from err

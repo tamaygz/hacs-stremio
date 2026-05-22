@@ -24,10 +24,10 @@ from .const import (
     CONF_HANDOVER_METHOD,
     DEFAULT_HANDOVER_METHOD,
     DOMAIN,
-    SERVICE_SET_CURRENTLY_WATCHING,
 )
 from .coordinator import StremioDataUpdateCoordinator
 from .entity_helpers import get_device_info
+from .playback_helpers import async_update_playback_state_after_handover
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -317,34 +317,15 @@ class StremioAppleTVHandoverButton(
                 title=title,
             )
             _LOGGER.info("Handover result: %s", result)
-
-            playback_payload = {
-                "media_id": media_id,
-                "media_type": media_type,
-                "season": season,
-                "episode": episode,
-                "progress": current.get("progress"),
-                "duration": current.get("duration"),
-                "fallback_to_watched": True,
-            }
-            filtered_payload = {
-                key: value
-                for key, value in playback_payload.items()
-                if value is not None
-            }
-
-            if filtered_payload.get("media_id"):
-                try:
-                    await self.hass.services.async_call(
-                        DOMAIN,
-                        SERVICE_SET_CURRENTLY_WATCHING,
-                        filtered_payload,
-                        blocking=True,
-                    )
-                except Exception as err:
-                    _LOGGER.warning(
-                        "Failed to update playback state after handover: %s", err
-                    )
+            await async_update_playback_state_after_handover(
+                hass=self.hass,
+                media_id=media_id,
+                media_type=media_type,
+                season=season,
+                episode=episode,
+                progress=current.get("progress"),
+                duration=current.get("duration"),
+            )
 
         except HandoverError as err:
             _LOGGER.error("Handover failed: %s", err)
