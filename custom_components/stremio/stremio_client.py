@@ -1286,6 +1286,7 @@ class StremioClient:
                 state["duration"] = duration_value
 
             if mode in ("watching", "progress"):
+                # Watching mode requires a minimum progress to show up in continue watching.
                 if mode == "watching" and progress_value <= 0:
                     progress_value = MIN_WATCHING_PROGRESS
 
@@ -1315,9 +1316,9 @@ class StremioClient:
                 state["lastWatched"] = now
                 state["watched"] = now
                 current_times_watched = int(state.get("timesWatched", 0))
-                was_flagged = int(state.get("flaggedWatched", 0)) == 1
+                is_already_flagged_watched = int(state.get("flaggedWatched", 0)) == 1
                 state["flaggedWatched"] = 1
-                if not was_flagged:
+                if not is_already_flagged_watched:
                     state["timesWatched"] = max(1, current_times_watched + 1)
                 else:
                     state["timesWatched"] = max(1, current_times_watched)
