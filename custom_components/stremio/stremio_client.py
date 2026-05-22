@@ -1279,8 +1279,13 @@ class StremioClient:
                 media_id, media_type, season, episode
             )
 
-            progress_value = max(int(progress or 0), 0)
-            duration_value = max(int(duration or 0), 0)
+            progress_value = int(progress or 0)
+            duration_value = int(duration or 0)
+            # Defensive clamp for direct client calls outside service schema validation.
+            if progress_value < 0:
+                progress_value = 0
+            if duration_value < 0:
+                duration_value = 0
 
             if duration is not None:
                 state["duration"] = duration_value
@@ -1303,15 +1308,15 @@ class StremioClient:
                         int(state.get("overallTimeWatched", 0)), duration_value
                     )
             elif mode == "watched":
-                effective_watched_time = progress_value
-                if duration_value > 0 and effective_watched_time < duration_value:
-                    effective_watched_time = duration_value
-                if effective_watched_time > 0:
-                    state["timeWatched"] = effective_watched_time
-                    state["timeOffset"] = duration_value or effective_watched_time
+                watched_time_to_record = progress_value
+                if duration_value > 0 and watched_time_to_record < duration_value:
+                    watched_time_to_record = duration_value
+                if watched_time_to_record > 0:
+                    state["timeWatched"] = watched_time_to_record
+                    state["timeOffset"] = duration_value or watched_time_to_record
                     state["overallTimeWatched"] = max(
                         int(state.get("overallTimeWatched", 0)),
-                        effective_watched_time,
+                        watched_time_to_record,
                     )
 
                 state["lastWatched"] = now

@@ -22,9 +22,14 @@ async def async_update_playback_state_after_handover(
     duration: int | None,
 ) -> None:
     """Update playback state after a handover operation."""
+    if not media_id:
+        return
+
+    resolved_media_type = media_type or "movie"
+
     payload = {
         "media_id": media_id,
-        "media_type": media_type or "movie",
+        "media_type": resolved_media_type,
         "season": season,
         "episode": episode,
         "progress": progress,
@@ -35,7 +40,7 @@ async def async_update_playback_state_after_handover(
         key: value for key, value in payload.items() if value is not None
     }
 
-    if not filtered_payload.get("media_id"):
+    if not filtered_payload.get("media_id") or not filtered_payload.get("media_type"):
         return
 
     try:
