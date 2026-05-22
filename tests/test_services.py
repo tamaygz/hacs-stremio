@@ -717,6 +717,28 @@ class TestSetCurrentlyWatchingService:
         client.async_set_currently_watching.assert_called_once()
         client.async_mark_watched.assert_called_once()
 
+    @pytest.mark.asyncio
+    async def test_set_currently_watching_failure_raises_error(
+        self, mock_service_hass, mock_coordinator
+    ):
+        """Test that HomeAssistantError is raised when set_currently_watching fails without fallback."""
+        client = mock_service_hass.data[DOMAIN]["test_entry"]["client"]
+        client.async_set_currently_watching = AsyncMock(return_value=False)
+
+        await async_setup_services(mock_service_hass)
+
+        with pytest.raises(HomeAssistantError):
+            await mock_service_hass.services.async_call(
+                DOMAIN,
+                "set_currently_watching",
+                {
+                    "media_id": "tt0111161",
+                    "media_type": "movie",
+                    "fallback_to_watched": False,
+                },
+                blocking=True,
+            )
+
 
 class TestUpdateWatchProgressService:
     """Tests for the update_watch_progress service."""
@@ -803,6 +825,28 @@ class TestUpdateWatchProgressService:
                 blocking=True,
             )
 
+    @pytest.mark.asyncio
+    async def test_update_watch_progress_failure_raises_error(
+        self, mock_service_hass, mock_coordinator
+    ):
+        """Test that HomeAssistantError is raised when update_watch_progress fails."""
+        client = mock_service_hass.data[DOMAIN]["test_entry"]["client"]
+        client.async_update_watch_progress = AsyncMock(return_value=False)
+
+        await async_setup_services(mock_service_hass)
+
+        with pytest.raises(HomeAssistantError):
+            await mock_service_hass.services.async_call(
+                DOMAIN,
+                "update_watch_progress",
+                {
+                    "media_id": "tt0111161",
+                    "media_type": "movie",
+                    "progress": 600,
+                },
+                blocking=True,
+            )
+
 
 class TestMarkWatchedService:
     """Tests for the mark_watched service."""
@@ -881,6 +925,27 @@ class TestMarkWatchedService:
                     "media_id": "tt0903747",
                     "media_type": "series",
                     # Missing season and episode
+                },
+                blocking=True,
+            )
+
+    @pytest.mark.asyncio
+    async def test_mark_watched_failure_raises_error(
+        self, mock_service_hass, mock_coordinator
+    ):
+        """Test that HomeAssistantError is raised when mark_watched fails."""
+        client = mock_service_hass.data[DOMAIN]["test_entry"]["client"]
+        client.async_mark_watched = AsyncMock(return_value=False)
+
+        await async_setup_services(mock_service_hass)
+
+        with pytest.raises(HomeAssistantError):
+            await mock_service_hass.services.async_call(
+                DOMAIN,
+                "mark_watched",
+                {
+                    "media_id": "tt0111161",
+                    "media_type": "movie",
                 },
                 blocking=True,
             )
