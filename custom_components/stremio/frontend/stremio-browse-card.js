@@ -585,6 +585,9 @@ class StremioBrowseCard extends LitElement {
     this._searchDebounceTimer = null;
     this._loadingMore = false;
     this._searchHasMore = false;
+    this._librarySensorEntityId = null;
+    this._libraryItemsRef = null;
+    this._libraryItemsByMediaId = null;
     this._genres = [
       'Action', 'Adventure', 'Animation', 'Biography', 'Comedy', 'Crime',
       'Documentary', 'Drama', 'Family', 'Fantasy', 'History', 'Horror',
@@ -666,6 +669,7 @@ class StremioBrowseCard extends LitElement {
   set hass(hass) {
     const oldHass = this._hass;
     this._hass = hass;
+    this._invalidateLibraryCache();
     
     // Load catalog on first hass set
     if (!oldHass && hass) {
@@ -934,10 +938,10 @@ class StremioBrowseCard extends LitElement {
         bubbles: true,
         composed: true,
         detail: { 
-          item,
-          mediaId: item.media_content_id,
-          title: item.title,
-          type: this._getItemMediaType(item),
+          item: enrichedItem,
+          mediaId: enrichedItem.media_content_id,
+          title: enrichedItem.title,
+          type: this._getItemMediaType(enrichedItem),
         },
       })
     );
@@ -963,14 +967,10 @@ class StremioBrowseCard extends LitElement {
     const mediaId = this._extractMediaId(item);
     if (!mediaId) return item;
 
-    // Find the library sensor to get library items
-    const librarySensor = this._findLibrarySensor();
-    if (!librarySensor) return item;
+    const libraryItemsByMediaId = this._getLibraryItemsByMediaId();
+    if (!libraryItemsByMediaId) return item;
 
-    const libraryItems = librarySensor.attributes?.items || [];
-    const libraryItem = libraryItems.find(
-      li => li.imdb_id === mediaId || li.id === mediaId
-    );
+    const libraryItem = libraryItemsByMediaId.get(mediaId);
 
     if (!libraryItem) return item;
 
@@ -991,17 +991,60 @@ class StremioBrowseCard extends LitElement {
 
   _findLibrarySensor() {
     if (!this._hass?.states) return null;
+    if (
+      this._librarySensorEntityId &&
+      this._hass.states[this._librarySensorEntityId]
+    ) {
+      return this._hass.states[this._librarySensorEntityId];
+    }
+
     for (const entityId in this._hass.states) {
       if (entityId.startsWith('sensor.stremio') && entityId.endsWith('_library_count')) {
+        this._librarySensorEntityId = entityId;
         return this._hass.states[entityId];
       }
     }
     for (const entityId in this._hass.states) {
       if (entityId.includes('stremio') && entityId.includes('library_count')) {
+        this._librarySensorEntityId = entityId;
         return this._hass.states[entityId];
       }
     }
+    this._librarySensorEntityId = null;
     return null;
+  }
+
+  _getLibraryItemsByMediaId() {
+    const librarySensor = this._findLibrarySensor();
+    if (!librarySensor) return null;
+
+    const libraryItems = librarySensor.attributes?.items;
+    if (!Array.isArray(libraryItems)) return null;
+
+    if (this._libraryItemsByMediaId && this._libraryItemsRef === libraryItems) {
+      return this._libraryItemsByMediaId;
+    }
+
+    const libraryItemsByMediaId = new Map();
+    for (const libraryItem of libraryItems) {
+      if (!libraryItem || typeof libraryItem !== 'object') continue;
+      if (libraryItem.imdb_id) {
+        libraryItemsByMediaId.set(libraryItem.imdb_id, libraryItem);
+      }
+      if (libraryItem.id) {
+        libraryItemsByMediaId.set(libraryItem.id, libraryItem);
+      }
+    }
+
+    this._libraryItemsRef = libraryItems;
+    this._libraryItemsByMediaId = libraryItemsByMediaId;
+    return this._libraryItemsByMediaId;
+  }
+
+  _invalidateLibraryCache() {
+    this._librarySensorEntityId = null;
+    this._libraryItemsRef = null;
+    this._libraryItemsByMediaId = null;
   }
 
   _showEpisodePicker(item, mode = 'streams') {

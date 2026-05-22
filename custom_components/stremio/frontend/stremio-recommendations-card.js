@@ -505,6 +505,9 @@ class StremioRecommendationsCard extends LitElement {
     this._loading = false;
     this._error = null;
     this._lastFetchTime = 0;
+    this._librarySensorEntityId = null;
+    this._libraryItemsRef = null;
+    this._libraryItemsByMediaId = null;
     
     // Bind methods that are used as event handlers
     this._closeDetail = this._closeDetail.bind(this);
@@ -549,6 +552,7 @@ class StremioRecommendationsCard extends LitElement {
   set hass(hass) {
     const oldHass = this._hass;
     this._hass = hass;
+    this._invalidateLibraryCache();
     
     // Fetch recommendations on first hass set
     if (!oldHass && hass) {
@@ -670,13 +674,10 @@ class StremioRecommendationsCard extends LitElement {
     const mediaId = item.imdb_id || item.id;
     if (!mediaId) return item;
 
-    const librarySensor = this._findLibrarySensor();
-    if (!librarySensor) return item;
+    const libraryItemsByMediaId = this._getLibraryItemsByMediaId();
+    if (!libraryItemsByMediaId) return item;
 
-    const libraryItems = librarySensor.attributes?.items || [];
-    const libraryItem = libraryItems.find(
-      li => li.imdb_id === mediaId || li.id === mediaId
-    );
+    const libraryItem = libraryItemsByMediaId.get(mediaId);
     if (!libraryItem) return item;
 
     return {
@@ -695,17 +696,60 @@ class StremioRecommendationsCard extends LitElement {
 
   _findLibrarySensor() {
     if (!this._hass?.states) return null;
+    if (
+      this._librarySensorEntityId &&
+      this._hass.states[this._librarySensorEntityId]
+    ) {
+      return this._hass.states[this._librarySensorEntityId];
+    }
+
     for (const entityId in this._hass.states) {
       if (entityId.startsWith('sensor.stremio') && entityId.endsWith('_library_count')) {
+        this._librarySensorEntityId = entityId;
         return this._hass.states[entityId];
       }
     }
     for (const entityId in this._hass.states) {
       if (entityId.includes('stremio') && entityId.includes('library_count')) {
+        this._librarySensorEntityId = entityId;
         return this._hass.states[entityId];
       }
     }
+    this._librarySensorEntityId = null;
     return null;
+  }
+
+  _getLibraryItemsByMediaId() {
+    const librarySensor = this._findLibrarySensor();
+    if (!librarySensor) return null;
+
+    const libraryItems = librarySensor.attributes?.items;
+    if (!Array.isArray(libraryItems)) return null;
+
+    if (this._libraryItemsByMediaId && this._libraryItemsRef === libraryItems) {
+      return this._libraryItemsByMediaId;
+    }
+
+    const libraryItemsByMediaId = new Map();
+    for (const libraryItem of libraryItems) {
+      if (!libraryItem || typeof libraryItem !== 'object') continue;
+      if (libraryItem.imdb_id) {
+        libraryItemsByMediaId.set(libraryItem.imdb_id, libraryItem);
+      }
+      if (libraryItem.id) {
+        libraryItemsByMediaId.set(libraryItem.id, libraryItem);
+      }
+    }
+
+    this._libraryItemsRef = libraryItems;
+    this._libraryItemsByMediaId = libraryItemsByMediaId;
+    return this._libraryItemsByMediaId;
+  }
+
+  _invalidateLibraryCache() {
+    this._librarySensorEntityId = null;
+    this._libraryItemsRef = null;
+    this._libraryItemsByMediaId = null;
   }
 
   _closeDetail() {
@@ -1532,4 +1576,3 @@ if (!customElements.get('stremio-recommendations-card-editor')) {
 }
 
 // Note: Card registration with window.customCards is handled in stremio-card-bundle.js
-
