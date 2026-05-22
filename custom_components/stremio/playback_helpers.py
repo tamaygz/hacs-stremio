@@ -1,4 +1,4 @@
-"""Helpers for updating Stremio playback state after handover."""
+"""Best-effort post-handover playback sync helpers using ``StremioClient``."""
 
 from __future__ import annotations
 
