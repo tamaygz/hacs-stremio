@@ -115,6 +115,9 @@ Set a media item as currently watching in Stremio, optionally updating progress.
 - `progress` (optional): Current progress in seconds
 - `duration` (optional): Total duration in seconds
 - `fallback_to_watched` (optional): Mark watched if setting currently watching fails (default: false)
+- `config_entry_id` (optional): Target a specific Stremio config entry in multi-entry setups
+
+**Note:** This service updates playback state for items already present in your Stremio library. If the item is not in the library, the update fails.
 
 **Example:**
 ```yaml
@@ -139,6 +142,9 @@ Update watch progress for a media item or episode.
 - `season` / `episode` (required for series): Episode details
 - `progress` (required): Current progress in seconds
 - `duration` (optional): Total duration in seconds
+- `config_entry_id` (optional): Target a specific Stremio config entry in multi-entry setups
+
+**Note:** This service updates playback state for items already present in your Stremio library. If the item is not in the library, the update fails.
 
 **Example:**
 ```yaml
@@ -162,6 +168,9 @@ Mark a media item or episode as watched.
 - `season` / `episode` (required for series): Episode details
 - `progress` (optional): Current progress in seconds
 - `duration` (optional): Total duration in seconds
+- `config_entry_id` (optional): Target a specific Stremio config entry in multi-entry setups
+
+**Note:** This service updates playback state for items already present in your Stremio library. If the item is not in the library, the update fails.
 
 **Example:**
 ```yaml

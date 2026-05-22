@@ -1298,6 +1298,7 @@ class StremioLibraryCard extends LitElement {
       if (isWatched) return 100;
       return progress;
     })();
+    const displayedProgress = progressBarWidth;
     const ariaLabel = `${title}${isWatched ? ', watched' : progress > 0 ? `, ${progress.toFixed(0)}% watched` : ''}`;
 
     return html`
@@ -1327,7 +1328,7 @@ class StremioLibraryCard extends LitElement {
           ` : ''}
         </div>
         <div class="item-title${showTitle ? '' : ' hidden'}" title="${title}">${showTitle ? title : ''}</div>
-        <div class="item-progress" role="progressbar" aria-valuenow="${progress}" aria-valuemin="0" aria-valuemax="100">
+        <div class="item-progress" role="progressbar" aria-valuenow="${displayedProgress}" aria-valuemin="0" aria-valuemax="100">
           <div class="item-progress-fill" style="width: ${progressBarWidth}%"></div>
         </div>
       </div>

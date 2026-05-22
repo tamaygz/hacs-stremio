@@ -722,9 +722,10 @@ class StremioMediaDetailsCard extends LitElement {
   }
 
   _renderHeader() {
-    const progressPercent = this._media.duration > 0 
-      ? (this._media.progress / this._media.duration) * 100 
+    const progressPercentRaw = this._media.duration > 0
+      ? (this._media.progress / this._media.duration) * 100
       : 0;
+    const progressPercent = Math.min(100, Math.max(0, progressPercentRaw));
     const isWatched = progressPercent >= 98;
 
     return html`

@@ -1002,6 +1002,7 @@ class StremioContinueWatchingCard extends LitElement {
     const title = item.title || 'Unknown';
     const progress = typeof item.progress_percent === 'number' ? item.progress_percent : 0;
     const isWatched = progress >= 98;
+    const progressBarWidth = isWatched ? 100 : progress;
     const showTitle = this.config.show_title !== false;
     const showProgressText = this.config.show_progress_text !== false;
     
@@ -1034,8 +1035,8 @@ class StremioContinueWatchingCard extends LitElement {
           ` : ''}
         </div>
         <div class="item-title${showTitle ? '' : ' hidden'}" title="${title}">${showTitle ? title : ''}</div>
-        <div class="item-progress" role="progressbar" aria-valuenow="${progress}" aria-valuemin="0" aria-valuemax="100">
-          <div class="item-progress-fill" style="width: ${progress}%"></div>
+        <div class="item-progress" role="progressbar" aria-valuenow="${progressBarWidth}" aria-valuemin="0" aria-valuemax="100">
+          <div class="item-progress-fill" style="width: ${progressBarWidth}%"></div>
         </div>
         <div class="item-progress-text">${showProgressText && progress > 0 && !isWatched ? `${progress.toFixed(0)}%` : ''}</div>
       </div>
