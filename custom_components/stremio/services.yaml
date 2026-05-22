@@ -175,6 +175,199 @@ handover_to_apple_tv:
             - "direct"
             - "vlc"
 
+set_currently_watching:
+  name: Set Currently Watching
+  description: Set a media item as currently watching in Stremio, optionally updating progress.
+  fields:
+    media_id:
+      name: Media ID
+      description: The IMDB ID of the media item.
+      required: true
+      example: "tt0903747"
+      selector:
+        text:
+    media_type:
+      name: Media Type
+      description: Type of media (movie or series).
+      required: true
+      example: "series"
+      selector:
+        select:
+          options:
+            - "movie"
+            - "series"
+    season:
+      name: Season
+      description: Season number (required for series).
+      required: false
+      example: 1
+      selector:
+        number:
+          min: 1
+          max: 100
+          mode: box
+    episode:
+      name: Episode
+      description: Episode number (required for series).
+      required: false
+      example: 1
+      selector:
+        number:
+          min: 1
+          max: 100
+          mode: box
+    progress:
+      name: Progress
+      description: Current progress in seconds.
+      required: false
+      example: 120
+      selector:
+        number:
+          min: 0
+          max: 100000
+          mode: box
+    duration:
+      name: Duration
+      description: Total duration in seconds.
+      required: false
+      example: 3600
+      selector:
+        number:
+          min: 0
+          max: 100000
+          mode: box
+    fallback_to_watched:
+      name: Fallback to Watched
+      description: Mark as watched if setting currently watching fails.
+      required: false
+      default: false
+      selector:
+        boolean:
+
+update_watch_progress:
+  name: Update Watch Progress
+  description: Update watch progress for a media item or episode.
+  fields:
+    media_id:
+      name: Media ID
+      description: The IMDB ID of the media item.
+      required: true
+      example: "tt0903747"
+      selector:
+        text:
+    media_type:
+      name: Media Type
+      description: Type of media (movie or series).
+      required: true
+      example: "series"
+      selector:
+        select:
+          options:
+            - "movie"
+            - "series"
+    season:
+      name: Season
+      description: Season number (required for series).
+      required: false
+      example: 1
+      selector:
+        number:
+          min: 1
+          max: 100
+          mode: box
+    episode:
+      name: Episode
+      description: Episode number (required for series).
+      required: false
+      example: 1
+      selector:
+        number:
+          min: 1
+          max: 100
+          mode: box
+    progress:
+      name: Progress
+      description: Current progress in seconds.
+      required: true
+      example: 120
+      selector:
+        number:
+          min: 0
+          max: 100000
+          mode: box
+    duration:
+      name: Duration
+      description: Total duration in seconds.
+      required: false
+      example: 3600
+      selector:
+        number:
+          min: 0
+          max: 100000
+          mode: box
+
+mark_watched:
+  name: Mark Watched
+  description: Mark a media item or episode as watched.
+  fields:
+    media_id:
+      name: Media ID
+      description: The IMDB ID of the media item.
+      required: true
+      example: "tt0903747"
+      selector:
+        text:
+    media_type:
+      name: Media Type
+      description: Type of media (movie or series).
+      required: true
+      example: "series"
+      selector:
+        select:
+          options:
+            - "movie"
+            - "series"
+    season:
+      name: Season
+      description: Season number (required for series).
+      required: false
+      example: 1
+      selector:
+        number:
+          min: 1
+          max: 100
+          mode: box
+    episode:
+      name: Episode
+      description: Episode number (required for series).
+      required: false
+      example: 1
+      selector:
+        number:
+          min: 1
+          max: 100
+          mode: box
+    progress:
+      name: Progress
+      description: Current progress in seconds.
+      required: false
+      example: 120
+      selector:
+        number:
+          min: 0
+          max: 100000
+          mode: box
+    duration:
+      name: Duration
+      description: Total duration in seconds.
+      required: false
+      example: 3600
+      selector:
+        number:
+          min: 0
+          max: 100000
+          mode: box
+
 browse_catalog:
   name: Browse Catalog
   description: Browse the Stremio catalog for popular or new movies/series, optionally filtered by genre.

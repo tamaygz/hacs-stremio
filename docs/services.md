@@ -104,6 +104,76 @@ data:
   method: "auto"
 ```
 
+### stremio.set_currently_watching
+
+Set a media item as currently watching in Stremio, optionally updating progress.
+
+**Parameters:**
+- `media_id` (required): IMDb ID of the media item
+- `media_type` (required): "movie" or "series"
+- `season` / `episode` (required for series): Episode details
+- `progress` (optional): Current progress in seconds
+- `duration` (optional): Total duration in seconds
+- `fallback_to_watched` (optional): Mark watched if setting currently watching fails (default: false)
+
+**Example:**
+```yaml
+service: stremio.set_currently_watching
+data:
+  media_id: "tt0903747"
+  media_type: "series"
+  season: 1
+  episode: 1
+  progress: 120
+  duration: 3600
+  fallback_to_watched: true
+```
+
+### stremio.update_watch_progress
+
+Update watch progress for a media item or episode.
+
+**Parameters:**
+- `media_id` (required): IMDb ID of the media item
+- `media_type` (required): "movie" or "series"
+- `season` / `episode` (required for series): Episode details
+- `progress` (required): Current progress in seconds
+- `duration` (optional): Total duration in seconds
+
+**Example:**
+```yaml
+service: stremio.update_watch_progress
+data:
+  media_id: "tt0903747"
+  media_type: "series"
+  season: 1
+  episode: 1
+  progress: 900
+  duration: 3600
+```
+
+### stremio.mark_watched
+
+Mark a media item or episode as watched.
+
+**Parameters:**
+- `media_id` (required): IMDb ID of the media item
+- `media_type` (required): "movie" or "series"
+- `season` / `episode` (required for series): Episode details
+- `progress` (optional): Current progress in seconds
+- `duration` (optional): Total duration in seconds
+
+**Example:**
+```yaml
+service: stremio.mark_watched
+data:
+  media_id: "tt0903747"
+  media_type: "series"
+  season: 1
+  episode: 1
+  duration: 3600
+```
+
 ### stremio.browse_catalog
 
 Browse the Stremio catalog for popular or new movies/series with optional genre filtering.

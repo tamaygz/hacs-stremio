@@ -35,10 +35,13 @@ from .const import (
     SERVICE_GET_STREAMS,
     SERVICE_GET_UPCOMING_EPISODES,
     SERVICE_HANDOVER_TO_APPLE_TV,
+    SERVICE_MARK_WATCHED,
     SERVICE_REFRESH_LIBRARY,
     SERVICE_REMOVE_FROM_LIBRARY,
+    SERVICE_SET_CURRENTLY_WATCHING,
     SERVICE_SEARCH_CATALOG,
     SERVICE_SEARCH_LIBRARY,
+    SERVICE_UPDATE_WATCH_PROGRESS,
 )
 from .coordinator import StremioDataUpdateCoordinator
 from .stremio_client import StremioClient, StremioConnectionError
@@ -60,6 +63,9 @@ ATTR_GENRE = "genre"
 ATTR_SKIP = "skip"
 ATTR_CATALOG_TYPE = "catalog_type"
 ATTR_DAYS_AHEAD = "days_ahead"
+ATTR_PROGRESS = "progress"
+ATTR_DURATION = "duration"
+ATTR_FALLBACK_TO_WATCHED = "fallback_to_watched"
 
 # Service schemas
 SEARCH_LIBRARY_SCHEMA = vol.Schema(
@@ -108,6 +114,52 @@ HANDOVER_SCHEMA = vol.Schema(
         vol.Optional(ATTR_MEDIA_ID): cv.string,
         vol.Optional(ATTR_STREAM_URL): cv.string,
         vol.Optional(ATTR_METHOD): vol.In(["auto", "airplay", "vlc", "direct"]),
+    }
+)
+
+SET_CURRENTLY_WATCHING_SCHEMA = vol.Schema(
+    {
+        vol.Required(ATTR_MEDIA_ID): cv.string,
+        vol.Required(ATTR_MEDIA_TYPE): vol.In(["movie", "series"]),
+        vol.Optional(ATTR_SEASON): vol.Coerce(int),  # type: ignore[arg-type]
+        vol.Optional(ATTR_EPISODE): vol.Coerce(int),  # type: ignore[arg-type]
+        vol.Optional(ATTR_PROGRESS): vol.All(
+            vol.Coerce(int), vol.Range(min=0)  # type: ignore[arg-type]
+        ),
+        vol.Optional(ATTR_DURATION): vol.All(
+            vol.Coerce(int), vol.Range(min=0)  # type: ignore[arg-type]
+        ),
+        vol.Optional(ATTR_FALLBACK_TO_WATCHED, default=False): cv.boolean,
+    }
+)
+
+UPDATE_WATCH_PROGRESS_SCHEMA = vol.Schema(
+    {
+        vol.Required(ATTR_MEDIA_ID): cv.string,
+        vol.Required(ATTR_MEDIA_TYPE): vol.In(["movie", "series"]),
+        vol.Required(ATTR_PROGRESS): vol.All(
+            vol.Coerce(int), vol.Range(min=0)  # type: ignore[arg-type]
+        ),
+        vol.Optional(ATTR_SEASON): vol.Coerce(int),  # type: ignore[arg-type]
+        vol.Optional(ATTR_EPISODE): vol.Coerce(int),  # type: ignore[arg-type]
+        vol.Optional(ATTR_DURATION): vol.All(
+            vol.Coerce(int), vol.Range(min=0)  # type: ignore[arg-type]
+        ),
+    }
+)
+
+MARK_WATCHED_SCHEMA = vol.Schema(
+    {
+        vol.Required(ATTR_MEDIA_ID): cv.string,
+        vol.Required(ATTR_MEDIA_TYPE): vol.In(["movie", "series"]),
+        vol.Optional(ATTR_SEASON): vol.Coerce(int),  # type: ignore[arg-type]
+        vol.Optional(ATTR_EPISODE): vol.Coerce(int),  # type: ignore[arg-type]
+        vol.Optional(ATTR_PROGRESS): vol.All(
+            vol.Coerce(int), vol.Range(min=0)  # type: ignore[arg-type]
+        ),
+        vol.Optional(ATTR_DURATION): vol.All(
+            vol.Coerce(int), vol.Range(min=0)  # type: ignore[arg-type]
+        ),
     }
 )
 
@@ -197,6 +249,18 @@ def _get_entry_data(
     return entry_data["coordinator"], entry_data["client"], entry_id
 
 
+def _validate_series_fields(
+    media_type: str, season: int | None, episode: int | None
+) -> None:
+    """Validate required fields for series items."""
+    if media_type == "series" and (season is None or episode is None):
+        raise ServiceValidationError(
+            "Season and episode are required for series",
+            translation_domain=DOMAIN,
+            translation_key="missing_season_episode",
+        )
+
+
 async def async_setup_services(hass: HomeAssistant) -> None:
     """Set up Stremio services.
 
@@ -277,13 +341,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         season = call.data.get(ATTR_SEASON)
         episode = call.data.get(ATTR_EPISODE)
 
-        # Validate series requires season/episode
-        if media_type == "series" and (season is None or episode is None):
-            raise ServiceValidationError(
-                "Season and episode are required for series",
-                translation_domain=DOMAIN,
-                translation_key="missing_season_episode",
-            )
+        _validate_series_fields(media_type, season, episode)
 
         _LOGGER.debug(
             "Getting streams: media_id=%s, type=%s, S%sE%s",
@@ -564,6 +622,35 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             # Update the current media on the Stremio device coordinator
             coordinator.set_current_media(media_info, stream_url)
 
+            # Update playback state in Stremio via service action
+            playback_payload = {
+                ATTR_MEDIA_ID: media_id,
+                ATTR_MEDIA_TYPE: media_info.get("type", "movie"),
+                ATTR_SEASON: media_info.get("season"),
+                ATTR_EPISODE: media_info.get("episode"),
+                ATTR_PROGRESS: media_info.get("progress"),
+                ATTR_DURATION: media_info.get("duration"),
+                ATTR_FALLBACK_TO_WATCHED: True,
+            }
+            playback_payload = {
+                key: value
+                for key, value in playback_payload.items()
+                if value is not None
+            }
+
+            if playback_payload.get(ATTR_MEDIA_ID):
+                try:
+                    await hass.services.async_call(
+                        DOMAIN,
+                        SERVICE_SET_CURRENTLY_WATCHING,
+                        playback_payload,
+                        blocking=True,
+                    )
+                except HomeAssistantError as err:
+                    _LOGGER.warning(
+                        "Failed to update playback state after handover: %s", err
+                    )
+
         except HandoverError as err:
             raise HomeAssistantError(f"Handover failed: {err}") from err
 
@@ -580,6 +667,138 @@ async def async_setup_services(hass: HomeAssistant) -> None:
 
         # Schedule a refresh after a short delay to allow Stremio's backend to sync
         coordinator.schedule_refresh_after_playback()
+
+    async def handle_set_currently_watching(call: ServiceCall) -> None:
+        """Handle set_currently_watching service call."""
+        coordinator, client, _ = _get_entry_data(hass)
+
+        media_id = call.data[ATTR_MEDIA_ID]
+        media_type = call.data[ATTR_MEDIA_TYPE]
+        season = call.data.get(ATTR_SEASON)
+        episode = call.data.get(ATTR_EPISODE)
+        progress = call.data.get(ATTR_PROGRESS)
+        duration = call.data.get(ATTR_DURATION)
+        fallback_to_watched = call.data.get(ATTR_FALLBACK_TO_WATCHED, False)
+
+        _validate_series_fields(media_type, season, episode)
+
+        _LOGGER.info(
+            "Setting currently watching: %s (%s) S%sE%s",
+            media_id,
+            media_type,
+            season,
+            episode,
+        )
+
+        try:
+            success = await client.async_set_currently_watching(
+                media_id=media_id,
+                media_type=media_type,
+                season=season,
+                episode=episode,
+                progress=progress,
+                duration=duration,
+            )
+            if not success and fallback_to_watched:
+                _LOGGER.warning(
+                    "Set currently watching failed; falling back to mark watched"
+                )
+                success = await client.async_mark_watched(
+                    media_id=media_id,
+                    media_type=media_type,
+                    season=season,
+                    episode=episode,
+                    progress=progress,
+                    duration=duration,
+                )
+
+            if not success:
+                raise HomeAssistantError(
+                    "Failed to update playback state (currently watching)"
+                )
+
+            await coordinator.async_request_refresh()
+        except StremioConnectionError as err:
+            raise HomeAssistantError(
+                f"Failed to set currently watching: {err}"
+            ) from err
+
+    async def handle_update_watch_progress(call: ServiceCall) -> None:
+        """Handle update_watch_progress service call."""
+        coordinator, client, _ = _get_entry_data(hass)
+
+        media_id = call.data[ATTR_MEDIA_ID]
+        media_type = call.data[ATTR_MEDIA_TYPE]
+        season = call.data.get(ATTR_SEASON)
+        episode = call.data.get(ATTR_EPISODE)
+        progress = call.data[ATTR_PROGRESS]
+        duration = call.data.get(ATTR_DURATION)
+
+        _validate_series_fields(media_type, season, episode)
+
+        _LOGGER.info(
+            "Updating watch progress: %s (%s) S%sE%s progress=%s",
+            media_id,
+            media_type,
+            season,
+            episode,
+            progress,
+        )
+
+        try:
+            success = await client.async_update_watch_progress(
+                media_id=media_id,
+                media_type=media_type,
+                season=season,
+                episode=episode,
+                progress=progress,
+                duration=duration,
+            )
+            if not success:
+                raise HomeAssistantError("Failed to update watch progress")
+
+            await coordinator.async_request_refresh()
+        except StremioConnectionError as err:
+            raise HomeAssistantError(
+                f"Failed to update watch progress: {err}"
+            ) from err
+
+    async def handle_mark_watched(call: ServiceCall) -> None:
+        """Handle mark_watched service call."""
+        coordinator, client, _ = _get_entry_data(hass)
+
+        media_id = call.data[ATTR_MEDIA_ID]
+        media_type = call.data[ATTR_MEDIA_TYPE]
+        season = call.data.get(ATTR_SEASON)
+        episode = call.data.get(ATTR_EPISODE)
+        progress = call.data.get(ATTR_PROGRESS)
+        duration = call.data.get(ATTR_DURATION)
+
+        _validate_series_fields(media_type, season, episode)
+
+        _LOGGER.info(
+            "Marking watched: %s (%s) S%sE%s",
+            media_id,
+            media_type,
+            season,
+            episode,
+        )
+
+        try:
+            success = await client.async_mark_watched(
+                media_id=media_id,
+                media_type=media_type,
+                season=season,
+                episode=episode,
+                progress=progress,
+                duration=duration,
+            )
+            if not success:
+                raise HomeAssistantError("Failed to mark watched")
+
+            await coordinator.async_request_refresh()
+        except StremioConnectionError as err:
+            raise HomeAssistantError(f"Failed to mark watched: {err}") from err
 
     async def handle_browse_catalog(call: ServiceCall) -> ServiceResponse:
         """Handle browse_catalog service call.
@@ -871,6 +1090,27 @@ async def async_setup_services(hass: HomeAssistant) -> None:
 
     hass.services.async_register(
         DOMAIN,
+        SERVICE_SET_CURRENTLY_WATCHING,
+        handle_set_currently_watching,
+        schema=SET_CURRENTLY_WATCHING_SCHEMA,
+    )
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_UPDATE_WATCH_PROGRESS,
+        handle_update_watch_progress,
+        schema=UPDATE_WATCH_PROGRESS_SCHEMA,
+    )
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_MARK_WATCHED,
+        handle_mark_watched,
+        schema=MARK_WATCHED_SCHEMA,
+    )
+
+    hass.services.async_register(
+        DOMAIN,
         SERVICE_BROWSE_CATALOG,
         handle_browse_catalog,
         schema=BROWSE_CATALOG_SCHEMA,
@@ -931,6 +1171,9 @@ async def async_unload_services(hass: HomeAssistant) -> None:
     hass.services.async_remove(DOMAIN, SERVICE_REMOVE_FROM_LIBRARY)
     hass.services.async_remove(DOMAIN, SERVICE_REFRESH_LIBRARY)
     hass.services.async_remove(DOMAIN, SERVICE_HANDOVER_TO_APPLE_TV)
+    hass.services.async_remove(DOMAIN, SERVICE_SET_CURRENTLY_WATCHING)
+    hass.services.async_remove(DOMAIN, SERVICE_UPDATE_WATCH_PROGRESS)
+    hass.services.async_remove(DOMAIN, SERVICE_MARK_WATCHED)
     hass.services.async_remove(DOMAIN, SERVICE_BROWSE_CATALOG)
     hass.services.async_remove(DOMAIN, SERVICE_GET_UPCOMING_EPISODES)
     hass.services.async_remove(DOMAIN, SERVICE_GET_RECOMMENDATIONS)
