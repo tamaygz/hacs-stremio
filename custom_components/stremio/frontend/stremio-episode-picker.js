@@ -420,6 +420,14 @@ class StremioEpisodePicker extends LitElement {
     if (lastSeason && lastEpisode) {
       if (season < lastSeason) return true;
       if (season === lastSeason && episode < lastEpisode) return true;
+      // The last-watched episode itself is watched if its progress is complete
+      if (
+        season === lastSeason &&
+        episode === lastEpisode &&
+        (this.mediaItem?.lastWatchedProgressPercent || 0) >= 98
+      ) {
+        return true;
+      }
     }
 
     return false;
