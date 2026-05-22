@@ -50,5 +50,5 @@ async def async_update_playback_state_after_handover(
                 progress=progress,
                 duration=duration,
             )
-    except (StremioAuthError, StremioConnectionError) as err:
+    except (StremioAuthError, StremioConnectionError, ValueError) as err:
         _LOGGER.warning("Failed to update playback state after handover: %s", err)
