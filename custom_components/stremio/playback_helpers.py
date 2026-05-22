@@ -19,7 +19,11 @@ async def async_update_playback_state_after_handover(
     duration: int | None,
     fallback_to_watched: bool = False,
 ) -> None:
-    """Update playback state after a handover operation."""
+    """Update playback state after a handover operation.
+
+    Fallback to marking watched is disabled by default and only used when
+    ``fallback_to_watched`` is explicitly set to ``True``.
+    """
     if not media_id:
         return
 

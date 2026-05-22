@@ -235,12 +235,15 @@ def _get_entry_data(
 
     Args:
         hass: Home Assistant instance
+        config_entry_id: Optional Stremio config entry ID. If not provided,
+            the first configured entry is used.
 
     Returns:
         Tuple of coordinator, client, and entry_id
 
     Raises:
-        ServiceValidationError: If no Stremio integration configured
+        ServiceValidationError: If no Stremio integration is configured or if
+            a provided config_entry_id does not exist.
     """
     if DOMAIN not in hass.data or not hass.data[DOMAIN]:
         raise ServiceValidationError(
