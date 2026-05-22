@@ -1082,6 +1082,7 @@ class StremioBrowseCard extends LitElement {
           lastWatchedSeason: enrichedItem.last_season || enrichedItem.season,
           lastWatchedEpisode: enrichedItem.last_episode || enrichedItem.episode,
           lastWatchedProgressPercent: enrichedItem.progress_percent || 0,
+          flagged_watched: enrichedItem.flagged_watched || 0,
           watched_episodes: enrichedItem.watched_episodes || [],
         },
         (selection) => {
@@ -1103,6 +1104,7 @@ class StremioBrowseCard extends LitElement {
         lastWatchedSeason: enrichedItem.last_season || enrichedItem.season,
         lastWatchedEpisode: enrichedItem.last_episode || enrichedItem.episode,
         lastWatchedProgressPercent: enrichedItem.progress_percent || 0,
+        flagged_watched: enrichedItem.flagged_watched || 0,
         watched_episodes: enrichedItem.watched_episodes || [],
       };
       picker.open = true;

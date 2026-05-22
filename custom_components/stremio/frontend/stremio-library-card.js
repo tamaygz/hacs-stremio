@@ -796,6 +796,7 @@ class StremioLibraryCard extends LitElement {
           lastWatchedSeason: item.last_season || item.season,
           lastWatchedEpisode: item.last_episode || item.episode,
           lastWatchedProgressPercent: item.progress_percent || 0,
+          flagged_watched: item.flagged_watched || 0,
           total_seasons: item.total_seasons,
           watched_episodes: item.watched_episodes || [],
         },
@@ -818,6 +819,7 @@ class StremioLibraryCard extends LitElement {
         lastWatchedSeason: item.last_season || item.season,
         lastWatchedEpisode: item.last_episode || item.episode,
         lastWatchedProgressPercent: item.progress_percent || 0,
+        flagged_watched: item.flagged_watched || 0,
         total_seasons: item.total_seasons,
       };
       picker.open = true;

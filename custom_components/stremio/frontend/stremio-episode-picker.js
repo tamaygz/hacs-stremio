@@ -402,8 +402,27 @@ class StremioEpisodePicker extends LitElement {
   }
 
   _isEpisodeWatched(season, episode) {
+    // If entire show is flagged as watched, all episodes are watched
+    if (this.mediaItem?.flagged_watched === 1) {
+      return true;
+    }
+
+    // Check explicit watched_episodes list (if provided by parent)
     const watched = this.mediaItem?.watched_episodes || [];
-    return watched.some(w => w.season === season && w.episode === episode);
+    if (watched.some(w => w.season === season && w.episode === episode)) {
+      return true;
+    }
+
+    // Infer watched status from last-watched position:
+    // episodes earlier in the series are considered watched
+    const lastSeason = this.mediaItem?.lastWatchedSeason;
+    const lastEpisode = this.mediaItem?.lastWatchedEpisode;
+    if (lastSeason && lastEpisode) {
+      if (season < lastSeason) return true;
+      if (season === lastSeason && episode < lastEpisode) return true;
+    }
+
+    return false;
   }
 
   _loadFallbackData() {

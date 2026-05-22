@@ -753,6 +753,7 @@ class StremioContinueWatchingCard extends LitElement {
           lastWatchedSeason: item.season,
           lastWatchedEpisode: item.episode,
           lastWatchedProgressPercent: item.progress_percent || 0,
+          flagged_watched: item.flagged_watched || 0,
           total_seasons: item.total_seasons,
           watched_episodes: item.watched_episodes || [],
         },

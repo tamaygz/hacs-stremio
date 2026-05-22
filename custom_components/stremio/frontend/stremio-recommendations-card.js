@@ -809,6 +809,10 @@ class StremioRecommendationsCard extends LitElement {
   }
 
   _showEpisodePicker(item) {
+    // Enrich with library data for progress display in the episode picker
+    const enrichedItem = this._enrichWithLibraryData(item);
+    const mediaId = item.imdb_id || item.id;
+
     if (window.StremioEpisodePicker) {
       window.StremioEpisodePicker.show(
         this._hass,
@@ -816,7 +820,12 @@ class StremioRecommendationsCard extends LitElement {
           title: item.title || item.name,
           type: item.type,
           poster: item.poster,
-          imdb_id: item.imdb_id || item.id,
+          imdb_id: mediaId,
+          lastWatchedSeason: enrichedItem.last_season || enrichedItem.season,
+          lastWatchedEpisode: enrichedItem.last_episode || enrichedItem.episode,
+          lastWatchedProgressPercent: enrichedItem.progress_percent || 0,
+          flagged_watched: enrichedItem.flagged_watched || 0,
+          watched_episodes: enrichedItem.watched_episodes || [],
         },
         (selection) => {
           this._fetchStreams(item, selection.season, selection.episode);
