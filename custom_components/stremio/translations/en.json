@@ -154,7 +154,7 @@
       "fields": {
         "media_id": {
           "name": "Media ID",
-          "description": "The IMDB ID of the media item."
+          "description": "The IMDb ID of the media item."
         },
         "media_type": {
           "name": "Media Type",
