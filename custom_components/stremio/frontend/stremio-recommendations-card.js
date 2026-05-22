@@ -686,6 +686,8 @@ class StremioRecommendationsCard extends LitElement {
       duration: libraryItem.duration || 0,
       season: libraryItem.season || libraryItem.last_season,
       episode: libraryItem.episode || libraryItem.last_episode,
+      last_season: libraryItem.last_season || libraryItem.season,
+      last_episode: libraryItem.last_episode || libraryItem.episode,
       flagged_watched: libraryItem.flagged_watched || 0,
       in_library: true,
     };
