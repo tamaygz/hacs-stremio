@@ -1264,10 +1264,11 @@ class StremioClient:
             session = await self._get_session()
             now = _utc_iso_ms_z()
 
-            library_item = await self.async_find_item(media_id, media_type)
+            library_item = await self.async_find_existing_item(media_id)
             if library_item is None or not isinstance(library_item, dict):
                 _LOGGER.warning(
-                    "Cannot update playback state: item %s not found", media_id
+                    "Cannot update playback state: item %s not found in library",
+                    media_id,
                 )
                 return False
 

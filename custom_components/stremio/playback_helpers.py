@@ -1,10 +1,10 @@
-"""Helpers for updating playback state via services."""
+"""Helpers for updating Stremio playback state after handover."""
 
 from __future__ import annotations
 
 import logging
 
-from .stremio_client import StremioClient, StremioConnectionError
+from .stremio_client import StremioAuthError, StremioClient, StremioConnectionError
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -45,5 +45,5 @@ async def async_update_playback_state_after_handover(
                 progress=progress,
                 duration=duration,
             )
-    except StremioConnectionError as err:
+    except (StremioAuthError, StremioConnectionError) as err:
         _LOGGER.warning("Failed to update playback state after handover: %s", err)
