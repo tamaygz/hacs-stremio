@@ -4,16 +4,13 @@ from __future__ import annotations
 
 import logging
 
-from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import HomeAssistantError
-
-from .const import DOMAIN, SERVICE_SET_CURRENTLY_WATCHING
+from .stremio_client import StremioClient, StremioConnectionError
 
 _LOGGER = logging.getLogger(__name__)
 
 
 async def async_update_playback_state_after_handover(
-    hass: HomeAssistant,
+    client: StremioClient,
     media_id: str | None,
     media_type: str | None,
     season: int | None,
@@ -27,28 +24,26 @@ async def async_update_playback_state_after_handover(
 
     resolved_media_type = media_type or "movie"
 
-    payload = {
-        "media_id": media_id,
-        "media_type": resolved_media_type,
-        "season": season,
-        "episode": episode,
-        "progress": progress,
-        "duration": duration,
-        "fallback_to_watched": True,
-    }
-    filtered_payload = {
-        key: value for key, value in payload.items() if value is not None
-    }
-
-    if not filtered_payload.get("media_id") or not filtered_payload.get("media_type"):
-        return
-
     try:
-        await hass.services.async_call(
-            DOMAIN,
-            SERVICE_SET_CURRENTLY_WATCHING,
-            filtered_payload,
-            blocking=True,
+        success = await client.async_set_currently_watching(
+            media_id=media_id,
+            media_type=resolved_media_type,
+            season=season,
+            episode=episode,
+            progress=progress,
+            duration=duration,
         )
-    except HomeAssistantError as err:
+        if not success:
+            _LOGGER.warning(
+                "Set currently watching failed after handover; falling back to mark watched"
+            )
+            await client.async_mark_watched(
+                media_id=media_id,
+                media_type=resolved_media_type,
+                season=season,
+                episode=episode,
+                progress=progress,
+                duration=duration,
+            )
+    except StremioConnectionError as err:
         _LOGGER.warning("Failed to update playback state after handover: %s", err)

@@ -318,7 +318,7 @@ class StremioAppleTVHandoverButton(
             )
             _LOGGER.info("Handover result: %s", result)
             await async_update_playback_state_after_handover(
-                hass=self.hass,
+                client=self.coordinator.client,
                 media_id=media_id,
                 media_type=media_type,
                 season=season,

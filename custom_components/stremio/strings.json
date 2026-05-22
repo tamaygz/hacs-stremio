@@ -57,6 +57,23 @@
       }
     }
   },
+  "exceptions": {
+    "no_integration": {
+      "message": "No Stremio integration configured."
+    },
+    "missing_season_episode": {
+      "message": "Season and episode are required for series."
+    },
+    "no_data_available": {
+      "message": "Coordinator data not available."
+    },
+    "no_media_for_handover": {
+      "message": "No media_id provided and nothing currently watching."
+    },
+    "no_stream_url": {
+      "message": "Could not determine stream URL."
+    }
+  },
   "services": {
     "set_currently_watching": {
       "name": "Set Currently Watching",

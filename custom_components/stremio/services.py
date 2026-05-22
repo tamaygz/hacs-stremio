@@ -623,7 +623,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             # Update the current media on the Stremio device coordinator
             coordinator.set_current_media(media_info, stream_url)
             await async_update_playback_state_after_handover(
-                hass=hass,
+                client=client,
                 media_id=media_id,
                 media_type=media_info.get("type"),
                 season=media_info.get("season"),

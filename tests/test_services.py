@@ -19,6 +19,9 @@ from custom_components.stremio.const import (
     SERVICE_GET_UPCOMING_EPISODES,
     SERVICE_GET_RECOMMENDATIONS,
     SERVICE_GET_SIMILAR_CONTENT,
+    SERVICE_SET_CURRENTLY_WATCHING,
+    SERVICE_MARK_WATCHED,
+    SERVICE_UPDATE_WATCH_PROGRESS,
 )
 from custom_components.stremio.services import (
     async_setup_services,
@@ -410,6 +413,9 @@ class TestServiceRegistration:
         assert hass.services.has_service(DOMAIN, SERVICE_GET_UPCOMING_EPISODES)
         assert hass.services.has_service(DOMAIN, SERVICE_GET_RECOMMENDATIONS)
         assert hass.services.has_service(DOMAIN, SERVICE_GET_SIMILAR_CONTENT)
+        assert hass.services.has_service(DOMAIN, SERVICE_SET_CURRENTLY_WATCHING)
+        assert hass.services.has_service(DOMAIN, SERVICE_UPDATE_WATCH_PROGRESS)
+        assert hass.services.has_service(DOMAIN, SERVICE_MARK_WATCHED)
 
     @pytest.mark.asyncio
     async def test_services_unregistered(self, hass: HomeAssistant):
@@ -599,3 +605,282 @@ class TestGetSimilarContentService:
             media_id="tt0468569",
             limit=10,
         )
+
+
+class TestSetCurrentlyWatchingService:
+    """Tests for the set_currently_watching service."""
+
+    @pytest.mark.asyncio
+    async def test_set_currently_watching_movie(self, mock_service_hass, mock_coordinator):
+        """Test setting a movie as currently watching."""
+        client = mock_service_hass.data[DOMAIN]["test_entry"]["client"]
+        client.async_set_currently_watching = AsyncMock(return_value=True)
+
+        await async_setup_services(mock_service_hass)
+
+        await mock_service_hass.services.async_call(
+            DOMAIN,
+            "set_currently_watching",
+            {
+                "media_id": "tt0111161",
+                "media_type": "movie",
+                "progress": 300,
+                "duration": 7200,
+            },
+            blocking=True,
+        )
+
+        client.async_set_currently_watching.assert_called_once_with(
+            media_id="tt0111161",
+            media_type="movie",
+            season=None,
+            episode=None,
+            progress=300,
+            duration=7200,
+        )
+
+    @pytest.mark.asyncio
+    async def test_set_currently_watching_series(self, mock_service_hass, mock_coordinator):
+        """Test setting a series episode as currently watching."""
+        client = mock_service_hass.data[DOMAIN]["test_entry"]["client"]
+        client.async_set_currently_watching = AsyncMock(return_value=True)
+
+        await async_setup_services(mock_service_hass)
+
+        await mock_service_hass.services.async_call(
+            DOMAIN,
+            "set_currently_watching",
+            {
+                "media_id": "tt0903747",
+                "media_type": "series",
+                "season": 1,
+                "episode": 1,
+                "progress": 120,
+                "duration": 3600,
+            },
+            blocking=True,
+        )
+
+        client.async_set_currently_watching.assert_called_once_with(
+            media_id="tt0903747",
+            media_type="series",
+            season=1,
+            episode=1,
+            progress=120,
+            duration=3600,
+        )
+
+    @pytest.mark.asyncio
+    async def test_set_currently_watching_series_missing_season_episode(
+        self, mock_service_hass, mock_coordinator
+    ):
+        """Test validation error when series is missing season/episode."""
+        client = mock_service_hass.data[DOMAIN]["test_entry"]["client"]
+        client.async_set_currently_watching = AsyncMock(return_value=True)
+
+        await async_setup_services(mock_service_hass)
+
+        with pytest.raises(ServiceValidationError):
+            await mock_service_hass.services.async_call(
+                DOMAIN,
+                "set_currently_watching",
+                {
+                    "media_id": "tt0903747",
+                    "media_type": "series",
+                    # Missing season and episode
+                },
+                blocking=True,
+            )
+
+    @pytest.mark.asyncio
+    async def test_set_currently_watching_fallback_to_watched(
+        self, mock_service_hass, mock_coordinator
+    ):
+        """Test fallback_to_watched when set_currently_watching fails."""
+        client = mock_service_hass.data[DOMAIN]["test_entry"]["client"]
+        client.async_set_currently_watching = AsyncMock(return_value=False)
+        client.async_mark_watched = AsyncMock(return_value=True)
+
+        await async_setup_services(mock_service_hass)
+
+        await mock_service_hass.services.async_call(
+            DOMAIN,
+            "set_currently_watching",
+            {
+                "media_id": "tt0111161",
+                "media_type": "movie",
+                "fallback_to_watched": True,
+            },
+            blocking=True,
+        )
+
+        client.async_set_currently_watching.assert_called_once()
+        client.async_mark_watched.assert_called_once()
+
+
+class TestUpdateWatchProgressService:
+    """Tests for the update_watch_progress service."""
+
+    @pytest.mark.asyncio
+    async def test_update_watch_progress_movie(self, mock_service_hass, mock_coordinator):
+        """Test updating watch progress for a movie."""
+        client = mock_service_hass.data[DOMAIN]["test_entry"]["client"]
+        client.async_update_watch_progress = AsyncMock(return_value=True)
+
+        await async_setup_services(mock_service_hass)
+
+        await mock_service_hass.services.async_call(
+            DOMAIN,
+            "update_watch_progress",
+            {
+                "media_id": "tt0111161",
+                "media_type": "movie",
+                "progress": 600,
+                "duration": 7200,
+            },
+            blocking=True,
+        )
+
+        client.async_update_watch_progress.assert_called_once_with(
+            media_id="tt0111161",
+            media_type="movie",
+            season=None,
+            episode=None,
+            progress=600,
+            duration=7200,
+        )
+
+    @pytest.mark.asyncio
+    async def test_update_watch_progress_series(self, mock_service_hass, mock_coordinator):
+        """Test updating watch progress for a series episode."""
+        client = mock_service_hass.data[DOMAIN]["test_entry"]["client"]
+        client.async_update_watch_progress = AsyncMock(return_value=True)
+
+        await async_setup_services(mock_service_hass)
+
+        await mock_service_hass.services.async_call(
+            DOMAIN,
+            "update_watch_progress",
+            {
+                "media_id": "tt0903747",
+                "media_type": "series",
+                "season": 2,
+                "episode": 5,
+                "progress": 900,
+            },
+            blocking=True,
+        )
+
+        client.async_update_watch_progress.assert_called_once_with(
+            media_id="tt0903747",
+            media_type="series",
+            season=2,
+            episode=5,
+            progress=900,
+            duration=None,
+        )
+
+    @pytest.mark.asyncio
+    async def test_update_watch_progress_series_missing_season_episode(
+        self, mock_service_hass, mock_coordinator
+    ):
+        """Test validation error when series is missing season/episode."""
+        client = mock_service_hass.data[DOMAIN]["test_entry"]["client"]
+        client.async_update_watch_progress = AsyncMock(return_value=True)
+
+        await async_setup_services(mock_service_hass)
+
+        with pytest.raises(ServiceValidationError):
+            await mock_service_hass.services.async_call(
+                DOMAIN,
+                "update_watch_progress",
+                {
+                    "media_id": "tt0903747",
+                    "media_type": "series",
+                    "progress": 900,
+                    # Missing season and episode
+                },
+                blocking=True,
+            )
+
+
+class TestMarkWatchedService:
+    """Tests for the mark_watched service."""
+
+    @pytest.mark.asyncio
+    async def test_mark_watched_movie(self, mock_service_hass, mock_coordinator):
+        """Test marking a movie as watched."""
+        client = mock_service_hass.data[DOMAIN]["test_entry"]["client"]
+        client.async_mark_watched = AsyncMock(return_value=True)
+
+        await async_setup_services(mock_service_hass)
+
+        await mock_service_hass.services.async_call(
+            DOMAIN,
+            "mark_watched",
+            {
+                "media_id": "tt0111161",
+                "media_type": "movie",
+            },
+            blocking=True,
+        )
+
+        client.async_mark_watched.assert_called_once_with(
+            media_id="tt0111161",
+            media_type="movie",
+            season=None,
+            episode=None,
+            progress=None,
+            duration=None,
+        )
+
+    @pytest.mark.asyncio
+    async def test_mark_watched_series_episode(self, mock_service_hass, mock_coordinator):
+        """Test marking a series episode as watched."""
+        client = mock_service_hass.data[DOMAIN]["test_entry"]["client"]
+        client.async_mark_watched = AsyncMock(return_value=True)
+
+        await async_setup_services(mock_service_hass)
+
+        await mock_service_hass.services.async_call(
+            DOMAIN,
+            "mark_watched",
+            {
+                "media_id": "tt0903747",
+                "media_type": "series",
+                "season": 3,
+                "episode": 7,
+            },
+            blocking=True,
+        )
+
+        client.async_mark_watched.assert_called_once_with(
+            media_id="tt0903747",
+            media_type="series",
+            season=3,
+            episode=7,
+            progress=None,
+            duration=None,
+        )
+
+    @pytest.mark.asyncio
+    async def test_mark_watched_series_missing_season_episode(
+        self, mock_service_hass, mock_coordinator
+    ):
+        """Test validation error when series is missing season/episode."""
+        client = mock_service_hass.data[DOMAIN]["test_entry"]["client"]
+        client.async_mark_watched = AsyncMock(return_value=True)
+
+        await async_setup_services(mock_service_hass)
+
+        with pytest.raises(ServiceValidationError):
+            await mock_service_hass.services.async_call(
+                DOMAIN,
+                "mark_watched",
+                {
+                    "media_id": "tt0903747",
+                    "media_type": "series",
+                    # Missing season and episode
+                },
+                blocking=True,
+            )
