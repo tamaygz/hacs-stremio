@@ -72,6 +72,9 @@
     },
     "no_stream_url": {
       "message": "Could not determine stream URL."
+    },
+    "invalid_config_entry": {
+      "message": "No Stremio config entry found."
     }
   },
   "services": {
@@ -106,6 +109,10 @@
         "fallback_to_watched": {
           "name": "Fallback to Watched",
           "description": "Mark as watched if setting currently watching fails."
+        },
+        "config_entry_id": {
+          "name": "Config Entry ID",
+          "description": "Optional Stremio config entry ID to target in multi-entry setups."
         }
       }
     },
@@ -136,6 +143,10 @@
         "duration": {
           "name": "Duration",
           "description": "Total duration in seconds."
+        },
+        "config_entry_id": {
+          "name": "Config Entry ID",
+          "description": "Optional Stremio config entry ID to target in multi-entry setups."
         }
       }
     },
@@ -166,6 +177,10 @@
         "duration": {
           "name": "Duration",
           "description": "Total duration in seconds."
+        },
+        "config_entry_id": {
+          "name": "Config Entry ID",
+          "description": "Optional Stremio config entry ID to target in multi-entry setups."
         }
       }
     },

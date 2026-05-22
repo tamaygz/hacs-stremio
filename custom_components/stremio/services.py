@@ -254,7 +254,11 @@ def _get_entry_data(
 
     entry_id = config_entry_id or next(iter(hass.data[DOMAIN]))
     if entry_id not in hass.data[DOMAIN]:
-        raise ServiceValidationError(f"No Stremio config entry found: {entry_id}")
+        raise ServiceValidationError(
+            f"No Stremio config entry found: {entry_id}",
+            translation_domain=DOMAIN,
+            translation_key="invalid_config_entry",
+        )
 
     entry_data = hass.data[DOMAIN][entry_id]
     return entry_data["coordinator"], entry_data["client"], entry_id
