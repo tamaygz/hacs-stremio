@@ -669,7 +669,6 @@ class StremioBrowseCard extends LitElement {
   set hass(hass) {
     const oldHass = this._hass;
     this._hass = hass;
-    this._invalidateLibraryCache();
     
     // Load catalog on first hass set
     if (!oldHass && hass) {

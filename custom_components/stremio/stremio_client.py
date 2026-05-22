@@ -1247,7 +1247,7 @@ class StremioClient:
 
         if media_type == "series" and (season is None or episode is None):
             _LOGGER.error("Season and episode are required for series playback updates")
-            raise StremioConnectionError(
+            raise ValueError(
                 "Season and episode are required for series playback updates"
             )
 
@@ -1429,7 +1429,7 @@ class StremioClient:
 
                 # Extract watch state data
                 state = item.get("state", {})
-                progress = state.get("timeWatched", 0)
+                progress = state.get("timeOffset", state.get("timeWatched", 0))
                 duration = state.get("duration", 0)
 
                 # Parse season/episode from video_id (format: imdb:season:episode)
@@ -1457,7 +1457,7 @@ class StremioClient:
                     "season": season,
                     "episode": episode,
                     "flagged_watched": state.get("flaggedWatched", 0),
-                    "watched_at": state.get("lastWatched"),
+                    "watched_at": state.get("watched") or state.get("lastWatched"),
                 }
                 items.append(processed_item)
             except (AttributeError, TypeError, KeyError) as err:
@@ -1526,13 +1526,13 @@ class StremioClient:
                     "title": name,
                     "type": item_type,
                     "poster": item.get("poster"),
-                    "progress": state.get("timeWatched", 0),
+                    "progress": state.get("timeOffset", state.get("timeWatched", 0)),
                     "duration": state.get("duration", 0),
                     "season": season,
                     "episode": episode,
                     "episode_title": None,  # Will be populated if metadata is fetched
                     "year": item.get("year"),
-                    "watched_at": state.get("lastWatched"),
+                    "watched_at": state.get("watched") or state.get("lastWatched"),
                 }
                 items.append(processed_item)
             except (AttributeError, TypeError, KeyError) as err:

@@ -102,7 +102,7 @@
       "message": "Could not determine stream URL."
     },
     "invalid_config_entry": {
-      "message": "No Stremio config entry found."
+      "message": "No Stremio config entry found: {config_entry_id}."
     }
   },
   "services": {

@@ -123,8 +123,12 @@ SET_CURRENTLY_WATCHING_SCHEMA = vol.Schema(
     {
         vol.Required(ATTR_MEDIA_ID): cv.string,
         vol.Required(ATTR_MEDIA_TYPE): vol.In(["movie", "series"]),
-        vol.Optional(ATTR_SEASON): vol.Coerce(int),  # type: ignore[arg-type]
-        vol.Optional(ATTR_EPISODE): vol.Coerce(int),  # type: ignore[arg-type]
+        vol.Optional(ATTR_SEASON): vol.All(
+            vol.Coerce(int), vol.Range(min=1)  # type: ignore[arg-type]
+        ),
+        vol.Optional(ATTR_EPISODE): vol.All(
+            vol.Coerce(int), vol.Range(min=1)  # type: ignore[arg-type]
+        ),
         vol.Optional(ATTR_PROGRESS): vol.All(
             vol.Coerce(int), vol.Range(min=0)  # type: ignore[arg-type]
         ),
@@ -143,8 +147,12 @@ UPDATE_WATCH_PROGRESS_SCHEMA = vol.Schema(
         vol.Required(ATTR_PROGRESS): vol.All(
             vol.Coerce(int), vol.Range(min=0)  # type: ignore[arg-type]
         ),
-        vol.Optional(ATTR_SEASON): vol.Coerce(int),  # type: ignore[arg-type]
-        vol.Optional(ATTR_EPISODE): vol.Coerce(int),  # type: ignore[arg-type]
+        vol.Optional(ATTR_SEASON): vol.All(
+            vol.Coerce(int), vol.Range(min=1)  # type: ignore[arg-type]
+        ),
+        vol.Optional(ATTR_EPISODE): vol.All(
+            vol.Coerce(int), vol.Range(min=1)  # type: ignore[arg-type]
+        ),
         vol.Optional(ATTR_DURATION): vol.All(
             vol.Coerce(int), vol.Range(min=0)  # type: ignore[arg-type]
         ),
@@ -156,8 +164,12 @@ MARK_WATCHED_SCHEMA = vol.Schema(
     {
         vol.Required(ATTR_MEDIA_ID): cv.string,
         vol.Required(ATTR_MEDIA_TYPE): vol.In(["movie", "series"]),
-        vol.Optional(ATTR_SEASON): vol.Coerce(int),  # type: ignore[arg-type]
-        vol.Optional(ATTR_EPISODE): vol.Coerce(int),  # type: ignore[arg-type]
+        vol.Optional(ATTR_SEASON): vol.All(
+            vol.Coerce(int), vol.Range(min=1)  # type: ignore[arg-type]
+        ),
+        vol.Optional(ATTR_EPISODE): vol.All(
+            vol.Coerce(int), vol.Range(min=1)  # type: ignore[arg-type]
+        ),
         vol.Optional(ATTR_PROGRESS): vol.All(
             vol.Coerce(int), vol.Range(min=0)  # type: ignore[arg-type]
         ),
@@ -258,6 +270,7 @@ def _get_entry_data(
             f"No Stremio config entry found: {entry_id}",
             translation_domain=DOMAIN,
             translation_key="invalid_config_entry",
+            translation_placeholders={"config_entry_id": entry_id},
         )
 
     entry_data = hass.data[DOMAIN][entry_id]

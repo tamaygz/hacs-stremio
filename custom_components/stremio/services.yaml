@@ -42,7 +42,7 @@ get_streams:
   fields:
     media_id:
       name: Media ID
-      description: The IMDB ID or Stremio ID of the media item.
+      description: The IMDb ID or Stremio ID of the media item.
       required: true
       example: "tt0903747"
       selector:
@@ -84,7 +84,7 @@ get_series_metadata:
   fields:
     media_id:
       name: Media ID
-      description: The IMDB ID of the TV series.
+      description: The IMDb ID of the TV series.
       required: true
       example: "tt0944947"
       selector:
@@ -96,7 +96,7 @@ add_to_library:
   fields:
     media_id:
       name: Media ID
-      description: The IMDB ID of the media item to add.
+      description: The IMDb ID of the media item to add.
       required: true
       example: "tt0903747"
       selector:
@@ -118,7 +118,7 @@ remove_from_library:
   fields:
     media_id:
       name: Media ID
-      description: The IMDB ID of the media item to remove.
+      description: The IMDb ID of the media item to remove.
       required: true
       example: "tt0903747"
       selector:
@@ -144,7 +144,7 @@ handover_to_apple_tv:
           integration: apple_tv
     media_id:
       name: Media ID
-      description: The IMDB ID of the media to play. If not provided, uses current watching.
+      description: The IMDb ID of the media to play. If not provided, uses current watching.
       required: false
       example: "tt0903747"
       selector:
@@ -181,7 +181,7 @@ set_currently_watching:
   fields:
     media_id:
       name: Media ID
-      description: The IMDB ID of the media item.
+      description: The IMDb ID of the media item.
       required: true
       example: "tt0903747"
       selector:
@@ -257,7 +257,7 @@ update_watch_progress:
   fields:
     media_id:
       name: Media ID
-      description: The IMDB ID of the media item.
+      description: The IMDb ID of the media item.
       required: true
       example: "tt0903747"
       selector:
@@ -326,7 +326,7 @@ mark_watched:
   fields:
     media_id:
       name: Media ID
-      description: The IMDB ID of the media item.
+      description: The IMDb ID of the media item.
       required: true
       example: "tt0903747"
       selector:
@@ -559,7 +559,7 @@ get_similar_content:
   fields:
     media_id:
       name: Media ID
-      description: The IMDB ID of the media item to find similar content for.
+      description: The IMDb ID of the media item to find similar content for.
       required: true
       example: "tt0903747"
       selector:
