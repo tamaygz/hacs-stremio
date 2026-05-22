@@ -327,18 +327,18 @@ class StremioAppleTVHandoverButton(
                 "duration": current.get("duration"),
                 "fallback_to_watched": True,
             }
-            playback_payload = {
+            filtered_payload = {
                 key: value
                 for key, value in playback_payload.items()
                 if value is not None
             }
 
-            if playback_payload.get("media_id"):
+            if filtered_payload.get("media_id"):
                 try:
                     await self.hass.services.async_call(
                         DOMAIN,
                         SERVICE_SET_CURRENTLY_WATCHING,
-                        playback_payload,
+                        filtered_payload,
                         blocking=True,
                     )
                 except Exception as err:

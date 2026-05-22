@@ -1312,7 +1312,7 @@ class StremioClient:
                 state["watched"] = now
                 state["flaggedWatched"] = 1
                 state["timesWatched"] = max(
-                    1, int(state.get("timesWatched", 0) or 0) + 1
+                    1, int(state.get("timesWatched") or 0) + 1
                 )
             else:
                 _LOGGER.error("Unknown playback update mode: %s", mode)

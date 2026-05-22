@@ -105,6 +105,14 @@ data:
   media_id: "tt0111161"
   device_name: "Living Room Apple TV"
   method: "airplay"
+
+# Set currently watching
+service: stremio.set_currently_watching
+data:
+  media_id: "tt0111161"
+  media_type: "movie"
+  progress: 120
+  duration: 7200
 ```
 
 📖 [Full Services Documentation](docs/services.md)

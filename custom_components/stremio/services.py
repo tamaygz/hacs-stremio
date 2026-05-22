@@ -632,18 +632,18 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                 ATTR_DURATION: media_info.get("duration"),
                 ATTR_FALLBACK_TO_WATCHED: True,
             }
-            playback_payload = {
+            filtered_payload = {
                 key: value
                 for key, value in playback_payload.items()
                 if value is not None
             }
 
-            if playback_payload.get(ATTR_MEDIA_ID):
+            if filtered_payload.get(ATTR_MEDIA_ID):
                 try:
                     await hass.services.async_call(
                         DOMAIN,
                         SERVICE_SET_CURRENTLY_WATCHING,
-                        playback_payload,
+                        filtered_payload,
                         blocking=True,
                     )
                 except HomeAssistantError as err:
