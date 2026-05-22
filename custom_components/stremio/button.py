@@ -27,6 +27,7 @@ from .const import (
 )
 from .coordinator import StremioDataUpdateCoordinator
 from .entity_helpers import get_device_info
+from .playback_helpers import async_update_playback_state_after_handover
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -316,6 +317,15 @@ class StremioAppleTVHandoverButton(
                 title=title,
             )
             _LOGGER.info("Handover result: %s", result)
+            await async_update_playback_state_after_handover(
+                client=self.coordinator.client,
+                media_id=media_id,
+                media_type=media_type,
+                season=season,
+                episode=episode,
+                progress=current.get("progress"),
+                duration=current.get("duration"),
+            )
 
         except HandoverError as err:
             _LOGGER.error("Handover failed: %s", err)

@@ -239,6 +239,39 @@ class StremioLibraryCard extends LitElement {
         background: var(--primary-color);
       }
 
+      .watched-overlay {
+        position: absolute;
+        top: 6px;
+        right: 6px;
+        background: rgba(0, 0, 0, 0.65);
+        border-radius: 50%;
+        width: 24px;
+        height: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 2;
+      }
+
+      .watched-overlay ha-icon {
+        --mdc-icon-size: 16px;
+        color: #fff;
+      }
+
+      .watched-label {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        color: var(--success-color, #4caf50);
+        font-size: 0.8em;
+        font-weight: 500;
+        margin-top: 4px;
+      }
+
+      .watched-label ha-icon {
+        --mdc-icon-size: 16px;
+      }
+
       .empty-state {
         padding: 32px;
         text-align: center;
@@ -762,6 +795,8 @@ class StremioLibraryCard extends LitElement {
           // Pass watch progress info for highlighting
           lastWatchedSeason: item.last_season || item.season,
           lastWatchedEpisode: item.last_episode || item.episode,
+          lastWatchedProgressPercent: item.progress_percent || 0,
+          flagged_watched: item.flagged_watched || 0,
           total_seasons: item.total_seasons,
           watched_episodes: item.watched_episodes || [],
         },
@@ -783,6 +818,8 @@ class StremioLibraryCard extends LitElement {
         imdb_id: item.imdb_id || item.id,
         lastWatchedSeason: item.last_season || item.season,
         lastWatchedEpisode: item.last_episode || item.episode,
+        lastWatchedProgressPercent: item.progress_percent || 0,
+        flagged_watched: item.flagged_watched || 0,
         total_seasons: item.total_seasons,
       };
       picker.open = true;
@@ -1049,7 +1086,17 @@ class StremioLibraryCard extends LitElement {
     const hasSelectedEpisode = item.type === 'series' && item.selectedSeason && item.selectedEpisode;
     const episodeLabel = hasSelectedEpisode 
       ? `S${String(item.selectedSeason).padStart(2, '0')}E${String(item.selectedEpisode).padStart(2, '0')}`
-      : null;
+      : (item.type === 'series' && item.season && item.episode)
+        ? `S${String(item.season).padStart(2, '0')}E${String(item.episode).padStart(2, '0')}`
+        : null;
+
+    // Only show progress if displaying the episode that the progress data belongs to
+    const isShowingTrackedEpisode = !hasSelectedEpisode || (
+      item.selectedSeason === (item.last_season || item.season) &&
+      item.selectedEpisode === (item.last_episode || item.episode)
+    );
+    const progress = isShowingTrackedEpisode ? (item.progress_percent || 0) : 0;
+    const isWatched = progress >= 98 || (item.flagged_watched === 1 && item.type !== 'series');
 
     return html`
       <div class="item-detail-view">
@@ -1066,11 +1113,16 @@ class StremioLibraryCard extends LitElement {
             <p class="detail-type">${item.type === 'series' ? 'TV Series' : 'Movie'}</p>
             ${episodeLabel ? html`<p class="detail-episode">Episode: ${episodeLabel}</p>` : ''}
             ${item.year ? html`<p class="detail-meta">Year: ${item.year}</p>` : ''}
-            ${item.progress_percent ? html`
+            ${isWatched ? html`
+              <div class="watched-label">
+                <ha-icon icon="mdi:eye"></ha-icon>
+                Watched
+              </div>
+            ` : progress > 0 ? html`
               <div class="detail-progress-container">
-                <p class="detail-meta">Progress: ${item.progress_percent.toFixed(0)}%</p>
+                <p class="detail-meta">Progress: ${progress.toFixed(0)}%</p>
                 <div class="detail-progress-bar">
-                  <div class="detail-progress-fill" style="width: ${item.progress_percent}%"></div>
+                  <div class="detail-progress-fill" style="width: ${progress}%"></div>
                 </div>
               </div>
             ` : ''}
@@ -1246,10 +1298,19 @@ class StremioLibraryCard extends LitElement {
   _renderItem(item) {
     const title = item.title || item.name || 'Unknown';
     const progress = item.progress_percent || 0;
+    const isWatched = progress >= 98;
     const showTitle = this.config.show_title !== false;
     const showProgress = this.config.show_progress !== false;
 
     // Always render all slots to maintain alignment across items in the same row
+    const progressBarWidth = (() => {
+      if (!showProgress) return 0;
+      if (isWatched) return 100;
+      return progress;
+    })();
+    const displayedProgress = progressBarWidth;
+    const ariaLabel = `${title}${isWatched ? ', watched' : progress > 0 ? `, ${progress.toFixed(0)}% watched` : ''}`;
+
     return html`
       <div 
         class="library-item" 
@@ -1257,7 +1318,7 @@ class StremioLibraryCard extends LitElement {
         tabindex="0"
         @click=${() => this._handleItemClick(item)}
         @keydown=${(e) => e.key === 'Enter' && this._handleItemClick(item)}
-        aria-label="${title}${progress > 0 ? `, ${progress.toFixed(0)}% watched` : ''}"
+        aria-label="${ariaLabel}"
       >
         <div class="item-poster-container">
           ${item.poster ? html`
@@ -1270,10 +1331,15 @@ class StremioLibraryCard extends LitElement {
           ${this.config.show_media_type_badge && item.type ? html`
             <span class="media-type-badge ${item.type}">${item.type === 'series' ? 'TV' : 'Movie'}</span>
           ` : ''}
+          ${isWatched ? html`
+            <div class="watched-overlay" title="Watched">
+              <ha-icon icon="mdi:eye"></ha-icon>
+            </div>
+          ` : ''}
         </div>
         <div class="item-title${showTitle ? '' : ' hidden'}" title="${title}">${showTitle ? title : ''}</div>
-        <div class="item-progress" role="progressbar" aria-valuenow="${progress}" aria-valuemin="0" aria-valuemax="100">
-          <div class="item-progress-fill" style="width: ${showProgress ? progress : 0}%"></div>
+        <div class="item-progress" role="progressbar" aria-valuenow="${displayedProgress}" aria-valuemin="0" aria-valuemax="100">
+          <div class="item-progress-fill" style="width: ${progressBarWidth}%"></div>
         </div>
       </div>
     `;

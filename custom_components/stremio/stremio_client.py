@@ -39,6 +39,9 @@ STREMIO_ADDON_COLLECTION_URL = f"{STREMIO_API_BASE}/api/addonCollectionGet"
 COLLECTION_LIBRARY_ITEM = "libraryItem"
 COLLECTION_USER = "user"
 
+# Playback state defaults
+MIN_WATCHING_PROGRESS = 1  # Ensure items appear in Stremio's continue watching list
+
 
 def _utc_iso_ms_z() -> str:
     return (
@@ -80,6 +83,34 @@ class StremioClient:
             email,
             session is not None,
         )
+
+    @staticmethod
+    def _build_video_id(
+        media_id: str, media_type: str, season: int | None, episode: int | None
+    ) -> str:
+        """Build a video_id for Stremio state updates."""
+        if media_type == "series" and season is not None and episode is not None:
+            return f"{media_id}:{season}:{episode}"
+        return media_id
+
+    @staticmethod
+    def _ensure_state_defaults(state: dict[str, Any] | None) -> dict[str, Any]:
+        """Ensure a library item state has all required default fields."""
+        defaults = {
+            "lastWatched": "",
+            "timeWatched": 0,
+            "timeOffset": 0,
+            "overallTimeWatched": 0,
+            "timesWatched": 0,
+            "flaggedWatched": 0,
+            "duration": 0,
+            "video_id": "",
+            "watched": "",
+            "noNotif": False,
+        }
+        if state:
+            defaults.update(state)
+        return defaults
 
     async def _get_session(self) -> aiohttp.ClientSession:
         """Get or create aiohttp session."""
@@ -1139,6 +1170,231 @@ class StremioClient:
                 f"Failed to remove from library: {err}"
             ) from err
 
+    async def async_set_currently_watching(
+        self,
+        media_id: str,
+        media_type: str = "movie",
+        season: int | None = None,
+        episode: int | None = None,
+        progress: int | None = None,
+        duration: int | None = None,
+    ) -> bool:
+        """Set an item as currently watching in Stremio."""
+        return await self._async_update_playback_state(
+            media_id=media_id,
+            media_type=media_type,
+            season=season,
+            episode=episode,
+            progress=progress,
+            duration=duration,
+            mode="watching",
+        )
+
+    async def async_update_watch_progress(
+        self,
+        media_id: str,
+        media_type: str = "movie",
+        season: int | None = None,
+        episode: int | None = None,
+        progress: int | None = None,
+        duration: int | None = None,
+    ) -> bool:
+        """Update watch progress for an item."""
+        return await self._async_update_playback_state(
+            media_id=media_id,
+            media_type=media_type,
+            season=season,
+            episode=episode,
+            progress=progress,
+            duration=duration,
+            mode="progress",
+        )
+
+    async def async_mark_watched(
+        self,
+        media_id: str,
+        media_type: str = "movie",
+        season: int | None = None,
+        episode: int | None = None,
+        progress: int | None = None,
+        duration: int | None = None,
+    ) -> bool:
+        """Mark an item as watched in Stremio."""
+        return await self._async_update_playback_state(
+            media_id=media_id,
+            media_type=media_type,
+            season=season,
+            episode=episode,
+            progress=progress,
+            duration=duration,
+            mode="watched",
+        )
+
+    async def _async_update_playback_state(
+        self,
+        media_id: str,
+        media_type: str,
+        season: int | None,
+        episode: int | None,
+        progress: int | None,
+        duration: int | None,
+        mode: str,
+    ) -> bool:
+        """Update playback state for a library item via datastorePut."""
+        if not self._auth_key:
+            _LOGGER.error("Cannot update playback state: client not authenticated")
+            raise StremioConnectionError("Client not authenticated")
+
+        if media_type == "series" and (season is None or episode is None):
+            _LOGGER.error("Season and episode are required for series playback updates")
+            raise ValueError(
+                "Season and episode are required for series playback updates"
+            )
+
+        _LOGGER.info(
+            "Updating playback state for %s (%s): mode=%s, progress=%s, duration=%s",
+            media_id,
+            media_type,
+            mode,
+            progress,
+            duration,
+        )
+
+        try:
+            session = await self._get_session()
+            now = _utc_iso_ms_z()
+
+            library_item = await self.async_find_existing_item(media_id)
+            if library_item is None or not isinstance(library_item, dict):
+                _LOGGER.warning(
+                    "Cannot update playback state: item %s not found in library",
+                    media_id,
+                )
+                return False
+
+            library_item["removed"] = False
+            library_item["_mtime"] = now
+
+            state = self._ensure_state_defaults(library_item.get("state"))
+            state["video_id"] = self._build_video_id(
+                media_id, media_type, season, episode
+            )
+
+            progress_value = int(progress or 0)
+            duration_value = int(duration or 0)
+            # Defensive clamp for direct client calls outside service schema validation.
+            if progress_value < 0:
+                progress_value = 0
+            if duration_value < 0:
+                duration_value = 0
+
+            if duration is not None:
+                state["duration"] = duration_value
+
+            if mode in ("watching", "progress"):
+                # Watching mode requires a minimum progress to show up in continue watching.
+                if mode == "watching" and progress_value <= 0:
+                    progress_value = MIN_WATCHING_PROGRESS
+
+                state["timeOffset"] = progress_value
+                if progress_value > 0:
+                    current_time_watched = int(state.get("timeWatched", 0))
+                    state["timeWatched"] = max(
+                        current_time_watched, progress_value
+                    )
+                state["lastWatched"] = now
+
+                if progress_value > 0:
+                    state["overallTimeWatched"] = max(
+                        int(state.get("overallTimeWatched", 0)), progress_value
+                    )
+            elif mode == "watched":
+                watched_time_to_record = progress_value
+                if duration_value > 0 and watched_time_to_record < duration_value:
+                    watched_time_to_record = duration_value
+                if watched_time_to_record > 0:
+                    state["timeWatched"] = watched_time_to_record
+                    state["timeOffset"] = duration_value or watched_time_to_record
+                    state["overallTimeWatched"] = max(
+                        int(state.get("overallTimeWatched", 0)),
+                        watched_time_to_record,
+                    )
+
+                state["lastWatched"] = now
+                state["watched"] = now
+                current_times_watched = int(state.get("timesWatched", 0))
+                is_already_flagged_watched = int(state.get("flaggedWatched", 0)) == 1
+                state["flaggedWatched"] = 1
+                if not is_already_flagged_watched:
+                    state["timesWatched"] = max(1, current_times_watched + 1)
+                else:
+                    state["timesWatched"] = max(1, current_times_watched)
+            else:
+                _LOGGER.error("Unknown playback update mode: %s", mode)
+                raise StremioConnectionError(f"Unknown playback update mode: {mode}")
+
+            library_item["state"] = state
+
+            payload = {
+                "authKey": self._auth_key,
+                "collection": COLLECTION_LIBRARY_ITEM,
+                "changes": [library_item],
+            }
+
+            _LOGGER.debug(
+                "Sending datastorePut request for playback update (%s): %s",
+                mode,
+                library_item,
+            )
+
+            async with session.post(
+                STREMIO_DATASTORE_PUT_URL, json=payload
+            ) as response:
+                if response.status == 401:
+                    _LOGGER.warning(
+                        "Authentication expired while updating playback state"
+                    )
+                    raise StremioAuthError("Authentication expired or invalid")
+                if response.status != 200:
+                    text = await response.text()
+                    _LOGGER.error(
+                        "Failed to update playback state (status %d): %s",
+                        response.status,
+                        text[:200],
+                    )
+                    raise StremioConnectionError(
+                        f"Failed to update playback state with status {response.status}: {text}"
+                    )
+
+                data = await response.json()
+                success = data.get("success", False) or data.get("result", {}).get(
+                    "success", False
+                )
+
+                if success:
+                    _LOGGER.info(
+                        "Successfully updated playback state for %s (%s)",
+                        media_id,
+                        mode,
+                    )
+                else:
+                    _LOGGER.warning(
+                        "Playback update returned non-success: %s", data
+                    )
+
+                return success
+
+        except (StremioAuthError, StremioConnectionError):
+            raise
+        except ClientError as err:
+            _LOGGER.error("Connection error updating playback state: %s", err)
+            raise StremioConnectionError(f"Connection failed: {err}") from err
+        except Exception as err:
+            _LOGGER.exception("Failed to update playback state")
+            raise StremioConnectionError(
+                f"Failed to update playback state: {err}"
+            ) from err
+
     def _process_library_items(
         self, library: list[dict[str, Any]]
     ) -> list[dict[str, Any]]:
@@ -1171,6 +1427,21 @@ class StremioClient:
                 # Parse ID (format: type:id, e.g., "movie:tt1234567")
                 imdb_id = _id.split(":", 1)[1] if ":" in _id else _id
 
+                # Extract watch state data
+                state = item.get("state", {})
+                progress = state.get("timeOffset", state.get("timeWatched", 0))
+                duration = state.get("duration", 0)
+
+                # Parse season/episode from video_id (format: imdb:season:episode)
+                video_id = state.get("video_id", "")
+                season = None
+                episode = None
+                if ":" in video_id:
+                    parts = video_id.split(":")
+                    if len(parts) >= 3:
+                        season = int(parts[1]) if parts[1].isdigit() else None
+                        episode = int(parts[2]) if parts[2].isdigit() else None
+
                 processed_item = {
                     "id": _id,
                     "imdb_id": imdb_id,
@@ -1181,6 +1452,12 @@ class StremioClient:
                     "genres": item.get("genres", []),
                     "cast": item.get("cast", []),
                     "added_at": item.get("mtime"),
+                    "progress": progress,
+                    "duration": duration,
+                    "season": season,
+                    "episode": episode,
+                    "flagged_watched": state.get("flaggedWatched", 0),
+                    "watched_at": state.get("watched") or state.get("lastWatched"),
                 }
                 items.append(processed_item)
             except (AttributeError, TypeError, KeyError) as err:
@@ -1249,13 +1526,13 @@ class StremioClient:
                     "title": name,
                     "type": item_type,
                     "poster": item.get("poster"),
-                    "progress": state.get("timeWatched", 0),
+                    "progress": state.get("timeOffset", state.get("timeWatched", 0)),
                     "duration": state.get("duration", 0),
                     "season": season,
                     "episode": episode,
                     "episode_title": None,  # Will be populated if metadata is fetched
                     "year": item.get("year"),
-                    "watched_at": state.get("lastWatched"),
+                    "watched_at": state.get("watched") or state.get("lastWatched"),
                 }
                 items.append(processed_item)
             except (AttributeError, TypeError, KeyError) as err:

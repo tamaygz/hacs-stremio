@@ -222,6 +222,39 @@ class StremioContinueWatchingCard extends LitElement {
         margin-top: 2px;
       }
 
+      .watched-overlay {
+        position: absolute;
+        top: 6px;
+        right: 6px;
+        background: rgba(0, 0, 0, 0.65);
+        border-radius: 50%;
+        width: 24px;
+        height: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 2;
+      }
+
+      .watched-overlay ha-icon {
+        --mdc-icon-size: 16px;
+        color: #fff;
+      }
+
+      .watched-label {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        color: var(--success-color, #4caf50);
+        font-size: 0.8em;
+        font-weight: 500;
+        margin-top: 4px;
+      }
+
+      .watched-label ha-icon {
+        --mdc-icon-size: 16px;
+      }
+
       .empty-state {
         padding: 40px;
         text-align: center;
@@ -719,6 +752,8 @@ class StremioContinueWatchingCard extends LitElement {
           // Pre-select the episode they were watching
           lastWatchedSeason: item.season,
           lastWatchedEpisode: item.episode,
+          lastWatchedProgressPercent: item.progress_percent || 0,
+          flagged_watched: item.flagged_watched || 0,
           total_seasons: item.total_seasons,
           watched_episodes: item.watched_episodes || [],
         },
@@ -967,6 +1002,8 @@ class StremioContinueWatchingCard extends LitElement {
   _renderItem(item) {
     const title = item.title || 'Unknown';
     const progress = typeof item.progress_percent === 'number' ? item.progress_percent : 0;
+    const isWatched = progress >= 98;
+    const progressBarWidth = isWatched ? 100 : progress;
     const showTitle = this.config.show_title !== false;
     const showProgressText = this.config.show_progress_text !== false;
     
@@ -979,7 +1016,7 @@ class StremioContinueWatchingCard extends LitElement {
         tabindex="0"
         @click=${() => this._handleItemClick(item)}
         @keydown=${(e) => e.key === 'Enter' && this._handleItemClick(item)}
-        aria-label="${title}, ${progress.toFixed(0)}% watched"
+        aria-label="${title}${isWatched ? ', watched' : `, ${progress.toFixed(0)}% watched`}"
       >
         <div class="item-poster-container">
           ${item.poster ? html`
@@ -992,12 +1029,17 @@ class StremioContinueWatchingCard extends LitElement {
           ${this.config.show_media_type_badge && item.type ? html`
             <span class="media-type-badge ${item.type}">${item.type === 'series' ? 'TV' : 'Movie'}</span>
           ` : ''}
+          ${isWatched ? html`
+            <div class="watched-overlay" title="Watched">
+              <ha-icon icon="mdi:eye"></ha-icon>
+            </div>
+          ` : ''}
         </div>
         <div class="item-title${showTitle ? '' : ' hidden'}" title="${title}">${showTitle ? title : ''}</div>
-        <div class="item-progress" role="progressbar" aria-valuenow="${progress}" aria-valuemin="0" aria-valuemax="100">
-          <div class="item-progress-fill" style="width: ${progress}%"></div>
+        <div class="item-progress" role="progressbar" aria-valuenow="${progressBarWidth}" aria-valuemin="0" aria-valuemax="100">
+          <div class="item-progress-fill" style="width: ${progressBarWidth}%"></div>
         </div>
-        <div class="item-progress-text">${showProgressText && progress > 0 ? `${progress.toFixed(0)}%` : ''}</div>
+        <div class="item-progress-text">${showProgressText && progress > 0 && !isWatched ? `${progress.toFixed(0)}%` : ''}</div>
       </div>
     `;
   }
@@ -1005,7 +1047,6 @@ class StremioContinueWatchingCard extends LitElement {
   _renderDetailView() {
     const item = this._selectedItem;
     const title = item.title || 'Unknown';
-    const progress = typeof item.progress_percent === 'number' ? item.progress_percent : 0;
     // For continue watching, use selectedSeason/Episode if changed, otherwise use original season/episode
     const displaySeason = item.selectedSeason || item.season;
     const displayEpisode = item.selectedEpisode || item.episode;
@@ -1013,6 +1054,16 @@ class StremioContinueWatchingCard extends LitElement {
     const episodeLabel = hasEpisodeInfo 
       ? `S${String(displaySeason).padStart(2, '0')}E${String(displayEpisode).padStart(2, '0')}`
       : null;
+
+    // Only show progress if displaying the episode that the progress data belongs to
+    const isShowingTrackedEpisode = !item.selectedSeason || (
+      item.selectedSeason === item.season &&
+      item.selectedEpisode === item.episode
+    );
+    const progress = isShowingTrackedEpisode
+      ? (typeof item.progress_percent === 'number' ? item.progress_percent : 0)
+      : 0;
+    const isWatched = progress >= 98;
 
     return html`
       <div class="item-detail-view">
@@ -1029,7 +1080,12 @@ class StremioContinueWatchingCard extends LitElement {
             <p class="detail-type">${item.type === 'series' ? 'TV Series' : 'Movie'}</p>
             ${episodeLabel ? html`<p class="detail-episode">Episode: ${episodeLabel}</p>` : ''}
             ${item.year ? html`<p class="detail-meta">Year: ${item.year}</p>` : ''}
-            ${progress > 0 ? html`
+            ${isWatched ? html`
+              <div class="watched-label">
+                <ha-icon icon="mdi:eye"></ha-icon>
+                Watched
+              </div>
+            ` : progress > 0 ? html`
               <div class="detail-progress-container">
                 <p class="detail-meta">Progress: ${progress.toFixed(0)}%</p>
                 <div class="detail-progress-bar">

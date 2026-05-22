@@ -147,6 +147,39 @@ class StremioMediaDetailsCard extends LitElement {
         transition: width 0.3s ease;
       }
 
+      .watched-overlay {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        background: rgba(0, 0, 0, 0.65);
+        border-radius: 50%;
+        width: 28px;
+        height: 28px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 2;
+      }
+
+      .watched-overlay ha-icon {
+        --mdc-icon-size: 18px;
+        color: #fff;
+      }
+
+      .watched-label {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        color: var(--success-color, #4caf50);
+        font-size: 0.85em;
+        font-weight: 500;
+        margin-top: 4px;
+      }
+
+      .watched-label ha-icon {
+        --mdc-icon-size: 16px;
+      }
+
       .info {
         flex: 1;
         min-width: 0;
@@ -689,9 +722,11 @@ class StremioMediaDetailsCard extends LitElement {
   }
 
   _renderHeader() {
-    const progressPercent = this._media.duration > 0 
-      ? (this._media.progress / this._media.duration) * 100 
+    const progressPercentRaw = this._media.duration > 0
+      ? (this._media.progress / this._media.duration) * 100
       : 0;
+    const progressPercent = Math.min(100, Math.max(0, progressPercentRaw));
+    const isWatched = progressPercent >= 98;
 
     return html`
       <div class="header">
@@ -703,6 +738,11 @@ class StremioMediaDetailsCard extends LitElement {
               <ha-icon icon="mdi:movie-outline"></ha-icon>
             </div>
           `}
+          ${isWatched ? html`
+            <div class="watched-overlay" title="Watched">
+              <ha-icon icon="mdi:eye"></ha-icon>
+            </div>
+          ` : ''}
           ${this.config.show_progress !== false && progressPercent > 0 ? html`
             <div class="progress-overlay">
               <div class="progress-bar" style="width: ${progressPercent}%"></div>
@@ -744,6 +784,20 @@ class StremioMediaDetailsCard extends LitElement {
               ${this._formatType(this._media.type)}
             </span>
           </div>
+
+          ${isWatched ? html`
+            <div class="watched-label">
+              <ha-icon icon="mdi:eye"></ha-icon>
+              Watched
+            </div>
+          ` : progressPercent > 0 ? html`
+            <div class="meta">
+              <span class="meta-item">
+                <ha-icon icon="mdi:play-circle-outline"></ha-icon>
+                ${Math.round(progressPercent)}% watched
+              </span>
+            </div>
+          ` : ''}
           
           ${this.config.show_genres && this._media.genres?.length > 0 ? html`
             <div class="genres">

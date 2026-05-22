@@ -57,7 +57,133 @@
       }
     }
   },
+  "exceptions": {
+    "no_integration": {
+      "message": "No Stremio integration configured."
+    },
+    "missing_season_episode": {
+      "message": "Season and episode are required for series."
+    },
+    "no_data_available": {
+      "message": "Coordinator data not available."
+    },
+    "no_media_for_handover": {
+      "message": "No media_id provided and nothing currently watching."
+    },
+    "no_stream_url": {
+      "message": "Could not determine stream URL."
+    },
+    "invalid_config_entry": {
+      "message": "No Stremio config entry found: {config_entry_id}."
+    }
+  },
   "services": {
+    "set_currently_watching": {
+      "name": "Set Currently Watching",
+      "description": "Set a media item as currently watching in Stremio.",
+      "fields": {
+        "media_id": {
+          "name": "Media ID",
+          "description": "The IMDb ID of the media item."
+        },
+        "media_type": {
+          "name": "Media Type",
+          "description": "Type of media (movie or series)."
+        },
+        "season": {
+          "name": "Season",
+          "description": "Season number (required for series)."
+        },
+        "episode": {
+          "name": "Episode",
+          "description": "Episode number (required for series)."
+        },
+        "progress": {
+          "name": "Progress",
+          "description": "Current progress in seconds."
+        },
+        "duration": {
+          "name": "Duration",
+          "description": "Total duration in seconds."
+        },
+        "fallback_to_watched": {
+          "name": "Fallback to Watched",
+          "description": "Mark as watched if setting currently watching fails."
+        },
+        "config_entry_id": {
+          "name": "Config Entry ID",
+          "description": "Optional Stremio config entry ID to target in multi-entry setups."
+        }
+      }
+    },
+    "update_watch_progress": {
+      "name": "Update Watch Progress",
+      "description": "Update watch progress for a media item or episode.",
+      "fields": {
+        "media_id": {
+          "name": "Media ID",
+          "description": "The IMDb ID of the media item."
+        },
+        "media_type": {
+          "name": "Media Type",
+          "description": "Type of media (movie or series)."
+        },
+        "season": {
+          "name": "Season",
+          "description": "Season number (required for series)."
+        },
+        "episode": {
+          "name": "Episode",
+          "description": "Episode number (required for series)."
+        },
+        "progress": {
+          "name": "Progress",
+          "description": "Current progress in seconds."
+        },
+        "duration": {
+          "name": "Duration",
+          "description": "Total duration in seconds."
+        },
+        "config_entry_id": {
+          "name": "Config Entry ID",
+          "description": "Optional Stremio config entry ID to target in multi-entry setups."
+        }
+      }
+    },
+    "mark_watched": {
+      "name": "Mark Watched",
+      "description": "Mark a media item or episode as watched.",
+      "fields": {
+        "media_id": {
+          "name": "Media ID",
+          "description": "The IMDB ID of the media item."
+        },
+        "media_type": {
+          "name": "Media Type",
+          "description": "Type of media (movie or series)."
+        },
+        "season": {
+          "name": "Season",
+          "description": "Season number (required for series)."
+        },
+        "episode": {
+          "name": "Episode",
+          "description": "Episode number (required for series)."
+        },
+        "progress": {
+          "name": "Progress",
+          "description": "Current progress in seconds."
+        },
+        "duration": {
+          "name": "Duration",
+          "description": "Total duration in seconds."
+        },
+        "config_entry_id": {
+          "name": "Config Entry ID",
+          "description": "Optional Stremio config entry ID to target in multi-entry setups."
+        }
+      }
+    },
     "get_upcoming_episodes": {
       "name": "Get Upcoming Episodes",
       "description": "Get air dates for upcoming episodes of series in your library.",

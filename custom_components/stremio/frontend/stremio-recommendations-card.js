@@ -213,6 +213,38 @@ class StremioRecommendationsCard extends LitElement {
         color: var(--secondary-text-color);
       }
 
+      .watched-overlay {
+        position: absolute;
+        top: 6px;
+        right: 6px;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        background: rgba(0, 0, 0, 0.7);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 2;
+      }
+
+      .watched-overlay ha-icon {
+        --mdc-icon-size: 16px;
+        color: white;
+      }
+
+      .item-progress {
+        width: 100%;
+        height: 4px;
+        background: var(--divider-color, rgba(255,255,255,0.1));
+        overflow: hidden;
+      }
+
+      .item-progress-fill {
+        height: 100%;
+        background: var(--primary-color);
+        transition: width 0.3s ease;
+      }
+
       .media-type-badge {
         position: absolute;
         top: 6px;
@@ -367,6 +399,40 @@ class StremioRecommendationsCard extends LitElement {
         color: var(--secondary-text-color);
       }
 
+      .watched-label {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        color: var(--success-color, #4caf50);
+        font-size: 0.85em;
+        font-weight: 500;
+        margin: 4px 0;
+      }
+
+      .watched-label ha-icon {
+        --mdc-icon-size: 16px;
+      }
+
+      .detail-progress-container {
+        margin: 4px 0;
+      }
+
+      .detail-progress-bar {
+        width: 100%;
+        height: 4px;
+        background: var(--divider-color, rgba(255,255,255,0.1));
+        border-radius: 2px;
+        overflow: hidden;
+        margin-top: 2px;
+      }
+
+      .detail-progress-fill {
+        height: 100%;
+        background: var(--primary-color);
+        border-radius: 2px;
+        transition: width 0.3s ease;
+      }
+
       .detail-reason {
         margin-top: 6px;
         padding: 6px;
@@ -439,6 +505,9 @@ class StremioRecommendationsCard extends LitElement {
     this._loading = false;
     this._error = null;
     this._lastFetchTime = 0;
+    this._librarySensorEntityId = null;
+    this._libraryItemsRef = null;
+    this._libraryItemsByMediaId = null;
     
     // Bind methods that are used as event handlers
     this._closeDetail = this._closeDetail.bind(this);
@@ -578,7 +647,9 @@ class StremioRecommendationsCard extends LitElement {
   }
 
   _handleItemClick(item) {
-    this._selectedItem = item;
+    // Enrich recommendation item with library progress data if available
+    const enrichedItem = this._enrichWithLibraryData(item);
+    this._selectedItem = enrichedItem;
     
     // Fire event for external listeners
     this.dispatchEvent(
@@ -586,7 +657,7 @@ class StremioRecommendationsCard extends LitElement {
         bubbles: true,
         composed: true,
         detail: { 
-          item,
+          item: enrichedItem,
           mediaId: item.imdb_id || item.id,
           title: item.title || item.name,
           type: item.type,
@@ -595,6 +666,89 @@ class StremioRecommendationsCard extends LitElement {
         },
       })
     );
+  }
+
+  _enrichWithLibraryData(item) {
+    if (!this._hass) return item;
+    const mediaId = item.imdb_id || item.id;
+    if (!mediaId) return item;
+
+    const libraryItemsByMediaId = this._getLibraryItemsByMediaId();
+    if (!libraryItemsByMediaId) return item;
+
+    const libraryItem = libraryItemsByMediaId.get(mediaId);
+    if (!libraryItem) return item;
+
+    return {
+      ...item,
+      progress_percent: libraryItem.progress_percent || 0,
+      progress: libraryItem.progress || 0,
+      duration: libraryItem.duration || 0,
+      season: libraryItem.season || libraryItem.last_season,
+      episode: libraryItem.episode || libraryItem.last_episode,
+      last_season: libraryItem.last_season || libraryItem.season,
+      last_episode: libraryItem.last_episode || libraryItem.episode,
+      flagged_watched: libraryItem.flagged_watched || 0,
+      in_library: true,
+    };
+  }
+
+  _findLibrarySensor() {
+    if (!this._hass?.states) return null;
+    if (
+      this._librarySensorEntityId &&
+      this._hass.states[this._librarySensorEntityId]
+    ) {
+      return this._hass.states[this._librarySensorEntityId];
+    }
+
+    for (const entityId in this._hass.states) {
+      if (entityId.startsWith('sensor.stremio') && entityId.endsWith('_library_count')) {
+        this._librarySensorEntityId = entityId;
+        return this._hass.states[entityId];
+      }
+    }
+    for (const entityId in this._hass.states) {
+      if (entityId.includes('stremio') && entityId.includes('library_count')) {
+        this._librarySensorEntityId = entityId;
+        return this._hass.states[entityId];
+      }
+    }
+    this._librarySensorEntityId = null;
+    return null;
+  }
+
+  _getLibraryItemsByMediaId() {
+    const librarySensor = this._findLibrarySensor();
+    if (!librarySensor) return null;
+
+    const libraryItems = librarySensor.attributes?.items;
+    if (!Array.isArray(libraryItems)) return null;
+
+    if (this._libraryItemsByMediaId && this._libraryItemsRef === libraryItems) {
+      return this._libraryItemsByMediaId;
+    }
+
+    const libraryItemsByMediaId = new Map();
+    for (const libraryItem of libraryItems) {
+      if (!libraryItem || typeof libraryItem !== 'object') continue;
+      if (libraryItem.imdb_id) {
+        libraryItemsByMediaId.set(libraryItem.imdb_id, libraryItem);
+      }
+      if (libraryItem.id) {
+        libraryItemsByMediaId.set(libraryItem.id, libraryItem);
+      }
+    }
+
+    this._libraryItemsRef = libraryItems;
+    this._libraryItemsByMediaId = libraryItemsByMediaId;
+    return this._libraryItemsByMediaId;
+  }
+
+  _invalidateLibraryCache() {
+    this._librarySensorEntityId = null;
+    this._libraryItemsRef = null;
+    this._libraryItemsByMediaId = null;
   }
 
   _closeDetail() {
@@ -654,6 +808,10 @@ class StremioRecommendationsCard extends LitElement {
   }
 
   _showEpisodePicker(item) {
+    // Enrich with library data for progress display in the episode picker
+    const enrichedItem = this._enrichWithLibraryData(item);
+    const mediaId = item.imdb_id || item.id;
+
     if (window.StremioEpisodePicker) {
       window.StremioEpisodePicker.show(
         this._hass,
@@ -661,7 +819,12 @@ class StremioRecommendationsCard extends LitElement {
           title: item.title || item.name,
           type: item.type,
           poster: item.poster,
-          imdb_id: item.imdb_id || item.id,
+          imdb_id: mediaId,
+          lastWatchedSeason: enrichedItem.last_season || enrichedItem.season,
+          lastWatchedEpisode: enrichedItem.last_episode || enrichedItem.episode,
+          lastWatchedProgressPercent: enrichedItem.progress_percent || 0,
+          flagged_watched: enrichedItem.flagged_watched ?? item.flagged_watched ?? 0,
+          watched_episodes: enrichedItem.watched_episodes || [],
         },
         (selection) => {
           this._fetchStreams(item, selection.season, selection.episode);
@@ -866,6 +1029,9 @@ class StremioRecommendationsCard extends LitElement {
   _renderItem(item) {
     const title = item.title || item.name || 'Unknown';
     const reason = item.recommendation_reason;
+    const enriched = this._enrichWithLibraryData(item);
+    const progress = enriched.progress_percent || 0;
+    const isWatched = progress >= 98 || enriched.flagged_watched === 1;
 
     return html`
       <div 
@@ -890,9 +1056,19 @@ class StremioRecommendationsCard extends LitElement {
           ${this.config.show_reason && reason ? html`
             <div class="recommendation-reason">${reason}</div>
           ` : ''}
+          ${isWatched ? html`
+            <div class="watched-overlay" title="Watched">
+              <ha-icon icon="mdi:eye"></ha-icon>
+            </div>
+          ` : ''}
         </div>
         ${this.config.show_title !== false ? html`
           <div class="item-title" title="${title}">${title}</div>
+        ` : ''}
+        ${enriched.in_library && progress > 0 ? html`
+          <div class="item-progress" role="progressbar" aria-valuenow="${isWatched ? 100 : progress}" aria-valuemin="0" aria-valuemax="100">
+            <div class="item-progress-fill" style="width: ${isWatched ? 100 : progress}%"></div>
+          </div>
         ` : ''}
       </div>
     `;
@@ -902,6 +1078,8 @@ class StremioRecommendationsCard extends LitElement {
     const item = this._selectedItem;
     const title = item.title || item.name || 'Unknown';
     const reason = item.recommendation_reason;
+    const progress = item.progress_percent || 0;
+    const isWatched = progress >= 98 || item.flagged_watched === 1;
 
     return html`
       <div class="item-detail-view">
@@ -920,6 +1098,19 @@ class StremioRecommendationsCard extends LitElement {
             ${item.genres && item.genres.length > 0 ? html`
               <p class="detail-meta">Genres: ${item.genres.join(', ')}</p>
             ` : ''}
+            ${isWatched ? html`
+              <div class="watched-label">
+                <ha-icon icon="mdi:eye"></ha-icon>
+                Watched
+              </div>
+            ` : progress > 0 ? html`
+              <div class="detail-progress-container">
+                <p class="detail-meta">Progress: ${progress.toFixed(0)}%</p>
+                <div class="detail-progress-bar">
+                  <div class="detail-progress-fill" style="width: ${progress}%"></div>
+                </div>
+              </div>
+            ` : ''}
             ${reason ? html`
               <div class="detail-reason">
                 <ha-icon icon="mdi:lightbulb"></ha-icon>
@@ -936,7 +1127,7 @@ class StremioRecommendationsCard extends LitElement {
           </button>
           <button class="detail-button secondary" @click=${() => this._addToLibrary(item)}>
             <ha-icon icon="mdi:plus"></ha-icon>
-            Add to Library
+            ${item.in_library ? 'In Library' : 'Add to Library'}
           </button>
         </div>
 
@@ -1393,4 +1584,3 @@ if (!customElements.get('stremio-recommendations-card-editor')) {
 }
 
 // Note: Card registration with window.customCards is handled in stremio-card-bundle.js
-
