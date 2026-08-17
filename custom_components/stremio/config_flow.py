@@ -23,6 +23,8 @@ from .const import (
     CONF_AUTH_KEY,
     CONF_DEFAULT_CATALOG_SOURCE,
     CONF_ENABLE_APPLE_TV_HANDOVER,
+    CONF_ENABLE_FIRE_TV_HANDOVER,
+    CONF_FIRE_TV_ENTITY_ID,
     CONF_HANDOVER_METHOD,
     CONF_LIBRARY_SCAN_INTERVAL,
     CONF_PLAYER_SCAN_INTERVAL,
@@ -35,6 +37,8 @@ from .const import (
     DEFAULT_APPLE_TV_ENTITY_ID,
     DEFAULT_CATALOG_SOURCE,
     DEFAULT_ENABLE_APPLE_TV_HANDOVER,
+    DEFAULT_ENABLE_FIRE_TV_HANDOVER,
+    DEFAULT_FIRE_TV_ENTITY_ID,
     DEFAULT_HANDOVER_METHOD,
     DEFAULT_LIBRARY_SCAN_INTERVAL,
     DEFAULT_PLAYER_SCAN_INTERVAL,
@@ -357,6 +361,24 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                         description={
                             "suggested_value": self._config_entry.options.get(
                                 CONF_APPLE_TV_ENTITY_ID, ""
+                            )
+                        },
+                    ): str,
+                    vol.Optional(
+                        CONF_ENABLE_FIRE_TV_HANDOVER,
+                        default=self._config_entry.options.get(
+                            CONF_ENABLE_FIRE_TV_HANDOVER,
+                            DEFAULT_ENABLE_FIRE_TV_HANDOVER,
+                        ),
+                    ): bool,
+                    vol.Optional(
+                        CONF_FIRE_TV_ENTITY_ID,
+                        default=self._config_entry.options.get(
+                            CONF_FIRE_TV_ENTITY_ID, DEFAULT_FIRE_TV_ENTITY_ID
+                        ),
+                        description={
+                            "suggested_value": self._config_entry.options.get(
+                                CONF_FIRE_TV_ENTITY_ID, ""
                             )
                         },
                     ): str,
