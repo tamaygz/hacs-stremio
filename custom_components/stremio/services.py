@@ -19,6 +19,7 @@ from .const import (
     CONF_ADDON_STREAM_ORDER,
     CONF_APPLE_TV_CREDENTIALS,
     CONF_APPLE_TV_IDENTIFIER,
+    CONF_FIRE_TV_ENTITY_ID,
     CONF_HANDOVER_METHOD,
     CONF_STREAM_QUALITY_PREFERENCE,
     DEFAULT_HANDOVER_METHOD,
@@ -35,11 +36,13 @@ from .const import (
     SERVICE_GET_STREAMS,
     SERVICE_GET_UPCOMING_EPISODES,
     SERVICE_HANDOVER_TO_APPLE_TV,
+    SERVICE_HANDOVER_TO_FIRE_TV,
     SERVICE_REFRESH_LIBRARY,
     SERVICE_REMOVE_FROM_LIBRARY,
     SERVICE_SEARCH_CATALOG,
     SERVICE_SEARCH_LIBRARY,
 )
+from .fire_tv_handover import FireTVHandoverError, FireTVHandoverManager
 from .coordinator import StremioDataUpdateCoordinator
 from .stremio_client import StremioClient, StremioConnectionError
 
@@ -108,6 +111,18 @@ HANDOVER_SCHEMA = vol.Schema(
         vol.Optional(ATTR_MEDIA_ID): cv.string,
         vol.Optional(ATTR_STREAM_URL): cv.string,
         vol.Optional(ATTR_METHOD): vol.In(["auto", "airplay", "vlc", "direct"]),
+    }
+)
+
+HANDOVER_FIRE_TV_SCHEMA = vol.Schema(
+    {
+        # device_id is optional: falls back to the configured default Fire TV.
+        vol.Optional(ATTR_DEVICE_ID): cv.entity_id,
+        # media_id is optional: falls back to what's currently watching.
+        vol.Optional(ATTR_MEDIA_ID): cv.string,
+        vol.Optional(ATTR_MEDIA_TYPE): vol.In(["movie", "series"]),
+        vol.Optional(ATTR_SEASON): vol.Coerce(int),  # type: ignore[arg-type]
+        vol.Optional(ATTR_EPISODE): vol.Coerce(int),  # type: ignore[arg-type]
     }
 )
 
@@ -581,6 +596,88 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         # Schedule a refresh after a short delay to allow Stremio's backend to sync
         coordinator.schedule_refresh_after_playback()
 
+    async def handle_handover_to_fire_tv(call: ServiceCall) -> ServiceResponse:  # type: ignore[return-value]
+        """Handle handover_to_fire_tv service call.
+
+        Opens the title directly in the Stremio app on a Fire TV via a
+        ``stremio://`` deep link (delegated to the androidtv integration's ADB
+        command). No stream resolution needed — the Fire TV's Stremio, signed
+        into the same account, resumes from the synced watch position.
+        """
+        coordinator, _, entry_id = _get_entry_data(hass)
+
+        device_id = call.data.get(ATTR_DEVICE_ID)
+        media_id = call.data.get(ATTR_MEDIA_ID)
+        media_type = call.data.get(ATTR_MEDIA_TYPE)
+        season = call.data.get(ATTR_SEASON)
+        episode = call.data.get(ATTR_EPISODE)
+
+        # Fall back to the configured default Fire TV entity.
+        entry = hass.config_entries.async_get_entry(entry_id)
+        if not device_id and entry:
+            device_id = entry.options.get(CONF_FIRE_TV_ENTITY_ID) or None
+        if not device_id:
+            raise ServiceValidationError(
+                "No Fire TV device_id provided and no default configured",
+                translation_domain=DOMAIN,
+                translation_key="no_fire_tv_device",
+            )
+
+        # Fall back to whatever is currently watching (carrying S/E for resume).
+        if not media_id:
+            current = (coordinator.data or {}).get("current_watching")
+            if not current:
+                raise ServiceValidationError(
+                    "No media_id provided and nothing currently watching",
+                    translation_domain=DOMAIN,
+                    translation_key="no_media_for_handover",
+                )
+            media_id = current.get("imdb_id")
+            media_type = media_type or current.get("type", "movie")
+            if season is None:
+                season = current.get("season")
+            if episode is None:
+                episode = current.get("episode")
+        else:
+            media_type = media_type or "movie"
+
+        _LOGGER.info(
+            "Handover to Fire TV: device=%s, media=%s (%s) S%sE%s",
+            device_id,
+            media_id,
+            media_type,
+            season,
+            episode,
+        )
+
+        manager = FireTVHandoverManager(hass)
+        try:
+            result = await manager.async_handover(
+                device_entity_id=device_id,
+                media_type=media_type,
+                media_id=media_id,
+                season=season,
+                episode=episode,
+            )
+        except FireTVHandoverError as err:
+            raise HomeAssistantError(f"Fire TV handover failed: {err}") from err
+
+        # Fire the same playback event the Apple TV path uses, tagged by method.
+        hass.bus.async_fire(
+            EVENT_PLAYBACK_STARTED,
+            {
+                "device_id": device_id,
+                "media_id": media_id,
+                "media_type": media_type,
+                "season": season,
+                "episode": episode,
+                "uri": result["uri"],
+                "method": "fire_tv_deeplink",
+            },
+        )
+
+        return {"success": True, **result}
+
     async def handle_browse_catalog(call: ServiceCall) -> ServiceResponse:
         """Handle browse_catalog service call.
 
@@ -871,6 +968,14 @@ async def async_setup_services(hass: HomeAssistant) -> None:
 
     hass.services.async_register(
         DOMAIN,
+        SERVICE_HANDOVER_TO_FIRE_TV,
+        handle_handover_to_fire_tv,
+        schema=HANDOVER_FIRE_TV_SCHEMA,
+        supports_response=SupportsResponse.OPTIONAL,
+    )
+
+    hass.services.async_register(
+        DOMAIN,
         SERVICE_BROWSE_CATALOG,
         handle_browse_catalog,
         schema=BROWSE_CATALOG_SCHEMA,
@@ -931,6 +1036,7 @@ async def async_unload_services(hass: HomeAssistant) -> None:
     hass.services.async_remove(DOMAIN, SERVICE_REMOVE_FROM_LIBRARY)
     hass.services.async_remove(DOMAIN, SERVICE_REFRESH_LIBRARY)
     hass.services.async_remove(DOMAIN, SERVICE_HANDOVER_TO_APPLE_TV)
+    hass.services.async_remove(DOMAIN, SERVICE_HANDOVER_TO_FIRE_TV)
     hass.services.async_remove(DOMAIN, SERVICE_BROWSE_CATALOG)
     hass.services.async_remove(DOMAIN, SERVICE_GET_UPCOMING_EPISODES)
     hass.services.async_remove(DOMAIN, SERVICE_GET_RECOMMENDATIONS)
