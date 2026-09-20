@@ -187,24 +187,15 @@ class JSModuleRegistration:
                         target_version,
                     )
                     try:
-                        if isinstance(resources, ResourceStorageCollection):
-                            await resources.async_update_item(
-                                resource["id"],
-                                {"res_type": "module", "url": versioned_url},
-                            )
-                            _LOGGER.info(
-                                "Successfully updated %s to v%s",
-                                module["name"],
-                                target_version,
-                            )
-                        else:
-                            _LOGGER.warning(
-                                "Cannot persist update for %s: resources collection "
-                                "is not a ResourceStorageCollection (type=%s). "
-                                "The update will not survive a restart.",
-                                module["name"],
-                                type(resources).__name__,
-                            )
+                        await resources.async_update_item(
+                            resource["id"],
+                            {"res_type": "module", "url": versioned_url},
+                        )
+                        _LOGGER.info(
+                            "Successfully updated %s to v%s",
+                            module["name"],
+                            target_version,
+                        )
                     except Exception as err:  # noqa: BLE001
                         _LOGGER.error(
                             "Failed to update resource %s: %s", module["name"], err
@@ -218,33 +209,14 @@ class JSModuleRegistration:
                     module["version"],
                 )
                 try:
-                    if isinstance(resources, ResourceStorageCollection):
-                        await resources.async_create_item(
-                            {"res_type": "module", "url": versioned_url}
-                        )
-                        _LOGGER.info(
-                            "Successfully registered %s v%s",
-                            module["name"],
-                            module["version"],
-                        )
-                    elif getattr(resources, "data", None) and getattr(
-                        resources.data, "append", None
-                    ):
-                        resources.data.append(
-                            {"type": "module", "url": versioned_url}
-                        )
-                        _LOGGER.info(
-                            "Successfully registered %s v%s (in-memory only)",
-                            module["name"],
-                            module["version"],
-                        )
-                    else:
-                        _LOGGER.warning(
-                            "Could not register %s: no supported registration API "
-                            "on resources collection (type=%s).",
-                            module["name"],
-                            type(resources).__name__,
-                        )
+                    await resources.async_create_item(
+                        {"res_type": "module", "url": versioned_url}
+                    )
+                    _LOGGER.info(
+                        "Successfully registered %s v%s",
+                        module["name"],
+                        module["version"],
+                    )
                 except Exception as err:  # noqa: BLE001
                     _LOGGER.error(
                         "Failed to register resource %s: %s", module["name"], err
