@@ -144,11 +144,11 @@ class JSModuleRegistration:
         self, resources: ResourceStorageCollection
     ) -> None:
         """Ensure resources are loaded then register or update JS modules."""
-        # Explicitly load resources before reading or writing to avoid the
-        # lazy-load race that can silently overwrite existing entries.
+        # Load resources before reading or writing to avoid the lazy-load race
+        # that can silently overwrite existing entries. async_load() is safe to
+        # call unconditionally — the underlying Store caches data in memory.
         # See: https://github.com/home-assistant/core/issues/165767
-        if not resources.loaded:
-            await resources.async_load()
+        await resources.async_load()
 
         _LOGGER.info("Installing Stremio JavaScript modules v%s", INTEGRATION_VERSION)
 
@@ -239,8 +239,7 @@ class JSModuleRegistration:
         if resources is None or not isinstance(resources, ResourceStorageCollection):
             return
 
-        if not resources.loaded:
-            await resources.async_load()
+        await resources.async_load()
 
         for module in JSMODULES:
             url = f"{URL_BASE}/{module['filename']}"
