@@ -65,18 +65,33 @@ class JSModuleRegistration:
         """
         lovelace = self._lovelace
         if lovelace is None:
-            _LOGGER.debug("Lovelace data is None")
+            _LOGGER.debug("Lovelace data is None (hass.data['lovelace'] not set)")
             return None
+
+        _LOGGER.debug("Lovelace data type: %s", type(lovelace).__name__)
 
         # Modern HA (2024+): lovelace data has a resources attribute
         if hasattr(lovelace, "resources"):
-            return lovelace.resources  # type: ignore[return-value]
+            resources = lovelace.resources
+            _LOGGER.debug(
+                "Lovelace resources type (attribute): %s",
+                type(resources).__name__,
+            )
+            return resources  # type: ignore[return-value]
 
         # Dict-based structure (older HA versions)
         if isinstance(lovelace, dict):
-            return lovelace.get("resources")  # type: ignore[return-value]
+            resources = lovelace.get("resources")
+            _LOGGER.debug(
+                "Lovelace resources type (dict key): %s",
+                type(resources).__name__ if resources is not None else "None",
+            )
+            return resources  # type: ignore[return-value]
 
-        _LOGGER.debug("Could not find lovelace resources")
+        _LOGGER.debug(
+            "Could not find lovelace resources in object of type %s",
+            type(lovelace).__name__,
+        )
         return None
 
     @property
@@ -106,9 +121,9 @@ class JSModuleRegistration:
         resources = self.lovelace_resources
 
         _LOGGER.debug(
-            "Lovelace mode: %s, resources available: %s",
+            "Lovelace mode: %s, resources type: %s",
             mode,
-            resources is not None,
+            type(resources).__name__ if resources is not None else "None",
         )
 
         if mode == "yaml":
@@ -122,10 +137,12 @@ class JSModuleRegistration:
         if isinstance(resources, ResourceStorageCollection):
             await self._async_register_modules(resources)
         else:
-            _LOGGER.info(
-                "Lovelace resources not accessible (mode='%s'). "
+            _LOGGER.warning(
+                "Lovelace resources not accessible "
+                "(mode='%s', resources_type='%s'). "
                 "Add resources manually if needed: %s/*.js?v=%s",
                 mode or "unknown",
+                type(resources).__name__ if resources is not None else "None",
                 URL_BASE,
                 INTEGRATION_VERSION,
             )
@@ -157,14 +174,25 @@ class JSModuleRegistration:
         # that can silently overwrite existing entries. async_load() is safe to
         # call unconditionally — the underlying Store caches data in memory.
         # See: https://github.com/home-assistant/core/issues/165767
+        _LOGGER.debug("Loading Lovelace resource store before registration")
         await resources.async_load()
+
+        all_resources = list(resources.async_items())
+        _LOGGER.debug(
+            "Lovelace resource store loaded: %d total resource(s)", len(all_resources)
+        )
 
         _LOGGER.info("Installing Stremio JavaScript modules v%s", INTEGRATION_VERSION)
 
         try:
             existing_resources = [
-                r for r in resources.async_items() if r["url"].startswith(URL_BASE)
+                r for r in all_resources if r["url"].startswith(URL_BASE)
             ]
+            _LOGGER.debug(
+                "Found %d existing Stremio resource(s): %s",
+                len(existing_resources),
+                [r["url"] for r in existing_resources],
+            )
         except Exception as err:  # noqa: BLE001
             _LOGGER.error("Failed to get existing resources: %s", err)
             return
@@ -246,19 +274,36 @@ class JSModuleRegistration:
         """Remove Lovelace resources from this integration."""
         resources = self.lovelace_resources
         if resources is None or not isinstance(resources, ResourceStorageCollection):
+            _LOGGER.debug(
+                "Skipping unregister: resources type is %s",
+                type(resources).__name__ if resources is not None else "None",
+            )
             return
 
+        _LOGGER.debug("Loading Lovelace resource store before unregistration")
         await resources.async_load()
+
+        all_resources = list(resources.async_items())
+        _LOGGER.debug(
+            "Lovelace resource store loaded: %d total resource(s)", len(all_resources)
+        )
 
         for module in JSMODULES:
             url = f"{URL_BASE}/{module['filename']}"
             try:
-                resource_list = [
-                    r for r in resources.async_items() if r["url"].startswith(url)
-                ]
+                resource_list = [r for r in all_resources if r["url"].startswith(url)]
+                _LOGGER.debug(
+                    "Found %d resource(s) to unregister for %s",
+                    len(resource_list),
+                    module["name"],
+                )
                 for resource in resource_list:
                     await resources.async_delete_item(resource["id"])
-                    _LOGGER.info("Unregistered resource: %s", module["name"])
+                    _LOGGER.info(
+                        "Unregistered resource: %s (url=%s)",
+                        module["name"],
+                        resource["url"],
+                    )
             except Exception as err:  # noqa: BLE001
                 _LOGGER.error(
                     "Failed to unregister resource %s: %s", module["name"], err
