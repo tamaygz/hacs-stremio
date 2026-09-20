@@ -147,10 +147,13 @@ class JSModuleRegistration:
         # Explicitly load resources before reading or writing — avoids the
         # lazy-load race that can silently overwrite existing entries.
         # See: https://github.com/home-assistant/core/issues/165767
-        # Note: StorageCollection.async_load() does NOT set `loaded`; we must
-        # set it ourselves so HA's own _update_data / async_get_info don't
-        # call async_load() a second time. This matches the pattern used by
-        # ResourceStorageCollection internally and by browser_mod.
+        #
+        # StorageCollection.async_load() does NOT set `loaded`; we set it here
+        # ourselves so HA's own _update_data / async_get_info don't trigger a
+        # redundant second load.  This is the established community pattern
+        # (browser_mod, haus) and mirrors how ResourceStorageCollection manages
+        # the flag in its own internal methods.  Track HA core for any API
+        # changes that could affect this coupling.
         if not resources.loaded:
             await resources.async_load()
             resources.loaded = True
@@ -227,17 +230,29 @@ class JSModuleRegistration:
                         await resources.async_create_item(
                             {"res_type": "module", "url": versioned_url}
                         )
+                        _LOGGER.info(
+                            "Successfully registered %s v%s",
+                            module["name"],
+                            module["version"],
+                        )
                     elif getattr(resources, "data", None) and getattr(
                         resources.data, "append", None
                     ):
                         resources.data.append(
                             {"type": "module", "url": versioned_url}
                         )
-                    _LOGGER.info(
-                        "Successfully registered %s v%s",
-                        module["name"],
-                        module["version"],
-                    )
+                        _LOGGER.info(
+                            "Successfully registered %s v%s (in-memory only)",
+                            module["name"],
+                            module["version"],
+                        )
+                    else:
+                        _LOGGER.warning(
+                            "Could not register %s: no supported registration API "
+                            "on resources collection (type=%s).",
+                            module["name"],
+                            type(resources).__name__,
+                        )
                 except Exception as err:  # noqa: BLE001
                     _LOGGER.error(
                         "Failed to register resource %s: %s", module["name"], err
