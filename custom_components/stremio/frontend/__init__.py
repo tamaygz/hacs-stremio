@@ -226,7 +226,7 @@ class JSModuleRegistration:
                     module["version"],
                 )
                 try:
-                    if getattr(resources, "async_create_item", None):
+                    if isinstance(resources, ResourceStorageCollection):
                         await resources.async_create_item(
                             {"res_type": "module", "url": versioned_url}
                         )
