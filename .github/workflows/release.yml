@@ -99,10 +99,11 @@ jobs:
           # HA requires a version parseable as SemVer, PEP440, CalVer, or similar — plain strings
           # like "0.5.44beta" are rejected and cause "Integration not found" errors at runtime.
           pip install awesomeversion --quiet
-          python3 << PYEOF
+          VERSION_TO_CHECK="$VERSION" python3 << 'PYEOF'
+          import os
           import sys
           from awesomeversion import AwesomeVersion, AwesomeVersionException
-          version = "$VERSION"
+          version = os.environ["VERSION_TO_CHECK"]
           try:
               av = AwesomeVersion(version)
               print(f"Version '{version}' is valid (strategy: {av.strategy})", file=sys.stderr)
