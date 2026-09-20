@@ -94,6 +94,23 @@ jobs:
             echo "Error: VERSION is empty. Failing workflow." >&2
             exit 1
           fi
+
+          # Validate the version is accepted by Home Assistant (uses awesomeversion internally).
+          # HA requires a version parseable as SemVer, PEP440, CalVer, or similar — plain strings
+          # like "0.5.44beta" are rejected and cause "Integration not found" errors at runtime.
+          pip install awesomeversion --quiet
+          python3 << PYEOF
+          import sys
+          from awesomeversion import AwesomeVersion, AwesomeVersionException
+          version = "$VERSION"
+          try:
+              av = AwesomeVersion(version)
+              print(f"Version '{version}' is valid (strategy: {av.strategy})", file=sys.stderr)
+          except AwesomeVersionException as e:
+              print(f"Error: '{version}' is not a valid Home Assistant version: {e}", file=sys.stderr)
+              print("Use formats like '1.2.3', '1.2.3b0', '1.2.3.dev0', or '2024.1.0'.", file=sys.stderr)
+              sys.exit(1)
+          PYEOF
           
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Final version to release: $VERSION"
