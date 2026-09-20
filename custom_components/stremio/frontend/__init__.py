@@ -147,6 +147,10 @@ class JSModuleRegistration:
         # Explicitly load resources before reading or writing — avoids the
         # lazy-load race that can silently overwrite existing entries.
         # See: https://github.com/home-assistant/core/issues/165767
+        # Note: StorageCollection.async_load() does NOT set `loaded`; we must
+        # set it ourselves so HA's own _update_data / async_get_info don't
+        # call async_load() a second time. This matches the pattern used by
+        # ResourceStorageCollection internally and by browser_mod.
         if not resources.loaded:
             await resources.async_load()
             resources.loaded = True
@@ -187,13 +191,19 @@ class JSModuleRegistration:
                                 resource["id"],
                                 {"res_type": "module", "url": versioned_url},
                             )
+                            _LOGGER.info(
+                                "Successfully updated %s to v%s",
+                                module["name"],
+                                target_version,
+                            )
                         else:
-                            resource["url"] = versioned_url
-                        _LOGGER.info(
-                            "Successfully updated %s to v%s",
-                            module["name"],
-                            target_version,
-                        )
+                            _LOGGER.warning(
+                                "Cannot persist update for %s: resources collection "
+                                "is not a ResourceStorageCollection (type=%s). "
+                                "The update will not survive a restart.",
+                                module["name"],
+                                type(resources).__name__,
+                            )
                     except Exception as err:  # noqa: BLE001
                         _LOGGER.error(
                             "Failed to update resource %s: %s", module["name"], err
