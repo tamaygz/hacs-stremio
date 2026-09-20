@@ -42,10 +42,19 @@ class JSModuleRegistration:
         """
         self.hass = hass
 
+    def _refresh_lovelace_data(self) -> Any:
+        """Re-read the lovelace data object from hass.data.
+
+        Called immediately before any read or write operation so that
+        late-initialisation cases (lovelace populated after __init__)
+        are always reflected.
+        """
+        return self.hass.data.get("lovelace")
+
     @property
     def _lovelace(self) -> Any:
         """Return the lovelace data object from hass.data."""
-        return self.hass.data.get("lovelace")
+        return self._refresh_lovelace_data()
 
     @property
     def lovelace_resources(self) -> ResourceStorageCollection | None:
@@ -110,7 +119,7 @@ class JSModuleRegistration:
             )
             return
 
-        if resources is not None:
+        if isinstance(resources, ResourceStorageCollection):
             await self._async_register_modules(resources)
         else:
             _LOGGER.info(
