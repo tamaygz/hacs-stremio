@@ -59,6 +59,10 @@ class JSModuleRegistration:
             self._lovelace_data,
         )
 
+    def _refresh_lovelace_data(self) -> None:
+        """Re-read lovelace data from hass.data (in case it was loaded after init)."""
+        self._lovelace_data = self.hass.data.get("lovelace")
+
     @property
     def lovelace_resources(self) -> ResourceStorageCollection | None:
         """Get the Lovelace resources collection.
@@ -109,6 +113,9 @@ class JSModuleRegistration:
         """Register frontend resources."""
         await self._async_register_path()
 
+        # Refresh lovelace data in case it was not yet populated at init time
+        self._refresh_lovelace_data()
+
         # Only register modules if Lovelace is in storage mode
         mode = self.lovelace_mode
         resources = self.lovelace_resources
@@ -119,11 +126,21 @@ class JSModuleRegistration:
             resources is not None,
         )
 
-        if mode == "storage" and resources is not None:
+        if mode == "yaml":
+            _LOGGER.info(
+                "Lovelace is in YAML mode. Add resources manually: %s/*.js?v=%s",
+                URL_BASE,
+                INTEGRATION_VERSION,
+            )
+            return
+
+        if resources is not None:
+            # storage mode (or mode unknown but resources accessible)
             await self._async_wait_for_lovelace_resources()
         else:
             _LOGGER.info(
-                "Lovelace mode is '%s'. Add resources manually if needed: %s/*.js?v=%s",
+                "Lovelace resources not accessible (mode='%s'). "
+                "Add resources manually if needed: %s/*.js?v=%s",
                 mode or "unknown",
                 URL_BASE,
                 INTEGRATION_VERSION,
