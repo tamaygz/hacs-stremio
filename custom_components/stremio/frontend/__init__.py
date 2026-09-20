@@ -144,19 +144,11 @@ class JSModuleRegistration:
         self, resources: ResourceStorageCollection
     ) -> None:
         """Ensure resources are loaded then register or update JS modules."""
-        # Explicitly load resources before reading or writing — avoids the
+        # Explicitly load resources before reading or writing to avoid the
         # lazy-load race that can silently overwrite existing entries.
         # See: https://github.com/home-assistant/core/issues/165767
-        #
-        # StorageCollection.async_load() does NOT set `loaded`; we set it here
-        # ourselves so HA's own _update_data / async_get_info don't trigger a
-        # redundant second load.  This is the established community pattern
-        # (browser_mod, haus) and mirrors how ResourceStorageCollection manages
-        # the flag in its own internal methods.  Track HA core for any API
-        # changes that could affect this coupling.
         if not resources.loaded:
             await resources.async_load()
-            resources.loaded = True
 
         _LOGGER.info("Installing Stremio JavaScript modules v%s", INTEGRATION_VERSION)
 
@@ -181,7 +173,13 @@ class JSModuleRegistration:
                 current_version = self._get_version(resource["url"])
                 target_version = module["version"]
 
-                if current_version != target_version:
+                if current_version == target_version:
+                    _LOGGER.debug(
+                        "%s already at v%s, no update needed",
+                        module["name"],
+                        target_version,
+                    )
+                else:
                     _LOGGER.info(
                         "Updating %s from v%s to v%s",
                         module["name"],
@@ -211,12 +209,6 @@ class JSModuleRegistration:
                         _LOGGER.error(
                             "Failed to update resource %s: %s", module["name"], err
                         )
-                else:
-                    _LOGGER.debug(
-                        "%s already at v%s, no update needed",
-                        module["name"],
-                        target_version,
-                    )
                 break
 
             if not registered:
@@ -277,7 +269,6 @@ class JSModuleRegistration:
 
         if not resources.loaded:
             await resources.async_load()
-            resources.loaded = True
 
         for module in JSMODULES:
             url = f"{URL_BASE}/{module['filename']}"
