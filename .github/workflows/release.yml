@@ -98,7 +98,7 @@ jobs:
           # Validate the version is accepted by Home Assistant (uses awesomeversion internally).
           # HA requires a version parseable as SemVer, PEP440, CalVer, or similar — plain strings
           # like "0.5.44beta" are rejected and cause "Integration not found" errors at runtime.
-          pip install awesomeversion --quiet
+          pip install awesomeversion==25.8.0 --quiet
           VERSION_TO_CHECK="$VERSION" python3 << 'PYEOF'
           import os
           import sys
