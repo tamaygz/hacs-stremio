@@ -24,6 +24,7 @@ A comprehensive Home Assistant Custom Component (HACS) integration that connects
 | 📊 **Multiple Sensors**    | Library stats, watch time, current media        |
 | 🔔 **Events**              | React to playback changes and library updates   |
 | 📺 **Apple TV Handover**   | Stream content directly to Apple TV via AirPlay |
+| 🔥 **Fire TV Handover**    | Open a title in Stremio on Fire TV via deep link (resumes) |
 | 🎨 **Custom UI Cards**     | Beautiful Lovelace cards for library browsing   |
 | 🔍 **Media Source**        | Browse library from HA media browser            |
 | 🎯 **Services**            | Search, manage library, get stream URLs         |
@@ -105,6 +106,15 @@ data:
   media_id: "tt0111161"
   device_name: "Living Room Apple TV"
   method: "airplay"
+
+# Open on Fire TV (deep link — resumes from your synced position)
+service: stremio.handover_to_fire_tv
+data:
+  device_id: media_player.fire_tv
+  media_id: "tt12637874"   # optional — defaults to what you're watching
+  media_type: "series"
+  season: 1                # optional — jumps to a specific episode
+  episode: 1
 ```
 
 📖 [Full Services Documentation](docs/services.md)
