@@ -183,7 +183,7 @@ async def test_coordinator_current_watching_detection(
 
 
 @pytest.mark.asyncio
-async def test_coordinator_enrichs_last_watched_without_current_watching(
+async def test_coordinator_enriches_last_watched_without_current_watching(
     hass: HomeAssistant, mock_config_entry
 ):
     """Test series enrichment when there is no active current_watching item."""
