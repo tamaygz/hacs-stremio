@@ -14,6 +14,7 @@ from custom_components.stremio.sensor import (
     SENSOR_TYPES,
     async_setup_entry,
 )
+from homeassistant.components.sensor import SensorStateClass
 
 from .conftest import MOCK_LIBRARY_ITEMS, MOCK_CONTINUE_WATCHING, MOCK_CURRENT_MEDIA
 
@@ -122,6 +123,11 @@ class TestLibraryCountSensor:
     async def test_sensor_unit_of_measurement(self, library_count_sensor):
         """Test library sensor unit of measurement."""
         assert library_count_sensor.native_unit_of_measurement == "items"
+
+    @pytest.mark.asyncio
+    async def test_sensor_state_class(self, library_count_sensor):
+        """Test library sensor state class."""
+        assert library_count_sensor.state_class == SensorStateClass.MEASUREMENT
 
 
 class TestContinueWatchingCountSensor:

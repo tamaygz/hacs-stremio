@@ -264,6 +264,11 @@ class StremioSensor(CoordinatorEntity[StremioDataUpdateCoordinator], SensorEntit
         self._attr_unique_id = f"{entry.entry_id}_{description.key}"
         self._attr_has_entity_name = True
         self._attr_device_info = get_device_info(entry)
+        self._attr_icon = description.icon
+        self._attr_native_unit_of_measurement = (
+            description.native_unit_of_measurement
+        )
+        self._attr_state_class = description.state_class
         # Track previous value to avoid unnecessary updates
         self._previous_value: StateType = None
 

@@ -97,6 +97,32 @@ class StremioDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # Set entry after parent init to avoid it being overwritten
         self.entry = self._entry_param
 
+    def _normalize_media_items(
+        self, items: Any, label: str
+    ) -> list[dict[str, Any]]:
+        """Normalize API media lists to dictionaries only.
+
+        Args:
+            items: Raw API payload expected to be a list of dicts.
+            label: Log label for the payload.
+
+        Returns:
+            Filtered list containing only dictionary items.
+        """
+        if not isinstance(items, list):
+            _LOGGER.debug("Ignoring malformed %s payload of type %s", label, type(items).__name__)
+            return []
+
+        valid_items = [item for item in items if isinstance(item, dict)]
+        if len(valid_items) != len(items):
+            _LOGGER.debug(
+                "Skipping %d malformed %s items",
+                len(items) - len(valid_items),
+                label,
+            )
+
+        return valid_items
+
     @property
     def config_entry(self):
         """Return the config entry associated with this coordinator."""
@@ -474,10 +500,11 @@ class StremioDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             data: The coordinator data dictionary to enrich
         """
         items_to_enrich = []
+        current = data.get("current_watching")
+        last = data.get("last_watched")
 
         # Collect series items that need episode title enrichment
-        if data.get("current_watching"):
-            current = data["current_watching"]
+        if isinstance(current, dict):
             if (
                 current.get("type") == "series"
                 and current.get("season") is not None
@@ -486,8 +513,7 @@ class StremioDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             ):
                 items_to_enrich.append(("current_watching", current))
 
-        if data.get("last_watched"):
-            last = data["last_watched"]
+        if isinstance(last, dict):
             if (
                 last.get("type") == "series"
                 and last.get("season") is not None
@@ -495,17 +521,17 @@ class StremioDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 and not last.get("episode_title")
             ):
                 # Don't fetch again if it's the same as current_watching
-                current = data.get("current_watching", {})
+                current_item = current if isinstance(current, dict) else {}
                 if (
-                    last.get("imdb_id") != current.get("imdb_id")
-                    or last.get("season") != current.get("season")
-                    or last.get("episode") != current.get("episode")
+                    last.get("imdb_id") != current_item.get("imdb_id")
+                    or last.get("season") != current_item.get("season")
+                    or last.get("episode") != current_item.get("episode")
                 ):
                     items_to_enrich.append(("last_watched", last))
                 else:
                     # Copy episode title from current if same episode
-                    if current.get("episode_title"):
-                        last["episode_title"] = current["episode_title"]
+                    if current_item.get("episode_title"):
+                        last["episode_title"] = current_item["episode_title"]
 
         # Fetch metadata for unique series
         fetched_metadata: dict[str, dict[str, Any] | None] = {}
@@ -570,6 +596,7 @@ class StremioDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             library = await self._async_fetch_with_retry(
                 self.client.async_get_library, "library"
             )
+            library = self._normalize_media_items(library, "library")
             _LOGGER.info("Coordinator: Fetched library items count: %d", len(library))
             if library:
                 _LOGGER.debug("Coordinator: First library item: %s", library[0])
@@ -580,6 +607,9 @@ class StremioDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     limit=DEFAULT_CONTINUE_WATCHING_LIMIT
                 ),
                 "continue watching",
+            )
+            continue_watching = self._normalize_media_items(
+                continue_watching, "continue watching"
             )
             _LOGGER.info(
                 "Coordinator: Fetched continue watching count: %d",
