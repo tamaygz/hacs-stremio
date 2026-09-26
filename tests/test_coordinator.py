@@ -183,6 +183,113 @@ async def test_coordinator_current_watching_detection(
 
 
 @pytest.mark.asyncio
+async def test_coordinator_enriches_last_watched_without_current_watching(
+    hass: HomeAssistant, mock_config_entry
+):
+    """Test series enrichment when there is no active current_watching item."""
+    mock_client = AsyncMock()
+    mock_client.async_get_user = AsyncMock(return_value=MOCK_USER_DATA)
+    mock_client.async_get_library = AsyncMock(return_value=[])
+    mock_client.async_get_continue_watching = AsyncMock(
+        return_value=[
+            {
+                "title": "Breaking Bad",
+                "type": "series",
+                "progress": 3600,
+                "duration": 3600,
+                "season": 1,
+                "episode": 2,
+                "imdb_id": "tt0903747",
+                "watched_at": "2024-01-01T12:00:00Z",
+            }
+        ]
+    )
+    mock_client.async_get_series_metadata = AsyncMock(
+        return_value={
+            "seasons": [
+                {
+                    "number": 1,
+                    "episodes": [
+                        {"number": 1, "title": "Pilot"},
+                        {"number": 2, "title": "Cat's in the Bag..."},
+                    ],
+                }
+            ]
+        }
+    )
+
+    coordinator = StremioDataUpdateCoordinator(
+        hass=hass,
+        client=mock_client,
+        entry=mock_config_entry,
+    )
+
+    data = await coordinator._async_update_data()
+
+    assert data["current_watching"] is None
+    assert data["last_watched"] is not None
+    assert data["last_watched"]["episode_title"] == "Cat's in the Bag..."
+
+
+@pytest.mark.asyncio
+async def test_coordinator_filters_malformed_library_and_continue_watching_items(
+    hass: HomeAssistant, mock_config_entry
+):
+    """Test malformed API entries are filtered before downstream use."""
+    mock_client = AsyncMock()
+    mock_client.async_get_user = AsyncMock(return_value=MOCK_USER_DATA)
+    mock_client.async_get_library = AsyncMock(
+        return_value=[
+            None,
+            {
+                "title": "The Shawshank Redemption",
+                "type": "movie",
+                "imdb_id": "tt0111161",
+            },
+        ]
+    )
+    mock_client.async_get_continue_watching = AsyncMock(
+        return_value=[
+            None,
+            {
+                "title": "Breaking Bad",
+                "type": "series",
+                "progress": 1200,
+                "duration": 3600,
+                "season": 1,
+                "episode": 1,
+                "imdb_id": "tt0903747",
+                "watched_at": "2024-01-01T12:00:00Z",
+            },
+        ]
+    )
+    mock_client.async_get_series_metadata = AsyncMock(
+        return_value={
+            "seasons": [
+                {
+                    "number": 1,
+                    "episodes": [{"number": 1, "title": "Pilot"}],
+                }
+            ]
+        }
+    )
+
+    coordinator = StremioDataUpdateCoordinator(
+        hass=hass,
+        client=mock_client,
+        entry=mock_config_entry,
+    )
+
+    data = await coordinator._async_update_data()
+
+    assert data["library_count"] == 1
+    assert len(data["library"]) == 1
+    assert len(data["continue_watching"]) == 1
+    assert data["current_watching"] is not None
+    assert data["current_watching"]["episode_title"] == "Pilot"
+
+
+@pytest.mark.asyncio
 async def test_coordinator_event_firing(hass: HomeAssistant, mock_config_entry):
     """Test that events are fired on state changes."""
     mock_client = AsyncMock()
