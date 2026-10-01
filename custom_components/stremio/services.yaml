@@ -175,6 +175,62 @@ handover_to_apple_tv:
             - "direct"
             - "vlc"
 
+handover_to_fire_tv:
+  name: Handover to Fire TV
+  description: >-
+    Open the current or specified title directly in the Stremio app on a Fire
+    TV, via a stremio:// deep link (sent through the Android TV / Fire TV
+    integration's ADB command). The Fire TV's Stremio, signed into the same
+    account, resumes from the synced watch position.
+  fields:
+    device_id:
+      name: Fire TV Device
+      description: >-
+        An Android TV / Fire TV entity to open Stremio on. If omitted, uses the
+        default Fire TV configured in the integration options.
+      required: false
+      example: "media_player.fire_tv"
+      selector:
+        entity:
+          integration: androidtv
+    media_id:
+      name: Media ID
+      description: The IMDB ID of the title to open. If omitted, uses current watching.
+      required: false
+      example: "tt12637874"
+      selector:
+        text:
+    media_type:
+      name: Media Type
+      description: Type of media. Defaults to the current item's type, or "movie".
+      required: false
+      example: "series"
+      selector:
+        select:
+          options:
+            - "movie"
+            - "series"
+    season:
+      name: Season
+      description: Season number (series only) to open a specific episode.
+      required: false
+      example: 1
+      selector:
+        number:
+          min: 1
+          max: 100
+          mode: box
+    episode:
+      name: Episode
+      description: Episode number (series only) to open a specific episode.
+      required: false
+      example: 1
+      selector:
+        number:
+          min: 1
+          max: 100
+          mode: box
+
 browse_catalog:
   name: Browse Catalog
   description: Browse the Stremio catalog for popular or new movies/series, optionally filtered by genre.

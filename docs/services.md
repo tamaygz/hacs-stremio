@@ -104,6 +104,38 @@ data:
   method: "auto"
 ```
 
+### stremio.handover_to_fire_tv
+
+Open a title in the Stremio app on a Fire TV via a `stremio://` deep link. Unlike the Apple TV handover, no stream is resolved: the Fire TV runs the Stremio Android app, so the deep link opens the title directly and — because that Stremio is signed into the same account — playback resumes from the synced watch position.
+
+The deep link is delivered through the [Android TV / Fire TV integration](https://www.home-assistant.io/integrations/androidtv/)'s `androidtv.adb_command` service, so that integration must be set up with your Fire TV. It returns the deep-link URI it sent (`SupportsResponse.OPTIONAL`).
+
+**Parameters:**
+- `device_id` (optional): An `androidtv` entity for the Fire TV. Defaults to the Fire TV configured in the integration's options.
+- `media_id` (optional): IMDb id of the title. Defaults to what's currently watching.
+- `media_type` (optional): "movie" or "series". Defaults to the current item's type, or "movie".
+- `season` (optional): Season number (series) to open a specific episode.
+- `episode` (optional): Episode number (series) to open a specific episode.
+
+**Deep-link format:**
+```
+movie:            stremio:///detail/movie/<imdb_id>/<imdb_id>
+series (show):    stremio:///detail/series/<imdb_id>/<imdb_id>
+series (episode): stremio:///detail/series/<imdb_id>/<imdb_id>:<season>:<episode>
+```
+The triple slash is required — `stremio://detail/...` (double slash) parses "detail" as the URI host and drops the path, landing on the app home instead of the title.
+
+**Example:**
+```yaml
+service: stremio.handover_to_fire_tv
+data:
+  device_id: media_player.fire_tv
+  media_id: "tt12637874"
+  media_type: "series"
+  season: 1
+  episode: 1
+```
+
 ### stremio.browse_catalog
 
 Browse the Stremio catalog for popular or new movies/series with optional genre filtering.
