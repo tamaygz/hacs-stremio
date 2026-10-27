@@ -655,7 +655,18 @@ class StremioContinueWatchingCard extends LitElement {
     );
   }
 
+  _runOpenInStremioScript() {
+    const script = this.config?.open_in_stremio_script;
+    if (!script || !this._hass) return false;
+    this._hass.callService('script', 'turn_on', { entity_id: script }).catch((err) => {
+      console.warn('[Stremio] open_in_stremio_script failed:', err);
+    });
+    return true;
+  }
+
   _resumeInStremio(item) {
+    // Run an HA script instead (e.g. wake the TV and open the Stremio app on it)
+    if (this._runOpenInStremioScript()) return;
     const type = item.type === 'series' ? 'series' : 'movie';
     const id = item.imdb_id || item.id;
     
@@ -776,9 +787,11 @@ class StremioContinueWatchingCard extends LitElement {
         if (streams && streams.length > 0) {
           console.log('[Continue Watching Card] Found', streams.length, 'streams');
           // Show the stream dialog
-          const displayItem = { ...item };
+          const displayItem = { ...item, resumePosition: this._resumePosition(item, season, episode) };
           if (season && episode) {
             displayItem.title = `${item.title || item.name} - S${season}E${episode}`;
+            displayItem.season = season;
+            displayItem.episode = episode;
           }
           this._showStreamDialog(displayItem, streams);
         } else {
@@ -790,6 +803,20 @@ class StremioContinueWatchingCard extends LitElement {
         console.error('[Continue Watching Card] Failed to get streams:', error);
         this._showToast(`Failed to get streams: ${error.message}`, 'error');
       });
+  }
+
+  /**
+   * Seconds where the item was stopped, or 0. For series only when the chosen
+   * episode is the one that was being watched.
+   */
+  _resumePosition(item, season, episode) {
+    const seconds = (Number(item.time_offset) || 0) / 1000;
+    if (seconds <= 0) return 0;
+    if (item.type === 'series') {
+      if (!season || !episode) return 0;
+      if (Number(season) !== Number(item.season) || Number(episode) !== Number(item.episode)) return 0;
+    }
+    return seconds;
   }
 
   _showStreamDialog(item, streams) {
@@ -804,9 +831,15 @@ class StremioContinueWatchingCard extends LitElement {
           type: item.type,
           poster: item.poster,
           imdb_id: item.imdb_id || item.id,
+          season: item.season,
+          episode: item.episode,
         },
         streams,
-        this.config.apple_tv_entity
+        this.config.apple_tv_entity,
+        {
+          showCopy: this.config.show_copy_button !== false,
+          resumePosition: item.resumePosition || 0,
+        }
       );
     } else {
       // Fallback: Create dialog directly
@@ -823,6 +856,8 @@ class StremioContinueWatchingCard extends LitElement {
       };
       dialog.streams = streams;
       dialog.appleTvEntity = this.config.apple_tv_entity;
+      dialog.showCopy = this.config.show_copy_button !== false;
+      dialog.resumePosition = item.resumePosition || 0;
       dialog.open = true;
     }
   }
@@ -1301,6 +1336,12 @@ class StremioContinueWatchingCardEditor extends LitElement {
     }
   }
 
+  _isAppleTvEntity(entityId) {
+    // Without registry info (older HA), keep the entity so custom choices still work
+    const platform = this.hass?.entities?.[entityId]?.platform;
+    return !platform || platform === 'apple_tv';
+  }
+
   _updateEntities() {
     // Find Stremio continue_watching sensors
     this._stremioEntities = Object.keys(this.hass.states)
@@ -1316,6 +1357,10 @@ class StremioContinueWatchingCardEditor extends LitElement {
     // Find Apple TV media_player entities
     this._appleTvEntities = Object.keys(this.hass.states)
       .filter(entityId => {
+        // Only Apple TV integration entities can launch VLC; the registry knows the
+        // platform, so Music Assistant speakers named after the Apple TV are skipped.
+        const platform = this.hass.entities?.[entityId]?.platform;
+        if (platform) return entityId.startsWith('media_player.') && platform === 'apple_tv';
         const state = this.hass.states[entityId];
         return entityId.startsWith('media_player.') && 
           (state.attributes.app_name?.toLowerCase().includes('apple tv') ||
@@ -1584,6 +1629,7 @@ class StremioContinueWatchingCardEditor extends LitElement {
                 .value=${this._config.apple_tv_entity || ''}
                 .configValue=${'apple_tv_entity'}
                 .includeDomains=${['media_player']}
+                .entityFilter=${(stateObj) => this._isAppleTvEntity(stateObj.entity_id)}
                 label="Apple TV Entity"
                 allow-custom-entity
                 @value-changed=${this._valueChanged}

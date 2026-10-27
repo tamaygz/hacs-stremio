@@ -33,6 +33,8 @@ class StremioStreamDialog extends LitElement {
       mediaItem: { type: Object },
       streams: { type: Array },
       appleTvEntity: { type: String },
+      showCopy: { type: Boolean },
+      resumePosition: { type: Number },
       _loading: { type: Boolean },
       _copiedIndex: { type: Number },
     };
@@ -88,6 +90,24 @@ class StremioStreamDialog extends LitElement {
         display: flex;
         align-items: center;
         justify-content: space-between;
+      }
+
+      .resume-hint {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin: 12px 20px 0;
+        padding: 10px 12px;
+        border-radius: 12px;
+        background: rgba(var(--rgb-primary-color, 3, 169, 244), 0.12);
+        color: var(--primary-text-color);
+        font-size: 0.9em;
+      }
+
+      .resume-hint ha-icon {
+        --mdc-icon-size: 20px;
+        color: var(--primary-color);
+        flex: none;
       }
 
       .dialog-header h3 {
@@ -267,6 +287,8 @@ class StremioStreamDialog extends LitElement {
     super();
     this.open = false;
     this.streams = [];
+    this.showCopy = true;
+    this.resumePosition = 0;
     this._loading = false;
     this._copiedIndex = -1;
     // Bind keyboard handler for cleanup
@@ -358,12 +380,27 @@ class StremioStreamDialog extends LitElement {
   _playOnAppleTv(stream) {
     if (!this.hass) return;
 
-    // Use configured entity or fallback to hardcoded default
-    const deviceId = this.appleTvEntity || 'media_player.apple_tv';
-    
-    this.hass.callService('stremio', 'handover_to_apple_tv', {
-      device_id: deviceId,
-      stream_url: stream.url,
+    // Send device_id only when the card sets one; otherwise the service uses
+    // the Apple TV entity configured in the integration options.
+    const data = { stream_url: stream.url };
+    if (this.appleTvEntity) {
+      data.device_id = this.appleTvEntity;
+    }
+    // Lets the integration add the title to Stremio's Continue Watching and
+    // save progress while VLC plays
+    const media = this.mediaItem || {};
+    if (media.imdb_id) {
+      data.media_id = media.imdb_id;
+      data.media_type = media.type === 'series' ? 'series' : 'movie';
+      if (media.title) data.title = String(media.title);
+      if (typeof media.poster === 'string' && media.poster) data.poster = media.poster;
+      if (data.media_type === 'series' && media.season && media.episode) {
+        data.season = Number(media.season);
+        data.episode = Number(media.episode);
+      }
+    }
+    this.hass.callService('stremio', 'handover_to_apple_tv', data).catch((err) => {
+      console.warn('[Stremio] Apple TV handover failed:', err);
     });
   }
 
@@ -411,6 +448,16 @@ class StremioStreamDialog extends LitElement {
             </button>
           </div>
 
+          ${this.resumePosition >= 30 ? html`
+            <div class="resume-hint" role="note">
+              <ha-icon icon="mdi:history"></ha-icon>
+              <span>
+                Last stopped at <b>${this._formatPosition(this.resumePosition)}</b>.
+                VLC starts from the beginning, so skip ahead once it's playing.
+              </span>
+            </div>
+          ` : ''}
+
           <div class="dialog-content">
             ${this._loading ? this._renderLoading() : 
               this.streams.length > 0 ? this._renderStreams() : this._renderEmpty()}
@@ -418,6 +465,14 @@ class StremioStreamDialog extends LitElement {
         </div>
       </div>
     `;
+  }
+
+  _formatPosition(seconds) {
+    const total = Math.floor(seconds);
+    const h = Math.floor(total / 3600);
+    const m = Math.floor((total % 3600) / 60);
+    const s = String(total % 60).padStart(2, '0');
+    return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${s}` : `${m}:${s}`;
   }
 
   _renderLoading() {
@@ -633,14 +688,16 @@ class StremioStreamDialog extends LitElement {
         </div>
 
         <div class="stream-actions" role="group" aria-label="Stream actions">
-          <button 
-            class="action-btn secondary ${isCopied ? 'success' : ''}"
-            @click=${() => this._copyToClipboard(stream.url, index)}
-            aria-label="${isCopied ? 'Copied to clipboard' : `Copy ${streamName} URL to clipboard`}"
-          >
-            <ha-icon icon="${isCopied ? 'mdi:check' : 'mdi:content-copy'}"></ha-icon>
-            ${isCopied ? 'Copied!' : 'Copy'}
-          </button>
+          ${this.showCopy ? html`
+            <button 
+              class="action-btn secondary ${isCopied ? 'success' : ''}"
+              @click=${() => this._copyToClipboard(stream.url, index)}
+              aria-label="${isCopied ? 'Copied to clipboard' : `Copy ${streamName} URL to clipboard`}"
+            >
+              <ha-icon icon="${isCopied ? 'mdi:check' : 'mdi:content-copy'}"></ha-icon>
+              ${isCopied ? 'Copied!' : 'Copy'}
+            </button>
+          ` : ''}
           <button 
             class="action-btn"
             @click=${() => this._playOnAppleTv(stream)}
@@ -661,7 +718,12 @@ if (!customElements.get('stremio-stream-dialog')) {
 
 // Global helper to open the dialog
 window.StremioStreamDialog = {
-  show(hass, mediaItem, streams, appleTvEntity) {
+  /**
+   * @param {object} [options]
+   * @param {boolean} [options.showCopy=true] Show the Copy URL button
+   * @param {number} [options.resumePosition] Seconds where playback last stopped
+   */
+  show(hass, mediaItem, streams, appleTvEntity, options = {}) {
     let dialog = document.querySelector('stremio-stream-dialog');
     if (!dialog) {
       dialog = document.createElement('stremio-stream-dialog');
@@ -671,6 +733,8 @@ window.StremioStreamDialog = {
     dialog.mediaItem = mediaItem;
     dialog.streams = streams || [];
     dialog.appleTvEntity = appleTvEntity;
+    dialog.showCopy = options.showCopy !== false;
+    dialog.resumePosition = options.resumePosition || 0;
     dialog.open = true;
     return dialog;
   },

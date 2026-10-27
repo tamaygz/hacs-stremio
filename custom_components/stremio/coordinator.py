@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from datetime import timedelta
 from typing import Any
 
@@ -32,9 +33,17 @@ from .const import (
     EVENT_RESUME_AVAILABLE,
     POLLING_GATE_IDLE_INTERVAL,
 )
-from .stremio_client import StremioAuthError, StremioClient, StremioConnectionError
+from .stremio_client import (
+    StremioAuthError,
+    StremioClient,
+    StremioConnectionError,
+    watch_progress_percent,
+)
 
 _LOGGER = logging.getLogger(__name__)
+
+# Keep a handed-over title as now playing this long while Stremio catches up
+HANDOVER_HOLD_SECONDS = 600
 
 # Retry configuration
 MAX_RETRIES = 3
@@ -73,6 +82,9 @@ class StremioDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._state_change_unsub: list[Any] = []
         self._is_polling_gated: bool = False
         self._current_stream_url: str | None = None  # Track current stream URL
+        # Media from the last handover and when it was set (monotonic seconds)
+        self._handover_media: dict[str, Any] | None = None
+        self._handover_at: float = 0.0
         self._delayed_refresh_task: asyncio.Task | None = None  # Track pending refresh task
 
         # Get scan interval from options or use default
@@ -435,9 +447,42 @@ class StremioDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         # Store previous watching state before updating
         self._previous_watching = self.data.get("current_watching")
+        self._handover_media = current_watching
+        self._handover_at = time.monotonic()
 
         self.data["current_watching"] = current_watching
         self.async_set_updated_data(self.data)
+
+    def _prefer_handover_media(
+        self, current: dict[str, Any] | None
+    ) -> dict[str, Any] | None:
+        """Keep a recent handover as now playing until Stremio reflects it.
+
+        The Stremio write for a handover can take a refresh or two to show up;
+        without this, the next refresh puts the previous title back.
+        """
+        handover = self._handover_media
+        if not handover:
+            return current
+        age = time.monotonic() - self._handover_at
+        same_title = current is not None and current.get("imdb_id") == handover.get(
+            "imdb_id"
+        )
+        if same_title:
+            # Stremio has it now; keep the handover's title/poster/episode if missing
+            return {
+                **current,
+                **{
+                    key: handover[key]
+                    for key in ("title", "poster", "season", "episode")
+                    if handover.get(key) and not current.get(key)
+                },
+                "stream_url": self._current_stream_url,
+            }
+        if age < HANDOVER_HOLD_SECONDS:
+            return {**handover, "stream_url": self._current_stream_url}
+        self._handover_media = None
+        return current
 
     async def async_shutdown(self) -> None:
         """Clean up resources on shutdown."""
@@ -640,19 +685,19 @@ class StremioDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     reverse=True,
                 )
 
-                # Current watching is the most recently watched with progress < 100%
+                # Current watching is the most recently watched title that was
+                # started but not finished. A title just handed over has a tiny
+                # offset that rounds to 0 %, so test the offset, not the percent.
                 for item in sorted_watching:
-                    progress = item.get("progress", 0)
-                    duration = item.get("duration", 1)
-                    progress_percent = (
-                        (progress / duration * 100) if duration > 0 else 0
-                    )
+                    progress_percent = watch_progress_percent(item)
+                    started = (item.get("time_offset") or item.get("progress") or 0) > 0
 
-                    if 0 < progress_percent < 95:  # Not finished
+                    if started and progress_percent < 95:  # Not finished
                         data["current_watching"] = {
                             **item,
-                            "progress_percent": round(progress_percent, 1),
-                            "time_offset": progress,
+                            "progress_percent": progress_percent,
+                            "time_offset": item.get("time_offset")
+                            or item.get("progress", 0),
                             "stream_url": self._current_stream_url,
                         }
                         break
@@ -662,19 +707,12 @@ class StremioDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     last_item = sorted_watching[0]
                     data["last_watched"] = {
                         **last_item,
-                        "progress_percent": (
-                            round(
-                                (
-                                    last_item.get("progress", 0)
-                                    / last_item.get("duration", 1)
-                                )
-                                * 100,
-                                1,
-                            )
-                            if last_item.get("duration", 0) > 0
-                            else 0
-                        ),
+                        "progress_percent": watch_progress_percent(last_item),
                     }
+
+            data["current_watching"] = self._prefer_handover_media(
+                data["current_watching"]
+            )
 
             # Fetch episode titles for series items
             await self._enrich_with_episode_titles(data)

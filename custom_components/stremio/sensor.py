@@ -21,6 +21,8 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import DOMAIN
 from .coordinator import StremioDataUpdateCoordinator
 from .entity_helpers import get_device_info
+from .apple_tv_handover import describe_stream_url
+from .stremio_client import watch_progress_percent
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -148,8 +150,9 @@ SENSOR_TYPES: tuple[StremioSensorEntityDescription, ...] = (
         key="current_stream_url",
         name="Current Stream URL",
         icon="mdi:link-variant",
+        # Host and file name only: the full link carries debrid keys
         value_fn=lambda data: (
-            data.get("current_watching", {}).get("stream_url")
+            describe_stream_url(data.get("current_watching", {}).get("stream_url"))
             if data.get("current_watching")
             else None
         ),
@@ -202,13 +205,12 @@ SENSOR_TYPES: tuple[StremioSensorEntityDescription, ...] = (
                     "imdb_id": item.get("imdb_id"),
                     "id": item.get("id"),
                     "year": item.get("year"),
-                    "progress_percent": (
-                        round(
-                            (item.get("progress", 0) / item.get("duration", 1)) * 100, 1
-                        )
-                        if item.get("duration", 0) > 0
-                        else 0
-                    ),
+                    "progress_percent": watch_progress_percent(item),
+                    "time_offset": item.get("time_offset", 0),
+                    "duration": item.get("duration", 0),
+                    "video_id": item.get("video_id"),
+                    "season": item.get("season"),
+                    "episode": item.get("episode"),
                 }
                 for item in data.get("continue_watching", [])
             ]
@@ -245,6 +247,10 @@ class StremioSensor(CoordinatorEntity[StremioDataUpdateCoordinator], SensorEntit
     """Representation of a Stremio sensor."""
 
     entity_description: StremioSensorEntityDescription
+
+    # Item lists can pass the recorder's 16 KB attribute limit; cards read
+    # them from the live state, so keep them out of history
+    _unrecorded_attributes = frozenset({"items"})
 
     def __init__(
         self,

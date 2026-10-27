@@ -18,7 +18,7 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .apple_tv_handover import HandoverError, HandoverManager
+from .apple_tv_handover import HandoverError, HandoverManager, redact_url
 from .const import (
     CONF_APPLE_TV_CREDENTIALS,
     CONF_APPLE_TV_ENTITY_ID,
@@ -351,7 +351,7 @@ class StremioMediaPlayer(
         # Case 1: Direct HTTP(S) URL
         if media_id.startswith(("http://", "https://")):
             stream_url = media_id
-            _LOGGER.debug("Direct stream URL provided: %s", stream_url[:100])
+            _LOGGER.debug("Direct stream URL provided: %s", redact_url(stream_url))
             # For direct URLs, we have minimal info
             media_info = {"stream_url": stream_url}
 
@@ -617,7 +617,7 @@ class StremioMediaPlayer(
 
             _LOGGER.debug(
                 "Resolved stream: url=%s, title=%s, media_info=%s",
-                stream_url[:100] if stream_url else None,
+                redact_url(stream_url),
                 stream_title,
                 {k: v for k, v in media_info.items() if k != "poster"},
             )

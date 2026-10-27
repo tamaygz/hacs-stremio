@@ -362,3 +362,83 @@ async def test_coordinator_partial_failure(hass: HomeAssistant, mock_config_entr
     # Should raise UpdateFailed due to unexpected error
     with pytest.raises(UpdateFailed):
         await coordinator._async_update_data()
+
+
+def _cw(imdb, watched_at, offset, duration=3000000, title=None):
+    return {
+        "imdb_id": imdb,
+        "title": title or imdb,
+        "type": "series",
+        "watched_at": watched_at,
+        "time_offset": offset,
+        "progress": offset,
+        "duration": duration,
+    }
+
+
+@pytest.mark.asyncio
+async def test_just_started_title_is_current_watching(
+    hass: HomeAssistant, mock_config_entry, mock_stremio_client_for_coordinator
+):
+    """A title saved at 1 s (0.0 %) is still the current one if most recent."""
+    mock_stremio_client_for_coordinator.async_get_continue_watching = AsyncMock(
+        return_value=[
+            _cw("tt_old", "2026-10-27T08:00:00.000Z", 150000),
+            _cw("tt_new", "2026-10-27T09:00:00.000Z", 1000),
+        ]
+    )
+    coordinator = StremioDataUpdateCoordinator(
+        hass=hass, client=mock_stremio_client_for_coordinator, entry=mock_config_entry
+    )
+    data = await coordinator._async_update_data()
+    assert data["current_watching"]["imdb_id"] == "tt_new"
+
+
+@pytest.mark.asyncio
+async def test_handover_kept_until_stremio_catches_up(
+    hass: HomeAssistant, mock_config_entry, mock_stremio_client_for_coordinator
+):
+    """After a handover, a refresh doesn't put the previous title back."""
+    mock_stremio_client_for_coordinator.async_get_continue_watching = AsyncMock(
+        return_value=[_cw("tt_old", "2026-10-27T08:00:00.000Z", 150000)]
+    )
+    coordinator = StremioDataUpdateCoordinator(
+        hass=hass, client=mock_stremio_client_for_coordinator, entry=mock_config_entry
+    )
+    coordinator.data = {}
+    coordinator.set_current_media(
+        {"imdb_id": "tt_new", "type": "series", "title": "Silo - S1E1", "poster": "p"},
+        "https://debrid.example/KEY/Silo.S01E01.mkv",
+    )
+
+    data = await coordinator._async_update_data()
+    assert data["current_watching"]["title"] == "Silo - S1E1"
+
+    # Once Stremio has it, its entry is used, keeping the handover's poster
+    mock_stremio_client_for_coordinator.async_get_continue_watching = AsyncMock(
+        return_value=[
+            _cw("tt_old", "2026-10-27T08:00:00.000Z", 150000),
+            {**_cw("tt_new", "2026-10-27T09:00:00.000Z", 60000, title="Silo"), "poster": None},
+        ]
+    )
+    data = await coordinator._async_update_data()
+    assert data["current_watching"]["imdb_id"] == "tt_new"
+    assert data["current_watching"]["time_offset"] == 60000
+    assert data["current_watching"]["poster"] == "p"
+
+
+@pytest.mark.asyncio
+async def test_handover_hold_expires(
+    hass: HomeAssistant, mock_config_entry, mock_stremio_client_for_coordinator
+):
+    mock_stremio_client_for_coordinator.async_get_continue_watching = AsyncMock(
+        return_value=[_cw("tt_old", "2026-10-27T08:00:00.000Z", 150000)]
+    )
+    coordinator = StremioDataUpdateCoordinator(
+        hass=hass, client=mock_stremio_client_for_coordinator, entry=mock_config_entry
+    )
+    coordinator.data = {}
+    coordinator.set_current_media({"imdb_id": "tt_new", "title": "Silo"}, None)
+    coordinator._handover_at -= 3600
+    data = await coordinator._async_update_data()
+    assert data["current_watching"]["imdb_id"] == "tt_old"

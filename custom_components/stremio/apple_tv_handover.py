@@ -2,15 +2,11 @@
 
 This module provides functionality to send Stremio streams to Apple TV devices.
 
-IMPORTANT: tvOS has significant limitations for URL schemes and deep links:
-- VLC deep links (vlc://, vlc-x-callback://) do NOT work on tvOS
-- Only certain apps support deep links (YouTube, Netflix, Disney+, etc.)
-- Generic HTTP/HTTPS URLs can only be played via:
-  1. AirPlay using pyatv library (recommended)
-  2. Direct playback for HLS/MP4 streams (limited support)
-
-The recommended approach is AirPlay via pyatv, which uses the native player
-and supports HLS (.m3u8) and MP4 streams.
+Handover methods:
+- VLC: opens the stream in VLC on tvOS via a vlc-x-callback:// link sent with
+  media_player.play_media. Handles MKV/WebM and other containers.
+- AirPlay: pyatv, uses the native player for HLS (.m3u8) and MP4 streams.
+- Direct: media_player.play_media with the raw URL, HLS/MP4 only.
 """
 
 from __future__ import annotations
@@ -20,11 +16,69 @@ import logging
 import re
 from enum import Enum
 from typing import Any
+from urllib.parse import quote, urlsplit
 
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def redact_url(url: str | None) -> str:
+    """Describe a URL for logs without its path or query (which can carry tokens)."""
+    if not url:
+        return "<empty>"
+    return f"host={urlsplit(url).hostname or '?'} len={len(url)}"
+
+
+def describe_stream_url(url: str | None) -> str | None:
+    """Show a stream URL as host and file name only.
+
+    Debrid links carry the API key in the path (and some addons in the query),
+    so the rest of the URL must never reach states, history or events.
+    """
+    if not url:
+        return None
+    parts = urlsplit(url)
+    host = parts.hostname or "?"
+    name = parts.path.rstrip("/").rsplit("/", 1)[-1]
+    # Only keep the last segment when it looks like a file, not a key
+    if "." in name and len(name) <= 200:
+        from urllib.parse import unquote
+
+        return f"{host} · {unquote(name)}"[:255]
+    return host
+
+
+_URL_RE = re.compile(r"[A-Za-z][A-Za-z0-9+.\-]*://\S+")
+_URL_REDACTED = "<redacted-url>"
+
+
+def safe_error(err: BaseException | str) -> str:
+    """Describe an error without any URL it may contain (links carry tokens)."""
+    if isinstance(err, BaseException):
+        message = str(err)
+        name = type(err).__name__
+    else:
+        message, name = err, ""
+    message = _URL_RE.sub(_URL_REDACTED, message)
+    if name and name not in ("HandoverError", "HomeAssistantError"):
+        return f"{name}: {message}" if message else name
+    return message
+
+
+# Apple TV states that mean the box is asleep and must be woken before VLC can launch
+APPLE_TV_ASLEEP_STATES = ("off", "standby")
+# Seconds to wait for the Apple TV to report it is awake after turn_on
+WAKE_TIMEOUT = 30
+# Seconds to let tvOS settle after waking before launching VLC
+DEFAULT_WAKE_DELAY = 3
+# After a wake, seconds to wait for VLC to come to the front before resending
+VLC_LAUNCH_CHECK = 8
+# Extra launch attempts after a wake (tvOS can drop a launch while waking)
+VLC_LAUNCH_RETRIES = 2
+VLC_APP_ID = "org.videolan.vlc-ios"
+
 
 # Try to import pyatv, but handle if not installed or incompatible
 try:
@@ -115,7 +169,7 @@ class HandoverManager:
         if not url.startswith(("http://", "https://")):
             return (
                 False,
-                f"Invalid URL scheme. Expected http:// or https://, got: {url[:50]}",
+                f"Invalid URL scheme. Expected http:// or https://, got: {redact_url(url)}",
             )
 
         # Check for common problematic patterns
@@ -124,7 +178,7 @@ class HandoverManager:
 
         if "192.168." in url or "10.0." in url or "172.16." in url:
             # Local network - this is fine, just log a debug message
-            _LOGGER.debug("Stream URL is on local network: %s", url[:100])
+            _LOGGER.debug("Stream URL is on local network: %s", redact_url(url))
 
         return True, None
 
@@ -175,9 +229,8 @@ class HandoverManager:
            - May work for some HLS streams
            - Less reliable than AirPlay
 
-        3. VLC - Does NOT work on tvOS!
-           - tvOS does not support VLC URL schemes
-           - Kept for compatibility but will fail
+        3. VLC - Opens the stream in VLC on tvOS via a vlc-x-callback link
+           - Used for MKV and WebM, which AirPlay and direct playback do not handle
 
         Args:
             stream_url: The stream URL
@@ -196,23 +249,10 @@ class HandoverManager:
         if stream_format in (StreamFormat.HLS, StreamFormat.MP4):
             return HandoverMethod.DIRECT
 
-        # For MKV and WebM formats:
-        # - VLC deep links do NOT work on tvOS
-        # - AirPlay via pyatv is the only option that might work
-        # - Direct playback will likely fail (unsupported format)
+        # MKV and WebM: AirPlay and direct playback do not handle these containers,
+        # so use VLC on the Apple TV.
         if stream_format in (StreamFormat.MKV, StreamFormat.WEBM):
-            if PYATV_AVAILABLE:
-                _LOGGER.warning(
-                    "MKV/WebM format detected. AirPlay may not support this format. "
-                    "Consider using an HLS or MP4 stream instead."
-                )
-                return HandoverMethod.AIRPLAY
-            else:
-                _LOGGER.warning(
-                    "MKV/WebM format detected but pyatv not installed. "
-                    "Handover will likely fail. Install pyatv for AirPlay support."
-                )
-                return HandoverMethod.DIRECT
+            return HandoverMethod.VLC
 
         # Default to AirPlay if available, otherwise DIRECT
         if PYATV_AVAILABLE:
@@ -263,8 +303,8 @@ class HandoverManager:
                 return self._discovered_devices
 
             except Exception as err:
-                _LOGGER.error("Error discovering Apple TV devices: %s", err)
-                raise HandoverError(f"Discovery failed: {err}") from err
+                _LOGGER.error("Error discovering Apple TV devices: %s", safe_error(err))
+                raise HandoverError(f"Discovery failed: {safe_error(err)}") from err
 
     async def get_device_by_name(self, device_name: str) -> Any:
         """Get an Apple TV device configuration by name.
@@ -396,7 +436,7 @@ class HandoverManager:
         _LOGGER.info(
             "Starting AirPlay handover to '%s': %s",
             device_name,
-            stream_url[:100],
+            redact_url(stream_url),
         )
 
         # Use provided credentials, fall back to stored credentials
@@ -440,8 +480,10 @@ class HandoverManager:
         except HandoverError:
             raise
         except Exception as err:
-            _LOGGER.error("AirPlay handover failed: %s", err)
-            raise AppleTVConnectionError(f"AirPlay handover failed: {err}") from err
+            _LOGGER.error("AirPlay handover failed: %s", safe_error(err))
+            raise AppleTVConnectionError(
+                f"AirPlay handover failed: {safe_error(err)}"
+            ) from err
 
     def generate_vlc_deep_link(
         self,
@@ -449,16 +491,7 @@ class HandoverManager:
         title: str | None = None,
         subtitle_url: str | None = None,
     ) -> str:
-        """Generate a VLC deep link URL.
-
-        WARNING: VLC deep links (vlc://, vlc-x-callback://) do NOT work on tvOS!
-        This is a known platform limitation. The tvOS version of VLC does not
-        expose URL schemes the same way the iOS version does.
-
-        This method is kept for potential future compatibility or iOS use cases,
-        but will NOT work for Apple TV handover.
-
-        For Apple TV, use the AirPlay method instead.
+        """Generate a VLC x-callback link that opens stream_url in VLC on tvOS.
 
         Args:
             stream_url: URL of the stream to play
@@ -466,17 +499,12 @@ class HandoverManager:
             subtitle_url: Optional subtitle file URL (not used)
 
         Returns:
-            VLC deep link URL (note: won't work on tvOS)
+            vlc-x-callback link with the stream URL percent-encoded
         """
-        # Note: Neither vlc:// nor vlc-x-callback:// work on tvOS
-        # Keeping this for reference but it will not work
-        deep_link = f"vlc://{stream_url}"
-
-        _LOGGER.warning(
-            "VLC deep links do NOT work on tvOS. Use AirPlay method instead. "
-            "Generated URL (will likely fail): %s",
-            deep_link[:100],
+        deep_link = "vlc-x-callback://x-callback-url/stream?url=" + quote(
+            stream_url, safe=""
         )
+        _LOGGER.debug("Generated VLC x-callback link (%d chars)", len(deep_link))
         return deep_link
 
     async def handover_via_vlc(
@@ -485,20 +513,20 @@ class HandoverManager:
         stream_url: str,
         title: str | None = None,
         subtitle_url: str | None = None,
+        wake_delay: float = DEFAULT_WAKE_DELAY,
     ) -> bool:
-        """Attempt to send stream to Apple TV via VLC deep link.
+        """Send a stream to Apple TV's VLC app via a vlc-x-callback link.
 
-        WARNING: This method will likely NOT work on tvOS!
-        VLC deep links are not supported on tvOS - this is a known platform limitation.
-        The tvOS version of VLC does not expose URL schemes.
-
-        Use AirPlay method (handover_via_airplay) for reliable Apple TV streaming.
+        If the Apple TV is asleep it is turned on first, and VLC is launched
+        once it reports awake plus wake_delay seconds (tvOS ignores app
+        launches while it is still waking).
 
         Args:
             device_entity_id: Entity ID of the target media player
             stream_url: URL of the stream to play
             title: Optional title for display
             subtitle_url: Optional subtitle file URL
+            wake_delay: Seconds to wait after waking before launching VLC
 
         Returns:
             True if the command was sent (but playback may not start)
@@ -506,10 +534,10 @@ class HandoverManager:
         Raises:
             HandoverError: If handover fails
         """
-        _LOGGER.warning(
-            "Attempting VLC handover to '%s' - NOTE: VLC deep links do NOT work "
-            "on tvOS. Use AirPlay method for reliable streaming.",
+        _LOGGER.debug(
+            "VLC handover to '%s': %s",
             device_entity_id,
+            redact_url(stream_url),
         )
 
         # Validate entity_id format
@@ -529,28 +557,89 @@ class HandoverManager:
                 "in Home Assistant's Entities page."
             )
 
+        woke = state.state in APPLE_TV_ASLEEP_STATES
+        if woke:
+            await self._wake_apple_tv(device_entity_id, wake_delay)
+
         try:
             vlc_url = self.generate_vlc_deep_link(stream_url, title, subtitle_url)
-
-            # Use media_player.play_media to open VLC with the stream
-            # The Apple TV integration will handle opening VLC via deep link
-            await self.hass.services.async_call(
-                "media_player",
-                "play_media",
-                {
-                    "entity_id": device_entity_id,
-                    "media_content_type": "url",
-                    "media_content_id": vlc_url,
-                },
-                blocking=True,
-            )
+            # A freshly woken Apple TV can ignore the first launch; check VLC came
+            # up and resend rather than waiting a long fixed time
+            attempts = 1 + (VLC_LAUNCH_RETRIES if woke else 0)
+            for attempt in range(1, attempts + 1):
+                # The Apple TV integration opens VLC via the deep link
+                await self.hass.services.async_call(
+                    "media_player",
+                    "play_media",
+                    {
+                        "entity_id": device_entity_id,
+                        "media_content_type": "url",
+                        "media_content_id": vlc_url,
+                    },
+                    blocking=True,
+                )
+                if not woke or await self._wait_for_vlc(device_entity_id):
+                    break
+                if attempt < attempts:
+                    _LOGGER.info(
+                        "VLC didn't open on '%s' after waking; resending (%d/%d)",
+                        device_entity_id,
+                        attempt + 1,
+                        attempts,
+                    )
 
             _LOGGER.info("Successfully sent VLC deep link to '%s'", device_entity_id)
             return True
 
         except Exception as err:
-            _LOGGER.error("VLC handover failed: %s", err)
-            raise HandoverError(f"VLC handover failed: {err}") from err
+            _LOGGER.error(
+                "VLC handover to '%s' failed: %s", device_entity_id, safe_error(err)
+            )
+            raise HandoverError(
+                f"VLC handover to '{device_entity_id}' failed: {safe_error(err)}"
+            ) from err
+
+    async def _wait_for_vlc(self, device_entity_id: str) -> bool:
+        """True once VLC is the app in front on the Apple TV."""
+        for _ in range(VLC_LAUNCH_CHECK):
+            await asyncio.sleep(1)
+            state = self.hass.states.get(device_entity_id)
+            if state is not None and state.attributes.get("app_id") == VLC_APP_ID:
+                return True
+        return False
+
+    async def _wake_apple_tv(self, device_entity_id: str, wake_delay: float) -> None:
+        """Turn on a sleeping Apple TV and wait until it can launch apps."""
+        _LOGGER.info("Apple TV '%s' is asleep; turning it on", device_entity_id)
+        try:
+            await self.hass.services.async_call(
+                "media_player",
+                "turn_on",
+                {"entity_id": device_entity_id},
+                blocking=True,
+            )
+        except Exception as err:
+            raise HandoverError(
+                f"Could not turn on '{device_entity_id}': {safe_error(err)}"
+            ) from err
+
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + WAKE_TIMEOUT
+        while loop.time() < deadline:
+            state = self.hass.states.get(device_entity_id)
+            if state is not None and state.state not in APPLE_TV_ASLEEP_STATES:
+                break
+            await asyncio.sleep(1)
+        else:
+            _LOGGER.warning(
+                "Apple TV '%s' still reports asleep after %ss; trying VLC anyway",
+                device_entity_id,
+                WAKE_TIMEOUT,
+            )
+
+        if wake_delay > 0:
+            _LOGGER.debug("Waiting %ss for '%s' to settle", wake_delay, device_entity_id)
+            await asyncio.sleep(wake_delay)
 
     async def handover_direct(
         self,
@@ -581,7 +670,7 @@ class HandoverManager:
         _LOGGER.info(
             "Starting direct handover to '%s': %s",
             device_entity_id,
-            stream_url[:100],
+            redact_url(stream_url),
         )
 
         # Validate entity_id format
@@ -610,7 +699,7 @@ class HandoverManager:
                 "Stream format '%s' may not be supported by Apple TV native player. "
                 "Consider using AirPlay method or an HLS/MP4 stream. URL: %s",
                 stream_format.value,
-                stream_url[:100],
+                redact_url(stream_url),
             )
 
         try:
@@ -646,7 +735,7 @@ class HandoverManager:
                     "Recommendation: Use AirPlay method instead (requires pyatv).\n"
                     "Stream URL: %s",
                     stream_format.value,
-                    stream_url[:150],
+                    redact_url(stream_url),
                 )
                 raise HandoverError(
                     f"Direct handover failed: Apple TV returned HTTP 500. "
@@ -666,8 +755,8 @@ class HandoverManager:
                     "The stream server may be slow or unreachable from Apple TV."
                 ) from err
 
-            _LOGGER.error("Direct handover failed: %s", err)
-            raise HandoverError(f"Direct handover failed: {err}") from err
+            _LOGGER.error("Direct handover failed: %s", safe_error(err))
+            raise HandoverError(f"Direct handover failed: {safe_error(err)}") from err
 
     async def handover(
         self,
@@ -676,6 +765,7 @@ class HandoverManager:
         method: HandoverMethod | str = HandoverMethod.AUTO,
         title: str | None = None,
         subtitle_url: str | None = None,
+        wake_delay: float = DEFAULT_WAKE_DELAY,
     ) -> dict[str, Any]:
         """Perform handover to Apple TV using the specified method.
 
@@ -687,6 +777,7 @@ class HandoverManager:
             method: Handover method to use
             title: Optional title for display
             subtitle_url: Optional subtitle URL
+            wake_delay: Seconds to wait after waking a sleeping Apple TV (VLC only)
 
         Returns:
             Dictionary with handover result info
@@ -741,7 +832,9 @@ class HandoverManager:
                 entity_id = await self._find_media_player_entity(device_identifier)
 
             if method == HandoverMethod.VLC:
-                await self.handover_via_vlc(entity_id, stream_url, title, subtitle_url)
+                await self.handover_via_vlc(
+                    entity_id, stream_url, title, subtitle_url, wake_delay
+                )
                 result["success"] = True
                 result["method"] = "vlc"
                 result["entity_id"] = entity_id
@@ -778,26 +871,27 @@ class HandoverManager:
                             result["success"] = True
                             result["method"] = "airplay"
                             result["fallback"] = True
-                            result["original_error"] = str(direct_err)
+                            result["original_error"] = safe_error(direct_err)
                             _LOGGER.info(
                                 "AirPlay fallback successful after direct handover failed"
                             )
                             return result
                         except Exception as airplay_err:
                             _LOGGER.error(
-                                "AirPlay fallback also failed: %s", airplay_err
+                                "AirPlay fallback also failed: %s",
+                                safe_error(airplay_err),
                             )
                             # Re-raise the original direct error with additional context
                             raise HandoverError(
-                                f"Direct handover failed ({direct_err}) and AirPlay "
-                                f"fallback also failed ({airplay_err}). "
+                                f"Direct handover failed ({safe_error(direct_err)}) and "
+                                f"AirPlay fallback also failed ({safe_error(airplay_err)}). "
                                 f"Please check your stream URL and Apple TV configuration."
                             ) from direct_err
                     # No fallback available or different error, re-raise
                     raise
 
         except Exception as err:
-            result["error"] = str(err)
+            result["error"] = safe_error(err)
             raise
 
         return result

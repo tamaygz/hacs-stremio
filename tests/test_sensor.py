@@ -162,6 +162,43 @@ class TestContinueWatchingCountSensor:
         assert "items" in attrs
 
 
+    @pytest.mark.asyncio
+    async def test_items_include_resume_fields(
+        self, hass: HomeAssistant, mock_sensor_coordinator, mock_config_entry
+    ):
+        """Items expose time_offset and episode info so cards can show resume."""
+        description = next(
+            d for d in SENSOR_TYPES if d.key == "continue_watching_count"
+        )
+        mock_sensor_coordinator.data = {
+            **(mock_sensor_coordinator.data or {}),
+            "continue_watching": [
+                {
+                    "title": "Show",
+                    "type": "series",
+                    "imdb_id": "tt0903747",
+                    "progress": 100,
+                    "duration": 3000000,
+                    "time_offset": 600000,
+                    "video_id": "tt0903747:2:5",
+                    "season": 2,
+                    "episode": 5,
+                }
+            ],
+        }
+        sensor = StremioSensor(mock_sensor_coordinator, mock_config_entry, description)
+        sensor.hass = hass
+
+        (item,) = sensor.extra_state_attributes["items"]
+        assert item["time_offset"] == 600000
+        assert item["duration"] == 3000000
+        assert (item["video_id"], item["season"], item["episode"]) == (
+            "tt0903747:2:5",
+            2,
+            5,
+        )
+
+
 class TestLastWatchedSensor:
     """Tests for the last watched sensor."""
 
@@ -268,3 +305,8 @@ class TestSensorSetup:
         async_add_entities.assert_called_once()
         entities = async_add_entities.call_args[0][0]
         assert len(entities) == len(SENSOR_TYPES)
+
+
+def test_item_lists_not_recorded():
+    """Item lists stay out of recorder history (16 KB attribute limit)."""
+    assert "items" in StremioSensor._unrecorded_attributes
