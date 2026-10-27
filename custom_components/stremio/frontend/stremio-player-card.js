@@ -414,7 +414,18 @@ class StremioPlayerCard extends LitElement {
     return parts.join(' • ');
   }
 
+  _runOpenInStremioScript() {
+    const script = this.config?.open_in_stremio_script;
+    if (!script || !this.hass) return false;
+    this.hass.callService('script', 'turn_on', { entity_id: script }).catch((err) => {
+      console.warn('[Stremio] open_in_stremio_script failed:', err);
+    });
+    return true;
+  }
+
   _openInStremio() {
+    // Run an HA script instead (e.g. wake the TV and open the Stremio app on it)
+    if (this._runOpenInStremioScript()) return;
     if (!this._mediaInfo?.imdb_id) return;
     const type = this._mediaInfo.type === 'series' ? 'series' : 'movie';
     const url = `stremio://detail/${type}/${this._mediaInfo.imdb_id}`;
@@ -668,6 +679,12 @@ class StremioPlayerCardEditor extends LitElement {
     }
   }
 
+  _isAppleTvEntity(entityId) {
+    // Without registry info (older HA), keep the entity so custom choices still work
+    const platform = this.hass?.entities?.[entityId]?.platform;
+    return !platform || platform === 'apple_tv';
+  }
+
   _updateEntities() {
     // Find Stremio media player entities
     this._stremioEntities = Object.keys(this.hass.states)
@@ -683,6 +700,10 @@ class StremioPlayerCardEditor extends LitElement {
     // Find Apple TV media_player entities
     this._appleTvEntities = Object.keys(this.hass.states)
       .filter(entityId => {
+        // Only Apple TV integration entities can launch VLC; the registry knows the
+        // platform, so Music Assistant speakers named after the Apple TV are skipped.
+        const platform = this.hass.entities?.[entityId]?.platform;
+        if (platform) return entityId.startsWith('media_player.') && platform === 'apple_tv';
         if (!entityId.startsWith('media_player.')) return false;
         const state = this.hass.states[entityId];
         const friendlyName = (state.attributes.friendly_name || '').toLowerCase();
@@ -871,6 +892,7 @@ class StremioPlayerCardEditor extends LitElement {
                 .value=${this._config.apple_tv_entity || ''}
                 .configValue=${'apple_tv_entity'}
                 .includeDomains=${['media_player']}
+                .entityFilter=${(stateObj) => this._isAppleTvEntity(stateObj.entity_id)}
                 label="Apple TV Entity"
                 allow-custom-entity
                 @value-changed=${this._valueChanged}

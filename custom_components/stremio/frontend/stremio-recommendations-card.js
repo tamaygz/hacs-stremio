@@ -609,7 +609,18 @@ class StremioRecommendationsCard extends LitElement {
     );
   }
 
+  _runOpenInStremioScript() {
+    const script = this.config?.open_in_stremio_script;
+    if (!script || !this._hass) return false;
+    this._hass.callService('script', 'turn_on', { entity_id: script }).catch((err) => {
+      console.warn('[Stremio] open_in_stremio_script failed:', err);
+    });
+    return true;
+  }
+
   _openInStremio(item) {
+    // Run an HA script instead (e.g. wake the TV and open the Stremio app on it)
+    if (this._runOpenInStremioScript()) return;
     const type = item.type === 'series' ? 'series' : 'movie';
     const id = item.imdb_id || item.id;
     
@@ -719,7 +730,8 @@ class StremioRecommendationsCard extends LitElement {
           imdb_id: item.imdb_id || item.id,
         },
         streams,
-        this.config.apple_tv_entity
+        this.config.apple_tv_entity,
+        { showCopy: this.config.show_copy_button !== false }
       );
     } else {
       let dialog = document.querySelector('stremio-stream-dialog');
@@ -731,6 +743,7 @@ class StremioRecommendationsCard extends LitElement {
       dialog.mediaItem = item;
       dialog.streams = streams;
       dialog.appleTvEntity = this.config.apple_tv_entity;
+      dialog.showCopy = this.config.show_copy_button !== false;
       dialog.open = true;
     }
   }
@@ -1028,10 +1041,20 @@ class StremioRecommendationsCardEditor extends LitElement {
     }
   }
 
+  _isAppleTvEntity(entityId) {
+    // Without registry info (older HA), keep the entity so custom choices still work
+    const platform = this.hass?.entities?.[entityId]?.platform;
+    return !platform || platform === 'apple_tv';
+  }
+
   _updateEntities() {
     // Find Apple TV media_player entities
     this._appleTvEntities = Object.keys(this.hass.states)
       .filter(entityId => {
+        // Only Apple TV integration entities can launch VLC; the registry knows the
+        // platform, so Music Assistant speakers named after the Apple TV are skipped.
+        const platform = this.hass.entities?.[entityId]?.platform;
+        if (platform) return entityId.startsWith('media_player.') && platform === 'apple_tv';
         if (!entityId.startsWith('media_player.')) return false;
         const state = this.hass.states[entityId];
         const friendlyName = (state.attributes.friendly_name || '').toLowerCase();
@@ -1265,6 +1288,7 @@ class StremioRecommendationsCardEditor extends LitElement {
                 .value=${this._config.apple_tv_entity || ''}
                 .configValue=${'apple_tv_entity'}
                 .includeDomains=${['media_player']}
+                .entityFilter=${(stateObj) => this._isAppleTvEntity(stateObj.entity_id)}
                 label="Apple TV Entity"
                 allow-custom-entity
                 @value-changed=${this._valueChanged}

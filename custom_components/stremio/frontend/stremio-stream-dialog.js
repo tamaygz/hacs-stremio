@@ -33,6 +33,7 @@ class StremioStreamDialog extends LitElement {
       mediaItem: { type: Object },
       streams: { type: Array },
       appleTvEntity: { type: String },
+      showCopy: { type: Boolean },
       _loading: { type: Boolean },
       _copiedIndex: { type: Number },
     };
@@ -267,6 +268,7 @@ class StremioStreamDialog extends LitElement {
     super();
     this.open = false;
     this.streams = [];
+    this.showCopy = true;
     this._loading = false;
     this._copiedIndex = -1;
     // Bind keyboard handler for cleanup
@@ -358,12 +360,14 @@ class StremioStreamDialog extends LitElement {
   _playOnAppleTv(stream) {
     if (!this.hass) return;
 
-    // Use configured entity or fallback to hardcoded default
-    const deviceId = this.appleTvEntity || 'media_player.apple_tv';
-    
-    this.hass.callService('stremio', 'handover_to_apple_tv', {
-      device_id: deviceId,
-      stream_url: stream.url,
+    // Send device_id only when the card sets one; otherwise the service uses
+    // the Apple TV entity configured in the integration options.
+    const data = { stream_url: stream.url };
+    if (this.appleTvEntity) {
+      data.device_id = this.appleTvEntity;
+    }
+    this.hass.callService('stremio', 'handover_to_apple_tv', data).catch((err) => {
+      console.warn('[Stremio] Apple TV handover failed:', err);
     });
   }
 
@@ -633,14 +637,16 @@ class StremioStreamDialog extends LitElement {
         </div>
 
         <div class="stream-actions" role="group" aria-label="Stream actions">
-          <button 
-            class="action-btn secondary ${isCopied ? 'success' : ''}"
-            @click=${() => this._copyToClipboard(stream.url, index)}
-            aria-label="${isCopied ? 'Copied to clipboard' : `Copy ${streamName} URL to clipboard`}"
-          >
-            <ha-icon icon="${isCopied ? 'mdi:check' : 'mdi:content-copy'}"></ha-icon>
-            ${isCopied ? 'Copied!' : 'Copy'}
-          </button>
+          ${this.showCopy ? html`
+            <button 
+              class="action-btn secondary ${isCopied ? 'success' : ''}"
+              @click=${() => this._copyToClipboard(stream.url, index)}
+              aria-label="${isCopied ? 'Copied to clipboard' : `Copy ${streamName} URL to clipboard`}"
+            >
+              <ha-icon icon="${isCopied ? 'mdi:check' : 'mdi:content-copy'}"></ha-icon>
+              ${isCopied ? 'Copied!' : 'Copy'}
+            </button>
+          ` : ''}
           <button 
             class="action-btn"
             @click=${() => this._playOnAppleTv(stream)}
@@ -661,7 +667,11 @@ if (!customElements.get('stremio-stream-dialog')) {
 
 // Global helper to open the dialog
 window.StremioStreamDialog = {
-  show(hass, mediaItem, streams, appleTvEntity) {
+  /**
+   * @param {object} [options]
+   * @param {boolean} [options.showCopy=true] Show the Copy URL button
+   */
+  show(hass, mediaItem, streams, appleTvEntity, options = {}) {
     let dialog = document.querySelector('stremio-stream-dialog');
     if (!dialog) {
       dialog = document.createElement('stremio-stream-dialog');
@@ -671,6 +681,7 @@ window.StremioStreamDialog = {
     dialog.mediaItem = mediaItem;
     dialog.streams = streams || [];
     dialog.appleTvEntity = appleTvEntity;
+    dialog.showCopy = options.showCopy !== false;
     dialog.open = true;
     return dialog;
   },
