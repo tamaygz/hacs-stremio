@@ -135,8 +135,10 @@ handover_to_apple_tv:
   fields:
     device_id:
       name: Apple TV Device
-      description: Entity ID of the Apple TV to send media to.
-      required: true
+      description: >-
+        Entity ID of the Apple TV to send media to. If omitted or not found, uses
+        the Apple TV entity configured in the Stremio integration options.
+      required: false
       example: "media_player.living_room_apple_tv"
       selector:
         entity:
@@ -163,7 +165,7 @@ handover_to_apple_tv:
         - auto: Automatically select the best method based on stream format
         - airplay: Use pyatv to stream via AirPlay (recommended, requires pyatv)
         - direct: Send stream URL directly to Apple TV's native player
-        - vlc: Attempt VLC deep link (WARNING: does NOT work on tvOS)
+        - vlc: Open the stream in VLC on the Apple TV (MKV, WebM, and other containers)
       required: false
       default: "auto"
       example: "airplay"

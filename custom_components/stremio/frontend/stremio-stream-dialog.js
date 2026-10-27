@@ -358,12 +358,14 @@ class StremioStreamDialog extends LitElement {
   _playOnAppleTv(stream) {
     if (!this.hass) return;
 
-    // Use configured entity or fallback to hardcoded default
-    const deviceId = this.appleTvEntity || 'media_player.apple_tv';
-    
-    this.hass.callService('stremio', 'handover_to_apple_tv', {
-      device_id: deviceId,
-      stream_url: stream.url,
+    // Send device_id only when the card sets one; otherwise the service uses
+    // the Apple TV entity configured in the integration options.
+    const data = { stream_url: stream.url };
+    if (this.appleTvEntity) {
+      data.device_id = this.appleTvEntity;
+    }
+    this.hass.callService('stremio', 'handover_to_apple_tv', data).catch((err) => {
+      console.warn('[Stremio] Apple TV handover failed:', err);
     });
   }
 

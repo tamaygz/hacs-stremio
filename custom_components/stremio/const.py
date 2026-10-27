@@ -74,16 +74,14 @@ POLLING_GATE_ACTIVE_INTERVAL: Final = None  # Use configured interval
 POLLING_GATE_IDLE_INTERVAL: Final = 86400  # 24 hours when all gate entities are off
 
 # Handover methods
-# Note: VLC deep links do NOT work on tvOS - kept for reference but will fail
 HANDOVER_METHOD_AUTO: Final = "auto"
 HANDOVER_METHOD_AIRPLAY: Final = "airplay"
-HANDOVER_METHOD_VLC: Final = "vlc"  # Does NOT work on tvOS!
+HANDOVER_METHOD_VLC: Final = "vlc"  # Opens the stream in the Apple TV's VLC app
 HANDOVER_METHOD_DIRECT: Final = "direct"
 HANDOVER_METHODS: Final = [
     HANDOVER_METHOD_AUTO,
     HANDOVER_METHOD_AIRPLAY,
     HANDOVER_METHOD_DIRECT,
-    # VLC is intentionally last and will show a warning - it doesn't work on tvOS
     HANDOVER_METHOD_VLC,
 ]
 

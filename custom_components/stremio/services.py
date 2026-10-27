@@ -18,6 +18,7 @@ from .apple_tv_handover import HandoverError, HandoverManager
 from .const import (
     CONF_ADDON_STREAM_ORDER,
     CONF_APPLE_TV_CREDENTIALS,
+    CONF_APPLE_TV_ENTITY_ID,
     CONF_APPLE_TV_IDENTIFIER,
     CONF_HANDOVER_METHOD,
     CONF_STREAM_QUALITY_PREFERENCE,
@@ -104,7 +105,7 @@ REMOVE_FROM_LIBRARY_SCHEMA = vol.Schema(
 
 HANDOVER_SCHEMA = vol.Schema(
     {
-        vol.Required(ATTR_DEVICE_ID): cv.entity_id,
+        vol.Optional(ATTR_DEVICE_ID): cv.entity_id,
         vol.Optional(ATTR_MEDIA_ID): cv.string,
         vol.Optional(ATTR_STREAM_URL): cv.string,
         vol.Optional(ATTR_METHOD): vol.In(["auto", "airplay", "vlc", "direct"]),
@@ -195,6 +196,41 @@ def _get_entry_data(
     entry_id = next(iter(hass.data[DOMAIN]))
     entry_data = hass.data[DOMAIN][entry_id]
     return entry_data["coordinator"], entry_data["client"], entry_id
+
+
+def _resolve_apple_tv_entity(
+    hass: HomeAssistant, requested: str | None, configured: str | None
+) -> str:
+    """Pick the Apple TV media_player for a handover.
+
+    Uses the requested entity if it exists, otherwise the configured default.
+
+    Raises:
+        ServiceValidationError: If neither entity exists
+    """
+
+    def _usable(entity_id: str) -> bool:
+        return entity_id.startswith("media_player.") and (
+            hass.states.get(entity_id) is not None
+        )
+
+    if requested and _usable(requested):
+        return requested
+
+    if configured and _usable(configured):
+        _LOGGER.info(
+            "Apple TV entity '%s' not available; using configured entity '%s'",
+            requested or "(none)",
+            configured,
+        )
+        return configured
+
+    raise ServiceValidationError(
+        "No Apple TV entity to send to. Set the Apple TV entity on the card, "
+        "or in the Stremio integration options.",
+        translation_domain=DOMAIN,
+        translation_key="no_apple_tv_entity",
+    )
 
 
 async def async_setup_services(hass: HomeAssistant) -> None:
@@ -431,17 +467,22 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         """Handle handover_to_apple_tv service call."""
         coordinator, client, entry_id = _get_entry_data(hass)
 
-        device_id = call.data[ATTR_DEVICE_ID]
         media_id = call.data.get(ATTR_MEDIA_ID)
         stream_url = call.data.get(ATTR_STREAM_URL)
 
         # Get configured default method from entry options
         entry = hass.config_entries.async_get_entry(entry_id)
         configured_method = DEFAULT_HANDOVER_METHOD
+        configured_entity = None
         if entry:
             configured_method = entry.options.get(
                 CONF_HANDOVER_METHOD, DEFAULT_HANDOVER_METHOD
             )
+            configured_entity = entry.options.get(CONF_APPLE_TV_ENTITY_ID)
+
+        device_id = _resolve_apple_tv_entity(
+            hass, call.data.get(ATTR_DEVICE_ID), configured_entity
+        )
 
         # Use service call method if provided, otherwise use configured default
         method = call.data.get(ATTR_METHOD) or configured_method

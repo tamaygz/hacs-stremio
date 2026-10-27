@@ -2,15 +2,11 @@
 
 This module provides functionality to send Stremio streams to Apple TV devices.
 
-IMPORTANT: tvOS has significant limitations for URL schemes and deep links:
-- VLC deep links (vlc://, vlc-x-callback://) do NOT work on tvOS
-- Only certain apps support deep links (YouTube, Netflix, Disney+, etc.)
-- Generic HTTP/HTTPS URLs can only be played via:
-  1. AirPlay using pyatv library (recommended)
-  2. Direct playback for HLS/MP4 streams (limited support)
-
-The recommended approach is AirPlay via pyatv, which uses the native player
-and supports HLS (.m3u8) and MP4 streams.
+Handover methods:
+- VLC: opens the stream in VLC on tvOS via a vlc-x-callback:// link sent with
+  media_player.play_media. Handles MKV/WebM and other containers.
+- AirPlay: pyatv, uses the native player for HLS (.m3u8) and MP4 streams.
+- Direct: media_player.play_media with the raw URL, HLS/MP4 only.
 """
 
 from __future__ import annotations
@@ -20,11 +16,20 @@ import logging
 import re
 from enum import Enum
 from typing import Any
+from urllib.parse import quote, urlsplit
 
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def redact_url(url: str | None) -> str:
+    """Describe a URL for logs without its path or query (which can carry tokens)."""
+    if not url:
+        return "<empty>"
+    return f"host={urlsplit(url).hostname or '?'} len={len(url)}"
+
 
 # Try to import pyatv, but handle if not installed or incompatible
 try:
@@ -115,7 +120,7 @@ class HandoverManager:
         if not url.startswith(("http://", "https://")):
             return (
                 False,
-                f"Invalid URL scheme. Expected http:// or https://, got: {url[:50]}",
+                f"Invalid URL scheme. Expected http:// or https://, got: {redact_url(url)}",
             )
 
         # Check for common problematic patterns
@@ -124,7 +129,7 @@ class HandoverManager:
 
         if "192.168." in url or "10.0." in url or "172.16." in url:
             # Local network - this is fine, just log a debug message
-            _LOGGER.debug("Stream URL is on local network: %s", url[:100])
+            _LOGGER.debug("Stream URL is on local network: %s", redact_url(url))
 
         return True, None
 
@@ -175,9 +180,8 @@ class HandoverManager:
            - May work for some HLS streams
            - Less reliable than AirPlay
 
-        3. VLC - Does NOT work on tvOS!
-           - tvOS does not support VLC URL schemes
-           - Kept for compatibility but will fail
+        3. VLC - Opens the stream in VLC on tvOS via a vlc-x-callback link
+           - Used for MKV and WebM, which AirPlay and direct playback do not handle
 
         Args:
             stream_url: The stream URL
@@ -196,23 +200,10 @@ class HandoverManager:
         if stream_format in (StreamFormat.HLS, StreamFormat.MP4):
             return HandoverMethod.DIRECT
 
-        # For MKV and WebM formats:
-        # - VLC deep links do NOT work on tvOS
-        # - AirPlay via pyatv is the only option that might work
-        # - Direct playback will likely fail (unsupported format)
+        # MKV and WebM: AirPlay and direct playback do not handle these containers,
+        # so use VLC on the Apple TV.
         if stream_format in (StreamFormat.MKV, StreamFormat.WEBM):
-            if PYATV_AVAILABLE:
-                _LOGGER.warning(
-                    "MKV/WebM format detected. AirPlay may not support this format. "
-                    "Consider using an HLS or MP4 stream instead."
-                )
-                return HandoverMethod.AIRPLAY
-            else:
-                _LOGGER.warning(
-                    "MKV/WebM format detected but pyatv not installed. "
-                    "Handover will likely fail. Install pyatv for AirPlay support."
-                )
-                return HandoverMethod.DIRECT
+            return HandoverMethod.VLC
 
         # Default to AirPlay if available, otherwise DIRECT
         if PYATV_AVAILABLE:
@@ -396,7 +387,7 @@ class HandoverManager:
         _LOGGER.info(
             "Starting AirPlay handover to '%s': %s",
             device_name,
-            stream_url[:100],
+            redact_url(stream_url),
         )
 
         # Use provided credentials, fall back to stored credentials
@@ -449,16 +440,7 @@ class HandoverManager:
         title: str | None = None,
         subtitle_url: str | None = None,
     ) -> str:
-        """Generate a VLC deep link URL.
-
-        WARNING: VLC deep links (vlc://, vlc-x-callback://) do NOT work on tvOS!
-        This is a known platform limitation. The tvOS version of VLC does not
-        expose URL schemes the same way the iOS version does.
-
-        This method is kept for potential future compatibility or iOS use cases,
-        but will NOT work for Apple TV handover.
-
-        For Apple TV, use the AirPlay method instead.
+        """Generate a VLC x-callback link that opens stream_url in VLC on tvOS.
 
         Args:
             stream_url: URL of the stream to play
@@ -466,17 +448,12 @@ class HandoverManager:
             subtitle_url: Optional subtitle file URL (not used)
 
         Returns:
-            VLC deep link URL (note: won't work on tvOS)
+            vlc-x-callback link with the stream URL percent-encoded
         """
-        # Note: Neither vlc:// nor vlc-x-callback:// work on tvOS
-        # Keeping this for reference but it will not work
-        deep_link = f"vlc://{stream_url}"
-
-        _LOGGER.warning(
-            "VLC deep links do NOT work on tvOS. Use AirPlay method instead. "
-            "Generated URL (will likely fail): %s",
-            deep_link[:100],
+        deep_link = "vlc-x-callback://x-callback-url/stream?url=" + quote(
+            stream_url, safe=""
         )
+        _LOGGER.debug("Generated VLC x-callback link (%d chars)", len(deep_link))
         return deep_link
 
     async def handover_via_vlc(
@@ -486,13 +463,7 @@ class HandoverManager:
         title: str | None = None,
         subtitle_url: str | None = None,
     ) -> bool:
-        """Attempt to send stream to Apple TV via VLC deep link.
-
-        WARNING: This method will likely NOT work on tvOS!
-        VLC deep links are not supported on tvOS - this is a known platform limitation.
-        The tvOS version of VLC does not expose URL schemes.
-
-        Use AirPlay method (handover_via_airplay) for reliable Apple TV streaming.
+        """Send a stream to Apple TV's VLC app via a vlc-x-callback link.
 
         Args:
             device_entity_id: Entity ID of the target media player
@@ -506,10 +477,10 @@ class HandoverManager:
         Raises:
             HandoverError: If handover fails
         """
-        _LOGGER.warning(
-            "Attempting VLC handover to '%s' - NOTE: VLC deep links do NOT work "
-            "on tvOS. Use AirPlay method for reliable streaming.",
+        _LOGGER.debug(
+            "VLC handover to '%s': %s",
             device_entity_id,
+            redact_url(stream_url),
         )
 
         # Validate entity_id format
@@ -581,7 +552,7 @@ class HandoverManager:
         _LOGGER.info(
             "Starting direct handover to '%s': %s",
             device_entity_id,
-            stream_url[:100],
+            redact_url(stream_url),
         )
 
         # Validate entity_id format
@@ -610,7 +581,7 @@ class HandoverManager:
                 "Stream format '%s' may not be supported by Apple TV native player. "
                 "Consider using AirPlay method or an HLS/MP4 stream. URL: %s",
                 stream_format.value,
-                stream_url[:100],
+                redact_url(stream_url),
             )
 
         try:
@@ -646,7 +617,7 @@ class HandoverManager:
                     "Recommendation: Use AirPlay method instead (requires pyatv).\n"
                     "Stream URL: %s",
                     stream_format.value,
-                    stream_url[:150],
+                    redact_url(stream_url),
                 )
                 raise HandoverError(
                     f"Direct handover failed: Apple TV returned HTTP 500. "
